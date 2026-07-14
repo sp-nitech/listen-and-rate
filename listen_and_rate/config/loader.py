@@ -188,9 +188,17 @@ def load_config(config_path: str | Path) -> Config:
             len(config.stimuli.items) if config.stimuli else 0, "stimuli"
         )
 
+    import soundfile as sf
+
     for stimulus in config.stimuli.items if config.stimuli else []:
         if not Path(stimulus.path).is_file():
             raise FileNotFoundError(f"Audio file not found: {stimulus.path}")
+        try:
+            info = sf.info(path)
+        except Exception as exc:
+            raise ValueError(f"Not a readable audio file: {path} ({exc})") from None
+        if info.frames == 0:
+            raise ValueError(f"Audio file has no audio samples: {path}")
 
     if isinstance(config, DMOSConfig):
         dmos_trials = build_dmos_trials(

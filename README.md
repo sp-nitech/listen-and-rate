@@ -82,7 +82,7 @@ stimuli_dirs:
 ```
 
 > [!IMPORTANT]
-> Filenames must match across all system directories.
+> Filenames (excluding extension) must match across all system directories.
 > Files that are missing from any directory are excluded from the experiment (a warning is shown when the configuration is loaded).
 
 > [!TIP]

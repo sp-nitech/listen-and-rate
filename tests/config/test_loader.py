@@ -99,6 +99,24 @@ def test_missing_audio_file_raises_file_not_found(tmp_path):
         load_config(write_config(tmp_path, minimal_config("./nonexistent.wav")))
 
 
+def test_non_audio_file_with_audio_extension_raises_error(tmp_path):
+    # A file that exists but isn't actually decodable audio (here: HTML bytes
+    # behind a .wav name) is caught at load time by a cheap header-only check,
+    # so the experimenter learns about it before any listener gets stuck on an
+    # unplayable stimulus.
+    bad = tmp_path / "broken.wav"
+    bad.write_bytes(b"<html>not audio at all</html>")
+    with pytest.raises(ValueError, match="broken.wav"):
+        load_config(write_config(tmp_path, minimal_config(str(bad))))
+
+
+def test_empty_audio_file_raises_error(tmp_path):
+    empty = tmp_path / "empty.wav"
+    empty.write_bytes(b"")
+    with pytest.raises(ValueError, match="empty.wav"):
+        load_config(write_config(tmp_path, minimal_config(str(empty))))
+
+
 def test_stimuli_dirs_expansion(tmp_path, test_audio_file):
     d = tmp_path / "system_a"
     d.mkdir()

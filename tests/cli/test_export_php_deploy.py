@@ -12,7 +12,11 @@ from ._helpers import _write_config_yaml
 
 
 def _run_export(
-    config_yaml: Path, outdir: Path, monkeypatch, overwrite: bool = False
+    config_yaml: Path,
+    outdir: Path,
+    monkeypatch,
+    overwrite: bool = False,
+    copy_audio: bool = False,
 ) -> None:
     """Run `lar-export-php-deploy --config config_yaml --outdir outdir`."""
     argv = [
@@ -24,6 +28,8 @@ def _run_export(
     ]
     if overwrite:
         argv.append("--overwrite")
+    if copy_audio:
+        argv.append("--copy-audio")
     monkeypatch.setattr("sys.argv", argv)
     from listen_and_rate.cli.export_php_deploy import main
 
@@ -591,6 +597,41 @@ def test_export_php_deploy_creates_audio_symlinks(
         assert link.readlink().is_absolute()
         assert link.resolve() == test_audio_file.resolve()
         assert link.read_bytes() == test_audio_file.read_bytes()
+
+
+def test_export_php_deploy_copies_audio_files_when_copy_audio(
+    config_yaml, tmp_path, test_audio_file, monkeypatch
+):
+    """--copy-audio hard-copies each audio file into the bundle as a real file
+    (not a symlink), so the bundle survives a plain FTP upload or being zipped
+    and unzipped elsewhere - unlike the default absolute symlinks."""
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch, copy_audio=True)
+    text = (outdir / "config_data.php").read_text()
+    urls = re.findall(r"'audio_url' => '([^']*)'", text)
+    assert urls
+    for u in urls:
+        f = outdir / u
+        assert f.is_file()
+        assert not f.is_symlink()
+        assert f.read_bytes() == test_audio_file.read_bytes()
+
+
+def test_export_php_deploy_overwrite_regenerates_copied_audio(
+    config_yaml, tmp_path, test_audio_file, monkeypatch
+):
+    """A --copy-audio bundle can be regenerated with --overwrite (the copied
+    files are reproducible clutter, cleared and rewritten like everything else)."""
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch, copy_audio=True)
+    _run_export(config_yaml, outdir, monkeypatch, overwrite=True, copy_audio=True)
+    text = (outdir / "config_data.php").read_text()
+    urls = re.findall(r"'audio_url' => '([^']*)'", text)
+    assert urls
+    for u in urls:
+        f = outdir / u
+        assert f.is_file()
+        assert not f.is_symlink()
 
 
 def test_export_php_deploy_can_run_twice_with_overwrite(

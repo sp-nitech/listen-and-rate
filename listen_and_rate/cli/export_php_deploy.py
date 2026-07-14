@@ -163,6 +163,27 @@ def _symlink_audio_files(
         dst.symlink_to(Path(s.path).resolve())
 
 
+def _copy_audio_files(
+    outdir: Path, all_items: list[StimulusConfig], audio_urls: dict[str, str]
+) -> None:
+    """Hard-copy each stimulus's audio file into outdir at its audio_url path.
+
+    The opt-in (`--copy-audio`) alternative to _symlink_audio_files: it makes
+    the bundle fully self-contained, so its audio survives being uploaded by a
+    plain FTP client (which doesn't dereference symlinks) or zipped and
+    unzipped on another host - at the cost of duplicating (potentially large)
+    audio into the bundle. shutil.copy2 follows the source if it is itself a
+    symlink, so the result is always a real file. The source is resolved to an
+    absolute path, matching _symlink_audio_files' target resolution.
+    """
+    for s in all_items:
+        dst = outdir / audio_urls[s.id]
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.is_symlink() or dst.exists():
+            dst.unlink()
+        shutil.copy2(Path(s.path).resolve(), dst)
+
+
 def _php_string(s: str) -> str:
     """Escape a string for embedding in a single-quoted PHP string literal."""
     return s.replace("\\", "\\\\").replace("'", "\\'")
@@ -259,6 +280,17 @@ def main() -> None:
             "clobbering the wrong directory by accident). results/ is always "
             "preserved regardless of this flag, since collected listener data "
             "can't be regenerated."
+        ),
+    )
+    parser.add_argument(
+        "--copy-audio",
+        action="store_true",
+        default=False,
+        help=(
+            "Hard-copy audio files into the bundle instead of symlinking them "
+            "(default: symlink). Use this when the bundle is uploaded by a plain "
+            "FTP client or shipped as a zip, since symlinks don't survive either; "
+            "it makes the bundle self-contained at the cost of a larger size."
         ),
     )
     args = parser.parse_args()
@@ -364,7 +396,10 @@ def main() -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     _copy_static_assets(outdir)
     _seed_results_dir(outdir, results_subpath)
-    _symlink_audio_files(outdir, all_items, audio_urls)
+    if args.copy_audio:
+        _copy_audio_files(outdir, all_items, audio_urls)
+    else:
+        _symlink_audio_files(outdir, all_items, audio_urls)
 
     config_data_path = outdir / "config_data.php"
     config_data_path.write_text(_render_config_data_php(config_data), encoding="utf-8")

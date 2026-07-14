@@ -323,7 +323,7 @@ def test_analyze_results_config_flag_orders_systems(
 def _write_report_config(tmp_path, data: dict) -> Path:
     import yaml
 
-    p = tmp_path / "report.yaml"
+    p = tmp_path / "report-config.yaml"
     p.write_text(yaml.dump(data, allow_unicode=True))
     return p
 

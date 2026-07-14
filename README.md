@@ -96,7 +96,7 @@ Start by running:
 make export CONFIG=/path/to/your/config.yaml DEPLOY=/path/to/your/public_html/my-test
 ```
 
-This creates a self-contained `my-test/` directory containing your configuration, stimuli (as symbolic links), and the required PHP scripts.
+This creates a self-contained `my-test/` directory containing your configuration, stimuli, and the required PHP scripts.
 Open the experiment URL in your browser or share it with your participants.
 
 To update the experiment, regenerate the bundle with
@@ -106,6 +106,11 @@ make export-force CONFIG=/path/to/your/another_config.yaml DEPLOY=/path/to/your/
 ```
 
 This replaces the exported files while preserving any results that have already been collected.
+
+> [!IMPORTANT]
+> Audio files are symlinked into the bundle instead of being copied, so they must be transferred separately when uploading or sharing the bundle.
+> To create a fully self-contained bundle, use `make export-copy` (or `make export-copy-force` to regenerate it).
+> This will copy the audio files directly into the bundle.
 
 ### 2.B. FastAPI deployment
 

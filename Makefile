@@ -1,7 +1,7 @@
 PROJECT := listen_and_rate
 
 CONFIG        := examples/config.mos.yaml
-REPORT_CONFIG := examples/report.yaml
+REPORT_CONFIG := examples/report-config.yaml
 
 DEPLOY  :=
 HOST    := 0.0.0.0
@@ -27,6 +27,12 @@ export:
 
 export-force:
 	uv run --no-sync lar-export-php-deploy --config $(CONFIG) --outdir $(DEPLOY) --overwrite
+
+export-copy:
+	uv run --no-sync lar-export-php-deploy --config $(CONFIG) --outdir $(DEPLOY) --copy-audio
+
+export-copy-force:
+	uv run --no-sync lar-export-php-deploy --config $(CONFIG) --outdir $(DEPLOY) --overwrite --copy-audio
 
 serve:
 	LISTEN_AND_RATE_CONFIG=$(CONFIG) uv run --no-sync uvicorn $(PROJECT).main:app --host $(HOST) --port $(PORT)
@@ -70,4 +76,4 @@ tool-clean:
 clean: tool-clean
 	rm -rf .venv
 
-.PHONY: setup setup-dev export export-force serve report lint format test tool tool-clean clean
+.PHONY: setup setup-dev export export-force export-copy export-copy-force serve report lint format test tool tool-clean clean

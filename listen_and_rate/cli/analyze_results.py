@@ -80,7 +80,7 @@ def main() -> None:
             "Path to a report (figure) YAML controlling presentation: figure "
             "scale (width/height multipliers), font, confidence level, and "
             "system display order/labels. Optional; defaults are used when "
-            "omitted. See examples/report.yaml."
+            "omitted. See examples/report-config.yaml."
         ),
     )
     args = parser.parse_args()

@@ -1,0 +1,94 @@
+# Listen and Rate - Example DMOS (Degradation MOS) Configuration
+
+test_type: dmos
+
+title: "Audio Degradation Evaluation"
+
+instructions: |
+  You will hear a Reference sample followed by a Test sample of the same
+  utterance.
+  Listen to both completely, then rate how much the Test sample is degraded
+  relative to the Reference on a scale from 1 (Very annoying) to
+  5 (Imperceptible).
+  You may replay each sample as many times as needed before rating.
+
+output:
+  format: csv # "csv" or "json" - each session is saved as a separate file
+  path: ./results/
+
+# Fetch each page's audio as soon as the page is shown instead of on the
+# listener's first play click (default: false) - useful on slow connections.
+# preload_audio: true
+
+# DMOS tests compare one reference system against one or more test systems,
+# defined via directories. Exactly one system must be flagged `reference: true`.
+stimuli_dirs:
+  utterances_per_session: 1 # optional: present N randomly chosen utterances per listener
+  systems:
+    - path: ./stimuli/examples/A
+      reference: true
+    - path: ./stimuli/examples/B
+      system: SNR 20dB
+    - path: ./stimuli/examples/C
+      system: SNR 10dB
+
+# -- Practice stage (optional) ------------------------------------------------
+# When count > 0, a practice round is shown after the metadata form and before
+# the real test: count trials are drawn from the full pool independently of
+# the session's trials (overlap allowed), and practice responses are discarded.
+# practice:
+#   count: 1 # number of practice trials (default: 0 = no practice)
+#   instructions: | # shown in a banner above the regular instructions
+#     This is a practice session. Your ratings will not be recorded.
+
+# -- Loudness check (optional) ------------------------------------------------
+# When configured, each stimulus's integrated loudness (LUFS) are measured. If
+# a threshold is exceeded, the offending values are shown and the run aborts.
+# loudness_check:
+#   per_system:
+#     threshold: .inf
+#     verbose: true
+#   per_stimulus:
+#     threshold: 1.0
+#     verbose: false
+
+# -- Rating labels (optional, shown below each rating button) -----------------
+# Defaults to the ITU-T P.800 5-point degradation category scale shown below.
+# rating_labels:
+#   1: "Very annoying"
+#   2: "Annoying"
+#   3: "Slightly annoying"
+#   4: "Not annoying"
+#   5: "Imperceptible"
+
+# -- Keyboard shortcuts (all fields optional, shown with defaults) ------------
+# Each key must be a single character (e.g. "a", "1") or a named key such as
+# Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).
+# shortcuts:
+#   play: Space
+#   rating:
+#     1: 1
+#     2: 2
+#     3: 3
+#     4: 4
+#     5: 5
+#   prev: ArrowLeft
+#   next: ArrowRight
+#   confirm: Enter # next on intermediate pages, submit on last page
+
+# -- Listener metadata form (optional) ----------------------------------------
+# When defined, a form is shown before the test starts to collect listener
+# information. Omit this section entirely to skip the form.
+# metadata:
+#   - key: listener
+#     label: "User name"
+#     type: text
+#     required: true
+#   - key: device
+#     label: "Playback device"
+#     type: select
+#     options:
+#       - Headphones
+#       - Earphones
+#       - Speakers
+#     default: Headphones

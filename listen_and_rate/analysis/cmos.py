@@ -1,0 +1,159 @@
+"""CMOS report: horizontal mean-CI bar, 7-category count chart, one-sample t-test."""
+
+from __future__ import annotations
+
+from ._render import (
+    _ordered_pairs,
+    _render_ci_bar_chart,
+    _render_pvalue_table_html,
+    _render_summary_stats_table_html,
+    _wrap_report_html,
+)
+
+_CMOS_CATEGORIES = [-3, -2, -1, 0, 1, 2, 3]
+_CMOS_CATEGORY_LABELS = [
+    "Much worse",
+    "Worse",
+    "Slightly worse",
+    "About the same",
+    "Slightly better",
+    "Better",
+    "Much better",
+]
+
+
+def _render_cmos_category_chart(
+    pair_labels: list[str],
+    counts_per_pair: list[list[int]],
+    font_family: str,
+    font_size: int,
+    height_scale: float = 1.0,
+) -> str:
+    """Render the 7-category (much worse..much better) response-count bar chart.
+
+    One go.Bar trace per pair; a report combining more than one system pair
+    groups the pairs' bars side by side per category (barmode="group") and
+    shows a legend, while the common single-pair case renders as a plain,
+    legend-free 7-bar chart.
+    """
+    import plotly.graph_objects as go
+
+    x_labels = [
+        f"{'+' if v > 0 else ''}{v} ({label})"
+        for v, label in zip(_CMOS_CATEGORIES, _CMOS_CATEGORY_LABELS, strict=True)
+    ]
+    fig = go.Figure()
+    for label, counts in zip(pair_labels, counts_per_pair, strict=True):
+        fig.add_trace(
+            go.Bar(x=x_labels, y=counts, name=label, marker_color="indianred")
+        )
+    fig.update_yaxes(title_text="Count")
+    fig.update_layout(
+        barmode="group",
+        showlegend=len(pair_labels) > 1,
+        height=round(320 * height_scale),
+        margin=dict(t=30, b=80),
+        font=dict(family=font_family, size=font_size),
+    )
+    return fig.to_html(include_plotlyjs=False, full_html=False)
+
+
+def _generate_cmos_report(
+    df,
+    title: str,
+    confidence: float,
+    font_family: str,
+    font_size: int,
+    width: int,
+    system_order: list[str] | None = None,
+    system_labels: dict[str, str] | None = None,
+    height_scale: float = 1.0,
+) -> str:
+    """Build the CMOS report: mean-CI bar, 7-category counts, one-sample t-test.
+
+    Mean/CI use the same t-distribution approach as _generate_mos_report
+    (continuous ratings), rendered with _render_ci_bar_chart's AB-style
+    horizontal layout instead of MOS's vertical one, since CMOS is
+    fundamentally a per-pair comparison like AB rather than a per-system one.
+    """
+    import math
+
+    from scipy import stats
+
+    labels = system_labels or {}
+    alpha = 1 - confidence
+
+    def _disp(name: str) -> str:
+        return labels.get(name, name)
+
+    pair_labels: list[str] = []
+    means: list[float] = []
+    mean_errors: list[float] = []
+    hover_text: list[str] = []
+    counts_per_pair: list[list[int]] = []
+    table_rows: list[list[str]] = []
+
+    for orig_a, orig_b, system_a, system_b in _ordered_pairs(df, system_order):
+        sub = df[(df["system_a"] == orig_a) & (df["system_b"] == orig_b)]
+        ratings = sub["rating"].astype(float)
+        n = len(ratings)
+        mean = float(ratings.mean()) if n else 0.0
+        sem = float(stats.sem(ratings)) if n >= 2 else 0.0
+        if n >= 2 and sem > 0:
+            lo, _ = stats.t.interval(confidence, df=n - 1, loc=mean, scale=sem)
+            err = float(mean - lo)
+            p_value = float(stats.ttest_1samp(ratings, popmean=0).pvalue)  # type: ignore[arg-type]
+        else:
+            err = 0.0
+            p_value = float("nan")
+
+        pair = f"{_disp(system_a)} vs {_disp(system_b)}"
+        pair_labels.append(pair)
+        means.append(mean)
+        mean_errors.append(err)
+        hover_text.append(f"{pair}: {mean:.2f}±{err:.2f}")
+        counts_per_pair.append([int((ratings == v).sum()) for v in _CMOS_CATEGORIES])
+        table_rows.append(
+            [
+                pair,
+                f"{mean:.2f}",
+                "N/A" if math.isnan(p_value) else f"{p_value:.4f}",
+                "" if math.isnan(p_value) else ("*" if p_value < alpha else ""),
+            ]
+        )
+
+    ci_html = _render_ci_bar_chart(
+        pair_labels,
+        means,
+        mean_errors,
+        hover_text,
+        "Mean CMOS rating",
+        x_range=(-3, 3),
+        reference_x=0,
+        confidence=confidence,
+        font_family=font_family,
+        font_size=font_size,
+        height_scale=height_scale,
+    )
+    category_html = _render_cmos_category_chart(
+        pair_labels, counts_per_pair, font_family, font_size, height_scale
+    )
+    table_html = _render_pvalue_table_html(
+        [
+            "Pair",
+            "Mean rating",
+            "p-value (t-test vs. 0)",
+            f"Significant (α={alpha:.2f})",
+        ],
+        table_rows,
+        font_family,
+        font_size,
+    )
+    stats_html = _render_summary_stats_table_html(df, font_family, font_size)
+    return _wrap_report_html(
+        title,
+        f"{ci_html}{category_html}{table_html}{stats_html}",
+        font_family,
+        font_size,
+        width,
+    )

@@ -1,0 +1,101 @@
+# Listen and Rate - Example MUSHRA Configuration
+
+test_type: mushra
+
+title: "Audio Quality Evaluation"
+
+instructions: |
+  You will hear a Reference sample (if shown) followed by several Test
+  samples of the same utterance, in random order.
+  Rate each Test sample's quality relative to the Reference on a scale
+  from 0 (Bad) to 100 (Excellent) using the sliders.
+  You may replay any sample as many times as needed before submitting, but
+  every sample must be played at least once and every slider must be moved
+  at least once before you can continue.
+
+output:
+  format: csv # "csv" or "json" - each session is saved as a separate file
+  path: ./results/
+
+# Fetch each page's audio as soon as the page is shown instead of on the
+# listener's first play click (default: false) - useful on slow connections.
+# preload_audio: true
+
+# MUSHRA tests rate 2+ systems (test systems and/or a hidden/disclosed
+# anchor) against an OPTIONAL shared reference, defined via directories.
+# - At most one system may be flagged `reference: true` (non-rateable,
+#   always shown first/leftmost as a plain playback clip, never a slider).
+# - At most one system may be flagged `anchor: true`. Unlike reference, the
+#   anchor IS rated — its slider is always shown rightmost and labeled
+#   "Anchor" so listeners know it's the anchor. To use a traditional HIDDEN
+#   anchor instead, simply omit `anchor: true` and treat it as a normal,
+#   blind test system.
+stimuli_dirs:
+  utterances_per_session: 2 # optional: present N randomly chosen utterances per listener
+  systems:
+    - path: ./stimuli/examples/A
+      reference: true
+    - path: ./stimuli/examples/B
+      system: My system
+    - path: ./stimuli/examples/C
+      system: Some anchor
+      anchor: true
+
+# -- Practice stage (optional) ------------------------------------------------
+# When count > 0, a practice round is shown after the metadata form and before
+# the real test: count trials are drawn from the full pool independently of
+# the session's trials (overlap allowed), and practice responses are discarded.
+# practice:
+#   count: 1 # number of practice trials (default: 0 = no practice)
+#   instructions: | # shown in a banner above the regular instructions
+#     This is a practice session. Your ratings will not be recorded.
+
+# -- Loudness check (optional) ------------------------------------------------
+# When configured, each stimulus's integrated loudness (LUFS) are measured. If
+# a threshold is exceeded, the offending values are shown and the run aborts.
+# loudness_check:
+#   per_system:
+#     threshold: .inf
+#     verbose: true
+#   per_stimulus:
+#     threshold: 1.0
+#     verbose: false
+
+# -- Rating labels (optional, shown under each 20-point band) -----------------
+# Defaults to the ITU-R BS.1534 5-band scale shown below. Ticks are always
+# drawn at 0/20/40/60/80/100; each label is centered in the band starting at
+# its key.
+# rating_labels:
+#   0: "Bad"
+#   20: "Poor"
+#   40: "Fair"
+#   60: "Good"
+#   80: "Excellent"
+
+# -- Keyboard shortcuts (all fields optional, shown with defaults) ------------
+# Each key must be a single character (e.g. "a", "1") or a named key such as
+# Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).
+# shortcuts:
+#   play: Space
+#   rate_up: ArrowUp
+#   rate_down: ArrowDown
+#   prev: ArrowLeft
+#   next: ArrowRight
+#   confirm: Enter # next on intermediate pages, submit on last page
+
+# -- Listener metadata form (optional) ----------------------------------------
+# When defined, a form is shown before the test starts to collect listener
+# information. Omit this section entirely to skip the form.
+# metadata:
+#   - key: listener
+#     label: "User name"
+#     type: text
+#     required: true
+#   - key: device
+#     label: "Playback device"
+#     type: select
+#     options:
+#       - Headphones
+#       - Earphones
+#       - Speakers
+#     default: Headphones

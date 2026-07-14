@@ -1,0 +1,75 @@
+[project]
+name = "listen-and-rate"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.93.0",
+  "uvicorn[standard]>=0.17.0",
+  "pydantic>=2.0.0",
+  "pyyaml>=5.1",
+  "pyloudnorm>=0.1.0",
+  "soundfile>=0.11.0",
+  "tqdm>=4.65.0",
+]
+
+[project.scripts]
+lar-export-php-deploy = "listen_and_rate.cli.export_php_deploy:main"
+lar-analyze-results = "listen_and_rate.cli.analyze_results:main"
+
+[project.optional-dependencies]
+analyze = ["plotly>=5.0.0", "scipy>=1.7.0", "pandas>=1.3.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
+exclude-newer = "14 days"
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = ["B", "D", "E", "I", "UP"]
+ignore = ["D107"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends() is designed to be called in an argument default
+# (config: Config = Depends(get_config)) - the framework idiom, not the
+# B008 mutable-default-argument bug.
+extend-immutable-calls = ["fastapi.Depends"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+[tool.djlint]
+profile = "html"
+indent = 2
+max_line_length = 100
+ignore = "H006"
+
+[tool.pyright]
+pythonVersion = "3.11"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "standard"
+
+[tool.pytest.ini_options]
+addopts = "-s -x"
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+  "djlint",
+  "httpx2",
+  "mdformat",
+  "mdformat-gfm",
+  "pyright[nodejs]",
+  "pytest",
+  "pytest-asyncio",
+  "ruff",
+]

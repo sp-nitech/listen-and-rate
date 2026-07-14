@@ -1,0 +1,1169 @@
+/* -- Design tokens - dark mode is the default -------------------------- */
+:root {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-border: #334155;
+  --color-primary: #818cf8;
+  --color-primary-hover: #a5b4fc;
+  --color-primary-light: #1e1b4b;
+  --color-success: #4ade80;
+  --color-success-light: #14532d;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-error: #f87171;
+  --color-error-light: #450a0a;
+  --color-practice: #fbbf24;
+  --color-practice-light: #451a03;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
+  --transition: 0.2s ease;
+}
+
+[data-theme="light"] {
+  --color-bg: #f5f6fa;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+  --color-primary-light: #eef2ff;
+  --color-success: #16a34a;
+  --color-success-light: #dcfce7;
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+  --color-error: #dc2626;
+  --color-error-light: #fef2f2;
+  --color-practice: #b45309;
+  --color-practice-light: #fef3c7;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* -- Reset & base ------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* -- Progress bar ------------------------------------------------------- */
+#progress-bar-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--color-border);
+  z-index: 100;
+}
+
+#progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), #818cf8);
+  width: 0%;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* -- Theme toggle button ------------------------------------------------
+   Styled via the class (the id is only the JS hook in theme.js): an id
+   selector's high specificity would out-rank every later class-based
+   "<component> svg" rule, tripping lint/style/noDescendingSpecificity. */
+.theme-toggle {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  /* Muted (not full text color) so the corner toggle stays understated - a
+     solid black moon on the light theme read as too prominent. */
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    transform var(--transition);
+  box-shadow: var(--shadow);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  display: block;
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  transform: scale(1.1);
+}
+
+/* -- Layout ------------------------------------------------------------- */
+#app {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+/* -- Loading ------------------------------------------------------------ */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 16px;
+  color: var(--color-text-muted);
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* -- Test header -------------------------------------------------------- */
+.test-header {
+  margin-bottom: 40px;
+}
+
+.test-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+
+.test-header .instructions {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* -- Practice stage ----------------------------------------------------- */
+.practice-badge {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-practice);
+  background: var(--color-practice-light);
+  border: 1px solid var(--color-practice);
+  padding: 3px 10px;
+  border-radius: 99px;
+  margin-left: 10px;
+}
+
+.practice-banner {
+  color: var(--color-practice);
+  background: var(--color-practice-light);
+  border: 1px solid var(--color-practice);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* -- Stimulus page ------------------------------------------------------ */
+/* The entrance animation lives on the persistent page slot, not the
+   per-navigation .stimulus-page it wraps, so it plays once on mount instead of
+   replaying (and flickering) on every prev/next re-render of the slot's content. */
+.page-slot {
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stimulus-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.page-counter {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-border);
+  padding: 4px 10px;
+  border-radius: 99px;
+  letter-spacing: 0.05em;
+}
+
+.stimulus-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* -- Audio player card -------------------------------------------------- */
+.audio-card {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow);
+}
+
+/* Tab embedded in a card's top-left corner, straddling the border. */
+.audio-card-label {
+  position: absolute;
+  top: 0;
+  left: 16px;
+  transform: translateY(-50%);
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-border);
+  padding: 2px 10px;
+  border-radius: 5px;
+  letter-spacing: 0.05em;
+}
+
+/* Bare <audio> elements are driven by custom controls (.audio-player and
+   MUSHRA's .mushra-play-btn) - never shown natively, so there's no shadow-DOM
+   control to flicker on src swaps and no right-click "Save Audio As" menu. */
+audio {
+  display: none;
+}
+
+/* -- Custom audio player (play/pause button + progress bar) ------------- */
+.audio-player {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.audio-play-btn {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  transition:
+    background var(--transition),
+    transform var(--transition);
+}
+
+.audio-play-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  display: block;
+}
+
+.audio-play-btn:hover {
+  background: var(--color-primary-hover);
+}
+
+.audio-play-btn:active {
+  transform: scale(0.93);
+}
+
+.audio-play-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.audio-progress {
+  flex: 1 1 auto;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.audio-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--color-primary);
+  border-radius: 99px;
+}
+
+.audio-time {
+  flex: 0 0 auto;
+  min-width: 8ch;
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -- AB paired audio cards ---------------------------------------------- */
+.ab-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.ab-pair .audio-card {
+  margin-bottom: 0;
+}
+
+/* -- ABX hidden "X" reference card ------------------------------------- */
+.abx-x-pair {
+  max-width: 320px;
+  margin: 0 auto 28px;
+}
+
+.abx-x-pair .audio-card {
+  margin-bottom: 0;
+}
+
+/* Compound selector so this reliably wins over .rating-buttons's display:
+   grid regardless of stylesheet order (equal-specificity single-class rules
+   would otherwise be decided by declaration order). */
+.rating-buttons.ab-choice-buttons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ab-choice-btn {
+  flex: 0 1 128px;
+}
+
+/* Same specificity trick as .ab-choice-buttons above - CMOS has 7 rating
+   buttons instead of MOS/DMOS's 5, so the default 5-column grid would leave
+   the last two buttons on their own row. */
+.rating-buttons.cmos-rating-buttons {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+/* -- Rating buttons ----------------------------------------------------- */
+.rating-section {
+  margin-bottom: 36px;
+}
+
+.rating-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 14px;
+}
+
+.rating-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.rating-btn {
+  /* Disable native disabled-control rendering (some browsers dim/gray
+     disabled buttons at the OS level in a way plain `color` can't override). */
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 8px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    transform var(--transition);
+  box-shadow: var(--shadow);
+}
+
+/* CMOS's 7 rating words range from short ("Worse", one line) to long
+   ("Slightly worse"/"About the same", two lines at this button width).
+   Centering (the default above) stacks the score on top of however tall
+   that button's own word happens to be, so the score drifts up or down
+   across the row depending on each word's line count. Anchoring to the top
+   instead keeps every score at the same height regardless of word length -
+   buttons with a short, one-line word just end up with extra blank space
+   below it instead. */
+.cmos-rating-buttons .rating-btn {
+  justify-content: flex-start;
+}
+
+.rating-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  transform: translateY(-2px);
+}
+
+.rating-btn.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.rating-btn .rating-score {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.rating-btn .rating-word {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.rating-btn.selected .rating-score {
+  color: var(--color-primary);
+}
+.rating-btn.selected .rating-word {
+  color: var(--color-primary);
+}
+
+.rating-btn:disabled {
+  cursor: not-allowed;
+  transform: none;
+  border-style: dashed;
+  /* biome-ignore lint/complexity/noImportantStyles: overrides .selected color when disabled */
+  color: var(--color-text) !important;
+  -webkit-text-fill-color: var(--color-text);
+}
+.rating-btn:disabled .rating-score {
+  color: var(--color-text);
+}
+.rating-btn:disabled .rating-word {
+  color: var(--color-text-muted);
+  /* .rating-btn:disabled sets -webkit-text-fill-color, which (unlike color)
+     is inherited by children and would otherwise override this back to the
+     brighter --color-text in WebKit browsers. */
+  -webkit-text-fill-color: var(--color-text-muted);
+}
+.rating-btn:disabled:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  transform: none;
+}
+
+/* -- MUSHRA trial layout ------------------------------------------------ */
+/* One shared axis (ticks + band words, rendered once, never per-slider) on
+   the far left, followed by the Reference (if any, no slider) and then one
+   narrow column per rateable system - all inside a single bordered
+   container, packed edge to edge, so the gridlines drawn identically on
+   every column's .mushra-track-row read as one continuous grid rather than
+   N disconnected ones. Reference's/Anchor's labels are absolutely-positioned
+   tabs straddling the container's top border (.audio-card-label, reused
+   from DMOS/ABX), not a row of their own. Playback is a compact square
+   button (not the browser's native, wide <audio controls> bar), which is
+   what keeps columns narrow enough for this to work. */
+.mushra-trial {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 auto 28px;
+  /* Shrink to fit its columns instead of stretching to the page's full
+     width - still wraps within whatever space is actually available. */
+  width: fit-content;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  /* Top padding slightly more than the Reference/Anchor tabs strictly need
+     (they sit at -20px, straddling the border) - a little extra breathing
+     room between the "100" tick/gridline and the panel's own top border. */
+  padding: 26px 16px 16px;
+  box-shadow: var(--shadow);
+}
+
+.mushra-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 60px;
+}
+
+.mushra-axis-col {
+  flex-basis: 128px;
+}
+
+/* .audio-card-label defaults to a fixed left:16px offset (tuned for
+   DMOS/ABX's much wider cards) straddling ITS OWN element's top:0 - but
+   here the actual visible border lives on the shared .mushra-trial
+   container, 26px (its padding-top) above each column's own top edge, so
+   the tab needs to move up by that same amount to land on that border
+   instead of just the column's top. Also re-centered horizontally on
+   MUSHRA's narrow columns instead of the fixed left offset. */
+.mushra-col .audio-card-label {
+  left: 50%;
+  top: -26px;
+  transform: translate(-50%, -50%);
+}
+
+.mushra-track-row {
+  /* align-self: stretch (not the parent's default align-items: center) so
+     this fills the column's full width - otherwise it shrinks to its
+     content's width (the 8px range input, or 0px for the empty Reference
+     spacer) and the gridline background below is only ever 0-8px wide. */
+  align-self: stretch;
+  height: 220px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  /* Gridlines at every 20-point mark. Percentage stops (not fixed pixels)
+     so they always land exactly where .mushra-tick-col's/.mushra-band-col's
+     own percentage-positioned labels do, at any track height (incl. the
+     shorter mobile override below). A *repeating* gradient here only draws
+     a line at the START of each 20%-tall repeat unit (0/20/40/60/80%) -
+     with the box's height dividing evenly into exactly 5 units, there's no
+     leftover 6th unit for it to draw a line at 100%, so the bottom ("0")
+     line is always missing. border-bottom draws that closing line
+     explicitly instead of fighting the gradient's repeat math. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--color-border) 0,
+    var(--color-border) 1px,
+    transparent 1px,
+    transparent 20%
+  );
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mushra-audio-row {
+  display: flex;
+  justify-content: center;
+}
+
+/* The button (below) drives playback; the element itself is never shown. */
+.mushra-audio-row audio {
+  display: none;
+}
+
+.mushra-play-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition);
+}
+
+.mushra-play-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  display: block;
+}
+
+.mushra-play-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.mushra-value-row {
+  min-height: 1.4em;
+}
+
+.mushra-slider-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* The Reference's "100" isn't a real rating (its slider is fixed/disabled)
+   - match the muted gray of its own disabled slider instead of the accent
+   color used for actual ratings. */
+.mushra-reference-col .mushra-slider-value {
+  color: var(--color-text-muted);
+}
+
+/* The shared axis's own track row lays out the tick numbers and band words
+   side by side, both read horizontally (never rotated), hugging the right
+   edge (closest to the first slider) rather than left-aligned with empty
+   space before the grid - the gridline background (inherited from
+   .mushra-track-row above) extends underneath them too, so the grid reads
+   as continuous from the axis all the way across every slider. */
+.mushra-axis-col .mushra-track-row {
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Each <span> is placed via an inline top:N% (see mushra.js) rather than
+   flexbox space-between/space-around - flex distribution centers each
+   label within its own line box, which lands a few pixels off from the
+   gridline it's meant to mark; absolute + percentage positioning puts its
+   center exactly on the gridline regardless of the track's height.
+   Explicit widths (not "shrink to content", which is ambiguous when every
+   child is taken out of flow by position:absolute and was collapsing to
+   ~0) - sized to comfortably fit "100" / "Excellent" at this font-size,
+   so text never spills into the neighboring column. */
+.mushra-tick-col,
+.mushra-band-col {
+  position: relative;
+  height: 100%;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.mushra-tick-col span,
+.mushra-band-col span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+.mushra-tick-col {
+  width: 32px;
+  text-align: right;
+}
+
+.mushra-band-col {
+  width: 62px;
+  text-align: left;
+}
+
+/* Hand-built vertical slider (track + absolutely-positioned thumb div), not
+   a native <input type=range>: a native vertical range's thumb is inset
+   from each end by half its own size (so it never overflows past the
+   track), which put it visibly off the percentage-based gridlines/ticks
+   everywhere except near the middle. The thumb here is positioned via the
+   exact same `top: N%` math as the gridlines/ticks (see mushra.js), so it
+   always lines up exactly, at any track height. width is a generous
+   pointer/touch hit target - the visible line itself is the thinner
+   ::before below.
+   .mushra-range (the interactive one) is deliberately TALLER than the
+   track by the thumb's own size, so a value-0/100 thumb sitting right at
+   the track's edge can still be grabbed by clicking the half of it that
+   would otherwise render past a hit box stopping exactly at that edge.
+   Its child .mushra-range-track re-establishes the *un-expanded* track
+   height as the containing block for the thumb/fill, so their `top`/
+   `height` percentages still map onto the real 0-100% range (matching the
+   gridlines) rather than the taller hit box's own. .mushra-range-fixed
+   (the Reference's non-interactive slider) needs none of this - it's
+   never dragged, so it stays exactly track-sized with no inner wrapper. */
+.mushra-range {
+  position: relative;
+  width: 24px;
+  align-self: center;
+  height: calc(100% + 18px);
+  margin-top: -9px;
+  margin-bottom: -9px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.mushra-range-fixed {
+  position: relative;
+  align-self: stretch;
+  width: 24px;
+}
+
+.mushra-range-track {
+  position: absolute;
+  inset: 9px 0;
+}
+
+.mushra-range-track::before,
+.mushra-range-fixed::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 6px;
+  transform: translateX(-50%);
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+/* Solid "filled" indicator from the bottom up to the current value -
+   full-strength color, matching how it looked when this was still a native
+   range input with accent-color (a lighter, translucent version of this
+   read as the slider having lost its color entirely). */
+.mushra-range-fill {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 6px;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.mushra-range-fixed .mushra-range-fill {
+  background: var(--color-text-muted);
+}
+
+.mushra-range.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.mushra-range:focus-visible {
+  outline: none;
+}
+
+.mushra-range-thumb {
+  position: absolute;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-primary);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}
+
+/* brightness() (not swapping to --color-primary-hover) so hovering always
+   reads as "lighter", in both themes - --color-primary-hover is a lighter
+   tint in dark mode but a *darker* one in light mode (the usual "hover
+   darkens" convention for light UIs), which made the hover state hard to
+   even notice against a light background. */
+.mushra-range:hover .mushra-range-thumb,
+.mushra-range:hover .mushra-range-fill {
+  filter: brightness(1.4);
+}
+
+/* The Reference's slider is permanently fixed at 100 (it IS the
+   benchmark) - not interactive, and its thumb is muted gray rather than
+   the accent color used for actual ratings. */
+.mushra-range-fixed .mushra-range-thumb {
+  background: var(--color-text-muted);
+  box-shadow: none;
+}
+
+/* The double-ring outline is a "currently moving" indicator (added/removed
+   in mushra.js on pointerdown/up and on the rate_up/rate_down keys' own
+   keydown/keyup), not a persistent focus ring - it disappears again as
+   soon as the drag ends or the key is released, even while still focused. */
+.mushra-range.is-active .mushra-range-thumb {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.mushra-col.audio-error-state .mushra-play-btn {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* -- Listen → Rate step indicator -------------------------------------- */
+.listen-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 0.85rem;
+}
+.step-listen,
+.step-rate {
+  font-weight: 600;
+  transition:
+    color 0.3s,
+    opacity 0.3s;
+}
+.step-sep {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+/* before played: Listen is active, Rate is dimmed */
+.step-listen {
+  color: var(--color-primary);
+}
+.step-rate {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+/* after played: Listen fades, Rate activates */
+.rating-section.played .step-listen,
+.listen-steps.played .step-listen {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+  font-weight: 400;
+}
+.rating-section.played .step-rate,
+.listen-steps.played .step-rate {
+  color: var(--color-primary);
+  opacity: 1;
+}
+
+/* -- Navigation --------------------------------------------------------- */
+.navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition:
+    background var(--transition),
+    transform var(--transition),
+    opacity var(--transition);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.btn-secondary:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+.btn-primary:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* -- Shortcut hint ------------------------------------------------------ */
+.shortcut-hint {
+  margin-top: 20px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.shortcut-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: var(--color-border);
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.7rem;
+}
+
+/* -- Complete screen ---------------------------------------------------- */
+.complete-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  animation: fadeIn 0.4s ease;
+}
+
+.complete-icon {
+  width: 72px;
+  height: 72px;
+  background: var(--color-success-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin-bottom: 24px;
+}
+
+.complete-screen h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.complete-screen p {
+  color: var(--color-text-muted);
+}
+
+/* -- Resume prompt ------------------------------------------------------ */
+.resume-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  animation: fadeIn 0.4s ease;
+}
+
+.resume-screen h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.resume-screen p {
+  color: var(--color-text-muted);
+}
+
+.resume-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* -- Error screen ------------------------------------------------------- */
+.error-screen {
+  background: var(--color-error-light);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius);
+  padding: 24px;
+  color: var(--color-error);
+  text-align: center;
+}
+
+.error-screen h2 {
+  margin-bottom: 8px;
+}
+
+.error-list {
+  list-style: none;
+  margin-top: 12px;
+  text-align: left;
+  display: inline-block;
+}
+
+.error-list li {
+  padding: 4px 0;
+  font-size: 0.85rem;
+}
+
+.error-list code {
+  background: var(--color-error-light);
+  border: 1px solid var(--color-error);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+/* -- Inline audio card error -------------------------------------------- */
+.audio-error {
+  color: var(--color-error);
+  background: var(--color-error-light);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* -- Metadata form ------------------------------------------------------ */
+.metadata-page {
+  animation: fadeIn 0.25s ease;
+}
+
+.metadata-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 36px;
+  box-shadow: var(--shadow);
+}
+
+.metadata-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 32px;
+}
+
+.metadata-field {
+  margin-bottom: 28px;
+}
+
+.metadata-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--color-text);
+}
+
+.required-mark {
+  color: var(--color-error);
+  margin-left: 2px;
+}
+
+.metadata-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color var(--transition);
+  outline: none;
+}
+
+.metadata-input:focus {
+  border-color: var(--color-primary);
+}
+
+.metadata-input::placeholder {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  user-select: none;
+  transition:
+    border-color var(--transition),
+    background var(--transition);
+}
+
+.radio-option:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.radio-option input[type="radio"] {
+  accent-color: var(--color-primary);
+}
+
+.metadata-start {
+  width: 100%;
+  margin-top: 8px;
+  justify-content: center;
+  font-size: 1rem;
+  padding: 14px;
+}
+
+/* -- Responsive --------------------------------------------------------- */
+@media (max-width: 480px) {
+  #app {
+    padding: 32px 16px 64px;
+  }
+  .ab-pair {
+    grid-template-columns: 1fr;
+  }
+  .rating-buttons {
+    gap: 6px;
+  }
+  .rating-buttons.cmos-rating-buttons {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .rating-btn {
+    padding: 12px 4px;
+  }
+  .rating-btn .rating-score {
+    font-size: 1.2rem;
+  }
+  .test-header h1 {
+    font-size: 1.4rem;
+  }
+  .mushra-col {
+    flex: 0 0 48px;
+  }
+  .mushra-axis-col {
+    flex-basis: 84px;
+  }
+  .mushra-track-row {
+    /* Percentage-based gridlines (set above) auto-scale to this height -
+       no need to recompute a pixel interval here. */
+    height: 160px;
+  }
+}

@@ -1,0 +1,14 @@
+.venv/
+
+results/
+stimuli/**/
+!stimuli/examples/
+
+tools/**/
+
+.claude/
+.php-cs-fixer.cache
+.phpunit.result.cache
+__pycache__/
+\#*#
+.\#*

@@ -1,0 +1,26 @@
+# Listen and Rate - Example report (figure) configuration.
+
+# Figure scale: multipliers (not pixels) on the report's base dimensions.
+scale:
+  width: 1.0
+  height: 1.0
+
+# Font settings for figure text.
+font:
+  family: sans-serif # Must be a font installed on your system
+  size: 13
+
+# Confidence level for the error bars. The significance tables use
+# alpha = 1 - confidence (0.95 -> 0.05, 0.99 -> 0.01).
+confidence: 0.95
+
+# Display order of systems/pairs, by their raw name as stored in the results.
+# When given, it must list EVERY system present in the results. Omit to fall
+# back to the experiment config's order.
+# order: [A, B]
+
+# Display labels for systems (charts/tables only); the stored data keeps its
+# raw names. Unlisted systems keep their raw name.
+# labels:
+#   A: Proposed
+#   B: Baseline

@@ -1,0 +1,98 @@
+# Listen and Rate - Example CMOS (Comparative MOS / CCR) Configuration
+
+test_type: cmos
+
+title: "Audio Quality Comparison"
+
+instructions: |
+  You will hear two versions of the same sentence, played as "A" and "B".
+  Listen to both completely, then rate how B compares to A on a scale from
+  -3 (much worse) to +3 (much better). 0 means about the same.
+  You may replay each sample as many times as needed before rating.
+  Which system plays as A or B is randomized for every trial.
+
+output:
+  format: csv # "csv" or "json" - each session is saved as a separate file
+  path: ./results/
+
+# Fetch each page's audio as soon as the page is shown instead of on the
+# listener's first play click (default: false) - useful on slow connections.
+# preload_audio: true
+
+# CMOS tests compare exactly 2 systems, defined via directories (each dir
+# should contain the same filenames - explicit `stimuli:` lists are not
+# supported for CMOS tests). Unlike DMOS, no system needs to be flagged
+# `reference: true` - both systems are compared symmetrically, and which one
+# plays as "A" vs "B" is blinded per trial.
+stimuli_dirs:
+  utterances_per_session: 2 # optional: present N randomly chosen trials per listener
+  systems:
+    - path: ./stimuli/examples/A
+      system: Clean
+    - path: ./stimuli/examples/B
+      system: Noisy
+
+# -- Practice stage (optional) ------------------------------------------------
+# When count > 0, a practice round is shown after the metadata form and before
+# the real test: count trials are drawn from the full pool independently of
+# the session's trials (overlap allowed), and practice responses are discarded.
+# practice:
+#   count: 1 # number of practice trials (default: 0 = no practice)
+#   instructions: | # shown in a banner above the regular instructions
+#     This is a practice session. Your ratings will not be recorded.
+
+# -- Loudness check (optional) ------------------------------------------------
+# When configured, each stimulus's integrated loudness (LUFS) are measured. If
+# a threshold is exceeded, the offending values are shown and the run aborts.
+# loudness_check:
+#   per_system:
+#     threshold: .inf
+#     verbose: true
+#   per_stimulus:
+#     threshold: 1.0
+#     verbose: false
+
+# -- Rating labels (optional, shown below each rating button) -----------------
+# Defaults to the ITU-T P.800 7-point CCR scale shown below.
+# rating_labels:
+#   -3: "Much worse"
+#   -2: "Worse"
+#   -1: "Slightly worse"
+#   0: "About the same"
+#   +1: "Slightly better"
+#   +2: "Better"
+#   +3: "Much better"
+
+# -- Keyboard shortcuts (all fields optional, shown with defaults) ------------
+# Each key must be a single character (e.g. "a", "1") or a named key such as
+# Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).
+# shortcuts:
+#   play: Space
+#   rating:
+#     -3: 1
+#     -2: 2
+#     -1: 3
+#     0: 4
+#     +1: 5
+#     +2: 6
+#     +3: 7
+#   prev: ArrowLeft
+#   next: ArrowRight
+#   confirm: Enter # next on intermediate pages, submit on last page
+
+# -- Listener metadata form (optional) ----------------------------------------
+# When defined, a form is shown before the test starts to collect listener
+# information. Omit this section entirely to skip the form.
+# metadata:
+#   - key: listener
+#     label: "User name"
+#     type: text
+#     required: true
+#   - key: device
+#     label: "Playback device"
+#     type: select
+#     options:
+#       - Headphones
+#       - Earphones
+#       - Speakers
+#     default: Headphones

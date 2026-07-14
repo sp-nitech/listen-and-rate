@@ -1,0 +1,108 @@
+# Listen and Rate - Example MOS (Naturalness MOS) Configuration
+
+test_type: mos
+
+title: "Audio Quality Evaluation"
+
+instructions: |
+  Please listen to each audio sample carefully and rate its overall quality
+  on a scale from 1 (Bad) to 5 (Excellent).
+  You may replay each sample as many times as needed before rating.
+
+output:
+  format: csv # "csv" or "json" - each session is saved as a separate file
+  path: ./results/
+
+# Fetch each page's audio as soon as the page is shown instead of on the
+# listener's first play click (default: false) - useful on slow connections.
+# preload_audio: true
+
+# -- Stimuli (choose one method) ---------------------------------------------
+
+# Method 1: list individual files
+# stimuli:
+#   stimuli_per_session: 2 # optional: present N randomly chosen stimuli per listener
+#   items:
+#     - id: A_utt1
+#       path: ./stimuli/examples/A/utt1.wav
+#       system: A
+#       label: "Sample 1" # optional: shown to listener
+#     - id: A_utt2
+#       path: ./stimuli/examples/A/utt2.wav
+#       system: A
+
+# Method 2: specify directories (each dir should contain the same filenames)
+stimuli_dirs:
+  utterances_per_session: 2 # optional: present N randomly chosen utterances per listener
+  systems:
+    - path: ./stimuli/examples/A
+      system: A # Clean
+    - path: ./stimuli/examples/B
+      system: B # SNR 20 dB
+
+# -- Practice stage (optional) ------------------------------------------------
+# When count > 0, a practice round is shown after the metadata form and before
+# the real test: count stimuli are drawn from the full pool independently of
+# the session's stimuli (overlap allowed), and practice ratings are discarded.
+# practice:
+#   count: 2 # number of practice stimuli (default: 0 = no practice)
+#   instructions: | # shown in a banner above the regular instructions
+#     This is a practice session. Your ratings will not be recorded.
+
+# -- Loudness check (optional) ------------------------------------------------
+# When configured, each stimulus's integrated loudness (LUFS) are measured. If
+# a threshold is exceeded, the offending values are shown and the run aborts.
+# loudness_check:
+#   per_system:
+#     threshold: .inf
+#     verbose: true
+#   per_stimulus:
+#     threshold: 1.0
+#     verbose: false
+
+# -- Rating labels (optional, shown below each rating button) -----------------
+# rating_labels:
+#   1: "Bad"
+#   2: "Poor"
+#   3: "Fair"
+#   4: "Good"
+#   5: "Excellent"
+
+# -- Keyboard shortcuts (all fields optional, shown with defaults) ------------
+# Each key must be a single character (e.g. "a", "1") or a named key such as
+# Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).
+# shortcuts:
+#   play: Space
+#   rating:
+#     1: 1
+#     2: 2
+#     3: 3
+#     4: 4
+#     5: 5
+#   prev: ArrowLeft
+#   next: ArrowRight
+#   confirm: Enter # next on intermediate pages, submit on last page
+
+# -- Listener metadata form (optional) ----------------------------------------
+# When defined, a form is shown before the test starts to collect listener
+# information. Omit this section entirely to skip the form.
+# metadata:
+#   - key: listener
+#     label: "User name"
+#     type: text
+#     required: true
+#   - key: device
+#     label: "Playback device"
+#     type: select
+#     options:
+#       - Headphones
+#       - Earphones
+#       - Speakers
+#     default: Headphones
+#   - key: room
+#     label: "Room"
+#     type: select
+#     options:
+#       - Soundproof
+#       - Other
+#     default: Other

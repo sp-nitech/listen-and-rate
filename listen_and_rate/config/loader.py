@@ -194,11 +194,13 @@ def load_config(config_path: str | Path) -> Config:
         if not Path(stimulus.path).is_file():
             raise FileNotFoundError(f"Audio file not found: {stimulus.path}")
         try:
-            info = sf.info(path)
+            info = sf.info(stimulus.path)
         except Exception as exc:
-            raise ValueError(f"Not a readable audio file: {path} ({exc})") from None
+            raise ValueError(
+                f"Not a readable audio file: {stimulus.path} ({exc})"
+            ) from None
         if info.frames == 0:
-            raise ValueError(f"Audio file has no audio samples: {path}")
+            raise ValueError(f"Audio file has no audio samples: {stimulus.path}")
 
     if isinstance(config, DMOSConfig):
         dmos_trials = build_dmos_trials(

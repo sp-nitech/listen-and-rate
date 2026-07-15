@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import secrets
+import shutil
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,7 +13,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_config_or_exit
-from .loudness import run_configured_loudness_check
+from .loudness import (
+    run_configured_loudness_check,
+    run_configured_loudness_normalization,
+)
 from .routers import api
 from .routers import audio as audio_router
 from .routers import report as report_router
@@ -38,7 +43,23 @@ async def lifespan(app: FastAPI):
         [f.key for f in config.metadata],
     )
     all_stimuli = config.stimuli.items if config.stimuli else []
-    app.state.audio_map = {s.id: s.path for s in all_stimuli}
+    # With loudness_normalization configured, pre-normalize every clip into a temp
+    # cache once at startup and serve from there; otherwise serve the originals.
+    normalized_cache: Path | None = None
+    if config.loudness_normalization is not None:
+        normalized_cache = Path(tempfile.mkdtemp(prefix="lar-normalized-"))
+        try:
+            app.state.audio_map = run_configured_loudness_normalization(
+                config, lambda s: normalized_cache / f"{s.id}.wav"
+            )
+        except BaseException:
+            # Startup died mid-normalization (bad file, Ctrl-C): the shutdown
+            # cleanup below never runs, so drop the fresh cache here instead of
+            # orphaning a full copy of the stimuli under /tmp on every attempt.
+            shutil.rmtree(normalized_cache, ignore_errors=True)
+            raise
+    else:
+        app.state.audio_map = {s.id: s.path for s in all_stimuli}
     # Used to blind ABX's hidden "X" reference (see x_token.py). Set
     # LISTEN_AND_RATE_X_SECRET to keep it stable across restarts/reloads and
     # multiple workers - otherwise each process mints its own random secret,
@@ -49,6 +70,8 @@ async def lifespan(app: FastAPI):
         x_secret_env.encode() if x_secret_env else secrets.token_bytes(32)
     )
     yield
+    if normalized_cache is not None:
+        shutil.rmtree(normalized_cache, ignore_errors=True)
 
 
 def create_app() -> FastAPI:

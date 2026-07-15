@@ -128,6 +128,21 @@ class LoudnessCheckConfig(_StrictModel):
     per_stimulus: LoudnessCriterion | None = None
 
 
+class LoudnessNormalizationConfig(_StrictModel):
+    """Optional loudness normalization applied to stimuli before the test.
+
+    The `scope` selects the unit over which one gain is computed (mutually
+    exclusive strategies, unlike LoudnessCheckConfig's independent criteria):
+    `stimulus` normalizes each clip individually to `target` (flattening every
+    clip to the same loudness); `system` applies one gain per system so that
+    system's mean loudness reaches `target`, preserving the natural loudness
+    differences between utterances within a system. See listen_and_rate/loudness.py.
+    """
+
+    target: float = Field(default=-23.0, lt=0)  # integrated loudness, LUFS (EBU R128)
+    scope: Literal["stimulus", "system"] = "stimulus"
+
+
 class StimulusConfig(_StrictModel):
     """A single audio stimulus."""
 
@@ -417,6 +432,7 @@ class BaseTestConfig(_StrictModel):
     metadata: list[MetadataFieldConfig] = Field(default_factory=list)
     practice: PracticeConfig | None = None
     loudness_check: LoudnessCheckConfig | None = None
+    loudness_normalization: LoudnessNormalizationConfig | None = None
 
     # Not user-configurable: always derived from the config file's stem by
     # load_config(). Kept as a private attribute so it cannot be set via YAML.
@@ -441,6 +457,22 @@ class BaseTestConfig(_StrictModel):
             raise PydanticCustomError(
                 "stimuli_source_conflict",
                 "'stimuli' and 'stimuli_dirs' are mutually exclusive",
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_loudness_check_and_normalization_exclusive(self) -> BaseTestConfig:
+        """Reject configuring both loudness_check and loudness_normalization.
+
+        Normalization already brings the stimuli into loudness agreement, so a
+        loudness_check alongside it is redundant (and would run against the
+        un-normalized originals); require choosing one.
+        """
+        if self.loudness_check is not None and self.loudness_normalization is not None:
+            raise PydanticCustomError(
+                "loudness_check_normalization_conflict",
+                "set only one of 'loudness_check' / 'loudness_normalization'; "
+                "normalization makes the check redundant",
             )
         return self
 

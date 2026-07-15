@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from .._helpers import write_sine
 from ._helpers import _write_config_yaml
 
 
@@ -632,6 +633,57 @@ def test_export_php_deploy_overwrite_regenerates_copied_audio(
         f = outdir / u
         assert f.is_file()
         assert not f.is_symlink()
+
+
+def test_export_normalizes_audio_into_bundle_as_real_wav(tmp_path, monkeypatch):
+    pytest.importorskip("soundfile")
+    from listen_and_rate.loudness import measure_loudness
+
+    sine = write_sine(tmp_path / "clip.wav")
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "loudness_normalization": {"target": -20.0, "scope": "stimulus"},
+        "stimuli": {"items": [{"id": "s001", "path": str(sine)}]},
+    }
+    outdir = tmp_path / "deploy"
+    _run_export(_write_config_yaml(tmp_path, config), outdir, monkeypatch)
+
+    text = (outdir / "config_data.php").read_text()
+    urls = re.findall(r"'audio_url' => '([^']*)'", text)
+    assert urls and all(u.endswith(".wav") for u in urls)
+    for u in urls:
+        f = outdir / u
+        assert f.is_file() and not f.is_symlink()  # real normalized copy, not a link
+        assert measure_loudness(f) == pytest.approx(-20.0, abs=0.5)
+
+
+def test_export_normalize_converts_non_wav_input_to_wav(tmp_path, monkeypatch):
+    pytest.importorskip("soundfile")
+    import soundfile as sf
+
+    if "MP3" not in sf.available_formats():
+        pytest.skip("libsndfile without MP3 support")
+    write_sine(tmp_path / "clip.wav")  # generate samples, then re-encode to mp3
+    data, rate = sf.read(str(tmp_path / "clip.wav"))
+    sf.write(str(tmp_path / "clip.mp3"), data, rate)
+
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "loudness_normalization": {"target": -20.0},
+        "stimuli": {"items": [{"id": "s001", "path": str(tmp_path / "clip.mp3")}]},
+    }
+    outdir = tmp_path / "deploy"
+    _run_export(_write_config_yaml(tmp_path, config), outdir, monkeypatch)
+
+    text = (outdir / "config_data.php").read_text()
+    (url,) = re.findall(r"'audio_url' => '([^']*)'", text)
+    assert url.endswith(".wav")  # mp3 input normalized out as wav
+    assert (outdir / url).is_file()
+    assert sf.info(str(outdir / url)).format == "WAV"
 
 
 def test_export_php_deploy_can_run_twice_with_overwrite(

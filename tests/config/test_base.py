@@ -372,6 +372,62 @@ def test_loudness_check_rejects_unknown_field(tmp_path, test_audio_file):
         load_config(write_config(tmp_path, data))
 
 
+def test_loudness_normalization_defaults_to_none(tmp_path, test_audio_file):
+    result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
+    assert result.loudness_normalization is None
+
+
+def test_loudness_normalization_empty_subblock_uses_defaults(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["loudness_normalization"] = {}
+    result = load_config(write_config(tmp_path, data))
+    assert result.loudness_normalization is not None
+    assert result.loudness_normalization.target == -23.0
+    assert result.loudness_normalization.scope == "stimulus"
+
+
+def test_loudness_normalization_parses_target_and_scope(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["loudness_normalization"] = {"target": -18.0, "scope": "system"}
+    result = load_config(write_config(tmp_path, data))
+    assert result.loudness_normalization.target == -18.0
+    assert result.loudness_normalization.scope == "system"
+
+
+@pytest.mark.parametrize("bad_target", [0, 3.0])
+def test_loudness_normalization_rejects_non_negative_target(
+    tmp_path, test_audio_file, bad_target
+):
+    data = minimal_config(str(test_audio_file))
+    data["loudness_normalization"] = {"target": bad_target}
+    with pytest.raises(ValidationError):
+        load_config(write_config(tmp_path, data))
+
+
+def test_loudness_normalization_rejects_invalid_scope(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["loudness_normalization"] = {"scope": "utterance"}
+    with pytest.raises(ValidationError):
+        load_config(write_config(tmp_path, data))
+
+
+def test_loudness_normalization_rejects_unknown_field(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["loudness_normalization"] = {"bogus": 1}
+    with pytest.raises(ValidationError, match="bogus"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_loudness_check_and_normalization_are_mutually_exclusive(
+    tmp_path, test_audio_file
+):
+    data = minimal_config(str(test_audio_file))
+    data["loudness_check"] = {"per_system": {}}
+    data["loudness_normalization"] = {}
+    with pytest.raises(ValidationError, match="loudness_normalization"):
+        load_config(write_config(tmp_path, data))
+
+
 def test_preload_audio_defaults_to_false(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
     result = load_config(write_config(tmp_path, data))

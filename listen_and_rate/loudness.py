@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import math
 import statistics
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from .config import Config
-from .config.base import LoudnessCriterion
+from .config.base import LoudnessCriterion, LoudnessNormalizationConfig, StimulusConfig
 
 # One measured clip: system, utterance, and integrated loudness (LUFS).
 LoudnessRow = tuple[str, str, float]
@@ -168,3 +169,135 @@ def _print_per_stimulus(
         spread, by_system = spreads[utterance]
         per_sys = "  ".join(f"{s}={lufs:.2f}" for s, lufs in by_system.items())
         print(f"  {utterance}: spread {spread:.2f}  [{per_sys}]")
+
+
+# -- Loudness normalization ----------------------------------------------------
+
+
+def apply_gain_and_write(
+    src: str | Path, dst: str | Path, gain_db: float
+) -> str | None:
+    """Scale src by gain_db and write it to dst as 16-bit PCM WAV.
+
+    Output is PCM_16 (universally browser-playable) regardless of the source's
+    subtype. Clipping is measured on the pre-quantization float peak: if the
+    gain pushes it past 0 dBFS, a warning string is returned but the sample is
+    still written (per the "warn and continue" policy - normalization does not
+    silently move the requested target). Returns None when it fits.
+    """
+    import numpy as np
+    import soundfile as sf
+
+    data, rate = sf.read(str(src))
+    scaled = data * (10.0 ** (gain_db / 20.0))
+    peak = float(np.max(np.abs(scaled))) if len(scaled) else 0.0
+    # A stale dst (e.g. a symlink left by a previous symlink-mode export) must
+    # be replaced, not written through - sf.write follows symlinks, which would
+    # destroy the original file dst points at. Mirrors _symlink_audio_files'
+    # and _copy_audio_files' unlink-before-write guard (src is already read).
+    dst = Path(dst)
+    if dst.is_symlink() or dst.exists():
+        dst.unlink()
+    sf.write(str(dst), scaled, rate, subtype="PCM_16")
+    if peak > 1.0:
+        return f"{src}: peak {20 * math.log10(peak):+.1f} dBFS after gain (clipping)"
+    return None
+
+
+def _normalization_gains(
+    items: list[StimulusConfig],
+    loudness_by_id: dict[str, float | None],
+    norm: LoudnessNormalizationConfig,
+) -> tuple[dict[str, float], list[str]]:
+    """Compute each stimulus id's gain (dB), plus the ids that couldn't be measured.
+
+    scope="stimulus": each clip gets its own gain to reach target. scope="system":
+    one gain per system, derived from that system's mean loudness (reusing
+    per_system_stats), so within-system loudness differences are preserved.
+    Unmeasurable clips (silent / < 1s) are excluded from measurement and listed
+    for reporting; with scope="stimulus" they get gain 0 (written unchanged),
+    while with scope="system" they still receive their system's shared gain -
+    gain 0 would shift their loudness relative to their measurable siblings,
+    defeating the one-gain-per-system contract.
+    """
+    unmeasured = [item.id for item in items if loudness_by_id[item.id] is None]
+
+    # The loudness each clip is shifted toward: for scope="system" it is the
+    # clip's system mean (one gain per system, preserving within-system
+    # differences); for scope="stimulus" it is the clip's own loudness.
+    if norm.scope == "system":
+        rows: list[LoudnessRow] = [
+            (item.system or "", item.utterance or item.id, lufs)
+            for item in items
+            if (lufs := loudness_by_id[item.id]) is not None
+        ]
+        stats = per_system_stats(rows)
+        system_mean = {system: mean for system, (mean, _std, _n) in stats.items()}
+        reference_of = {item.id: system_mean.get(item.system or "") for item in items}
+    else:
+        reference_of = {item.id: loudness_by_id[item.id] for item in items}
+
+    gains: dict[str, float] = {}
+    for item in items:
+        reference = reference_of[item.id]
+        gains[item.id] = 0.0 if reference is None else norm.target - reference
+    return gains, unmeasured
+
+
+def run_configured_loudness_normalization(
+    config: Config, dst_for: Callable[[StimulusConfig], Path]
+) -> dict[str, str]:
+    """Normalize stimuli per config.loudness_normalization, writing each via dst_for.
+
+    Returns id -> written output path (str); {} (no-op) when loudness_normalization
+    is unset. dst_for(stimulus) resolves each output path so the caller controls
+    the bundle/cache layout; every output is written as WAV (see
+    apply_gain_and_write). Prints a summary of clips that couldn't be measured
+    (silent / < 1s, written unchanged) or clipped after gain. Does not exit -
+    this is the corrective step, not a QA gate.
+    """
+    norm = config.loudness_normalization
+    if norm is None:
+        return {}
+
+    from tqdm import tqdm
+
+    items = config.stimuli.items if config.stimuli else []
+
+    # Phase 1: measure every clip's integrated loudness once (progress on stderr).
+    loudness_by_id: dict[str, float | None] = {
+        item.id: measure_loudness(item.path)
+        for item in tqdm(items, desc="Normalizing loudness", unit="clip", disable=None)
+    }
+
+    # Phase 2: decide each clip's gain (per-clip, or one gain per system).
+    gains, unmeasured = _normalization_gains(items, loudness_by_id, norm)
+
+    # Phase 3: apply the gain and write each output.
+    result: dict[str, str] = {}
+    clipped: list[str] = []
+    for item in items:
+        dst = dst_for(item)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        warning = apply_gain_and_write(item.path, dst, gains[item.id])
+        if warning is not None:
+            clipped.append(warning)
+        result[item.id] = str(dst)
+
+    if unmeasured:
+        # scope="system" still applies the system's shared gain to these clips
+        # (see _normalization_gains); only scope="stimulus" leaves them as-is.
+        detail = (
+            "written unchanged"
+            if norm.scope == "stimulus"
+            else "their system's shared gain still applies"
+        )
+        print(
+            f"[loudness] normalize: {len(unmeasured)} clip(s) not measurable "
+            f"(silent or < 1s); {detail}: {sorted(unmeasured)}"
+        )
+    if clipped:
+        print("[loudness] normalize: clipping after gain:")
+        for warning in clipped:
+            print(f"  {warning}")
+    return result

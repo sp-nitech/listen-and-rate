@@ -60,6 +60,18 @@ stimuli_dirs:
 #     threshold: 1.0
 #     verbose: false
 
+# -- Loudness normalization (optional) ----------------------------------------
+# When configured, every stimulus is loudness-normalized to `target` (LUFS)
+# before the test, writing WAV copies (into the bundle on export, into a cache
+# on serve). Mutually exclusive with loudness_check (normalization is the fix,
+# the check is the gate). `scope: stimulus` (default) brings every clip to the
+# same loudness; `scope: system` applies one gain per system so the system's
+# mean reaches target, preserving the natural loudness differences between
+# utterances within a system.
+# loudness_normalization:
+#   target: -23.0
+#   scope: stimulus
+
 # -- Rating labels (optional, shown below each rating button) -----------------
 # rating_labels:
 #   1: "Bad"

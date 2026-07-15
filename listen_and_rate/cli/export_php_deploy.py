@@ -18,7 +18,10 @@ from listen_and_rate.config import (
     XABConfig,
     load_config_or_exit,
 )
-from listen_and_rate.loudness import run_configured_loudness_check
+from listen_and_rate.loudness import (
+    run_configured_loudness_check,
+    run_configured_loudness_normalization,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -301,7 +304,19 @@ def main() -> None:
         raise RuntimeError("config.stimuli is None after loading")
 
     all_items = config.stimuli.items
-    audio_urls = {s.id: _audio_url(Path(s.path)) for s in all_items}
+    # Normalized audio is always written out as WAV (see apply_gain_and_write),
+    # so its URL carries a .wav suffix even when the source was e.g. .mp3.
+    # The rewrite cannot collide two stimuli onto one output path: load_config
+    # already rejects stimuli whose paths differ only in extension.
+    normalize = config.loudness_normalization is not None
+    audio_urls = {
+        s.id: (
+            str(Path(_audio_url(Path(s.path))).with_suffix(".wav"))
+            if normalize
+            else _audio_url(Path(s.path))
+        )
+        for s in all_items
+    }
     reference_system = (
         config.reference_system
         if isinstance(config, (DMOSConfig, XABConfig, MUSHRAConfig))
@@ -396,7 +411,13 @@ def main() -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     _copy_static_assets(outdir)
     _seed_results_dir(outdir, results_subpath)
-    if args.copy_audio:
+    if normalize:
+        # Normalization always writes real (loudness-adjusted) audio into the
+        # bundle, so it supersedes the symlink/--copy-audio choice.
+        run_configured_loudness_normalization(
+            config, lambda s: outdir / audio_urls[s.id]
+        )
+    elif args.copy_audio:
         _copy_audio_files(outdir, all_items, audio_urls)
     else:
         _symlink_audio_files(outdir, all_items, audio_urls)

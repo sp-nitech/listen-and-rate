@@ -53,6 +53,18 @@ stimuli_dirs:
 #     threshold: 1.0
 #     verbose: false
 
+# -- Loudness normalization (optional) ----------------------------------------
+# When configured, every stimulus is loudness-normalized to `target` (LUFS)
+# before the test, writing WAV copies (into the bundle on export, into a cache
+# on serve). Mutually exclusive with loudness_check (normalization is the fix,
+# the check is the gate). `scope: stimulus` (default) brings every clip to the
+# same loudness; `scope: system` applies one gain per system so the system's
+# mean reaches target, preserving the natural loudness differences between
+# utterances within a system.
+# loudness_normalization:
+#   target: -23.0
+#   scope: stimulus
+
 # -- Keyboard shortcuts (all fields optional, shown with defaults) ------------
 # Each key must be a single character (e.g. "a", "1") or a named key such as
 # Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).

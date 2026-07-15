@@ -117,6 +117,70 @@ def test_empty_audio_file_raises_error(tmp_path):
         load_config(write_config(tmp_path, minimal_config(str(empty))))
 
 
+def test_same_dir_same_stem_stimuli_rejected(tmp_path, test_audio_file):
+    # Two stimuli whose paths differ only in extension (utt1.wav vs utt1.flac
+    # in one directory, a realistic codec-comparison layout) are rejected
+    # unconditionally: loudness normalization would fold them onto one .wav
+    # output (the later write silently replacing the earlier), so allowing
+    # them only while normalization is off would make config validity depend
+    # on an unrelated setting.
+    d = tmp_path / "audio"
+    d.mkdir()
+    shutil.copy(test_audio_file, d / "utt1.wav")
+    shutil.copy(test_audio_file, d / "utt1.flac")
+    data = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "stimuli": {
+            "items": [
+                {"id": "original", "path": str(d / "utt1.wav")},
+                {"id": "coded", "path": str(d / "utt1.flac")},
+            ]
+        },
+    }
+    with pytest.raises(ValueError, match="utt1"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_same_file_referenced_by_multiple_stimuli_allowed(tmp_path, test_audio_file):
+    # Deliberately repeating ONE clip under several ids (e.g. an intra-rater
+    # consistency trial) is not a basename conflict: every id sharing one
+    # normalized output is exactly the intent.
+    data = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "stimuli": {
+            "items": [
+                {"id": "first", "path": str(test_audio_file)},
+                {"id": "repeat", "path": str(test_audio_file)},
+            ]
+        },
+    }
+    assert load_config(write_config(tmp_path, data)) is not None
+
+
+def test_same_stem_in_different_dirs_allowed(tmp_path, test_audio_file):
+    da, db = tmp_path / "A", tmp_path / "B"
+    da.mkdir()
+    db.mkdir()
+    shutil.copy(test_audio_file, da / "utt1.wav")
+    shutil.copy(test_audio_file, db / "utt1.wav")
+    data = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "stimuli": {
+            "items": [
+                {"id": "a", "path": str(da / "utt1.wav")},
+                {"id": "b", "path": str(db / "utt1.wav")},
+            ]
+        },
+    }
+    assert load_config(write_config(tmp_path, data)) is not None
+
+
 def test_stimuli_dirs_expansion(tmp_path, test_audio_file):
     d = tmp_path / "system_a"
     d.mkdir()

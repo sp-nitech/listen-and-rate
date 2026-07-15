@@ -165,6 +165,30 @@ def load_config(config_path: str | Path) -> Config:
             "supported format (.wav, .mp3, .flac, .ogg)."
         )
 
+    # Reject DISTINCT stimulus files whose paths differ only in extension
+    # (utt1.wav vs utt1.mp3 in one directory). Loudness normalization would
+    # fold such a pair onto one .wav output file - the later write silently
+    # replacing the earlier, making both ids serve identical audio - and
+    # allowing the pair only while normalization is off would make config
+    # validity depend on an unrelated setting, so it is rejected
+    # unconditionally. Referencing the SAME file from several stimulus ids
+    # stays allowed - a deliberate repeat of one clip (e.g. an intra-rater
+    # consistency trial), where every id sharing one output is the point.
+    by_basename: dict[tuple[str, str], set[str]] = {}
+    for s in config.stimuli.items:
+        p = Path(s.path)
+        by_basename.setdefault((str(p.parent), p.stem), set()).add(str(p))
+    duplicated = {k: paths for k, paths in by_basename.items() if len(paths) > 1}
+    if duplicated:
+        detail = "; ".join(
+            ", ".join(sorted(paths)) for _, paths in sorted(duplicated.items())
+        )
+        raise ValueError(
+            "Stimulus files in the same directory must not share a basename "
+            f"(paths differing only in extension): {detail}. Rename the files "
+            "so their basenames differ."
+        )
+
     if config.stimuli is not None and config.stimuli.stimuli_per_session is not None:
         n = config.stimuli.stimuli_per_session
         total = len(config.stimuli.items)

@@ -26,7 +26,7 @@ output:
 # - At most one system may be flagged `reference: true` (non-rateable,
 #   always shown first/leftmost as a plain playback clip, never a slider).
 # - At most one system may be flagged `anchor: true`. Unlike reference, the
-#   anchor IS rated — its slider is always shown rightmost and labeled
+#   anchor IS rated - its slider is always shown rightmost and labeled
 #   "Anchor" so listeners know it's the anchor. To use a traditional HIDDEN
 #   anchor instead, simply omit `anchor: true` and treat it as a normal,
 #   blind test system.

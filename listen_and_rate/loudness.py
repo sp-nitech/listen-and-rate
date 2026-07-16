@@ -1,4 +1,4 @@
-"""Pre-test loudness check."""
+"""Pre-test loudness QA: the configured check (gate) and normalization (fix)."""
 
 from __future__ import annotations
 
@@ -84,6 +84,33 @@ def _meter_for(rate: int) -> Any:
     return _meters[rate]
 
 
+def _measure_items(items: list[StimulusConfig], desc: str) -> dict[str, float | None]:
+    """Measure each stimulus's integrated loudness (LUFS), keyed by id.
+
+    The progress bar goes to stderr (separate from the stdout report) and,
+    with disable=None, shows only on an interactive terminal - silent in
+    pipes/tests. Unmeasurable clips (silent / < 1s, see measure_loudness)
+    map to None.
+    """
+    from tqdm import tqdm
+
+    return {
+        item.id: measure_loudness(item.path)
+        for item in tqdm(items, desc=desc, unit="clip", disable=None)
+    }
+
+
+def _measured_rows(
+    items: list[StimulusConfig], loudness_by_id: dict[str, float | None]
+) -> list[LoudnessRow]:
+    """Build the (system, utterance, LUFS) rows of the measurable items, in order."""
+    return [
+        (item.system or "", item.utterance or item.id, lufs)
+        for item in items
+        if (lufs := loudness_by_id[item.id]) is not None
+    ]
+
+
 def run_configured_loudness_check(config: Config) -> None:
     """Run the loudness check if `loudness_check` is configured (else no-op).
 
@@ -94,20 +121,11 @@ def run_configured_loudness_check(config: Config) -> None:
     if check is None:
         return
 
-    from tqdm import tqdm
-
     items = config.stimuli.items if config.stimuli else []
-    rows: list[LoudnessRow] = []
-    excluded = 0
-    # Progress bar goes to stderr (separate from the stdout report) and, with
-    # disable=None, shows only on an interactive terminal - silent in pipes/tests.
-    for item in tqdm(items, desc="Measuring loudness", unit="clip", disable=None):
-        lufs = measure_loudness(item.path)
-        if lufs is None:
-            excluded += 1
-            continue
-        rows.append((item.system or "", item.utterance or item.id, lufs))
+    loudness_by_id = _measure_items(items, desc="Measuring loudness")
+    rows = _measured_rows(items, loudness_by_id)
 
+    excluded = len(items) - len(rows)
     if excluded:
         print(f"[loudness] {excluded} clip(s) excluded (shorter than 1s or silent).")
 
@@ -226,12 +244,7 @@ def _normalization_gains(
     # clip's system mean (one gain per system, preserving within-system
     # differences); for scope="stimulus" it is the clip's own loudness.
     if norm.scope == "system":
-        rows: list[LoudnessRow] = [
-            (item.system or "", item.utterance or item.id, lufs)
-            for item in items
-            if (lufs := loudness_by_id[item.id]) is not None
-        ]
-        stats = per_system_stats(rows)
+        stats = per_system_stats(_measured_rows(items, loudness_by_id))
         system_mean = {system: mean for system, (mean, _std, _n) in stats.items()}
         reference_of = {item.id: system_mean.get(item.system or "") for item in items}
     else:
@@ -260,15 +273,10 @@ def run_configured_loudness_normalization(
     if norm is None:
         return {}
 
-    from tqdm import tqdm
-
     items = config.stimuli.items if config.stimuli else []
 
-    # Phase 1: measure every clip's integrated loudness once (progress on stderr).
-    loudness_by_id: dict[str, float | None] = {
-        item.id: measure_loudness(item.path)
-        for item in tqdm(items, desc="Normalizing loudness", unit="clip", disable=None)
-    }
+    # Phase 1: measure every clip's integrated loudness once.
+    loudness_by_id = _measure_items(items, desc="Normalizing loudness")
 
     # Phase 2: decide each clip's gain (per-clip, or one gain per system).
     gains, unmeasured = _normalization_gains(items, loudness_by_id, norm)

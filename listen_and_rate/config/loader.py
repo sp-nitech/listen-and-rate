@@ -107,6 +107,65 @@ def _expand_stimuli_dirs(dirs_config: StimuliDirsConfig) -> list[StimulusConfig]
     return stimuli
 
 
+def _check_no_basename_conflicts(items: list[StimulusConfig]) -> None:
+    """Reject DISTINCT stimulus files whose paths differ only in extension.
+
+    utt1.wav vs utt1.mp3 in one directory: loudness normalization would fold
+    such a pair onto one .wav output file - the later write silently replacing
+    the earlier, making both ids serve identical audio - and allowing the pair
+    only while normalization is off would make config validity depend on an
+    unrelated setting, so it is rejected unconditionally. Referencing the SAME
+    file from several stimulus ids stays allowed - a deliberate repeat of one
+    clip (e.g. an intra-rater consistency trial), where every id sharing one
+    output is the point.
+    """
+    by_basename: dict[tuple[str, str], set[str]] = {}
+    for s in items:
+        p = Path(s.path)
+        by_basename.setdefault((str(p.parent), p.stem), set()).add(str(p))
+    duplicated = {k: paths for k, paths in by_basename.items() if len(paths) > 1}
+    if duplicated:
+        detail = "; ".join(
+            ", ".join(sorted(paths)) for _, paths in sorted(duplicated.items())
+        )
+        raise ValueError(
+            "Stimulus files in the same directory must not share a basename "
+            f"(paths differing only in extension): {detail}. Rename the files "
+            "so their basenames differ."
+        )
+
+
+def _check_audio_files_readable(items: list[StimulusConfig]) -> None:
+    """Reject a stimulus file that is missing or isn't decodable, non-empty audio.
+
+    Reads only the audio header (soundfile.info), not the samples, so the cost
+    is constant per file regardless of clip length - cheap enough to run
+    unconditionally at load time. This catches the common "the file is there
+    but isn't really audio" case (a wrong/corrupt file, an HTML error page
+    saved under a .wav name, an empty file) before any listener reaches an
+    unplayable stimulus and gets stuck on a playback-gated page. A file whose
+    header is intact but whose body is truncated still slips through -
+    detecting that needs a full decode, left to the opt-in loudness check.
+
+    soundfile (a core dependency) is imported here, not at module top, to keep
+    importing this package cheap when no config is being loaded - matching
+    loudness.py's lazy-import style.
+    """
+    import soundfile as sf
+
+    for stimulus in items:
+        if not Path(stimulus.path).is_file():
+            raise FileNotFoundError(f"Audio file not found: {stimulus.path}")
+        try:
+            info = sf.info(stimulus.path)
+        except Exception as exc:
+            raise ValueError(
+                f"Not a readable audio file: {stimulus.path} ({exc})"
+            ) from None
+        if info.frames == 0:
+            raise ValueError(f"Audio file has no audio samples: {stimulus.path}")
+
+
 def load_config(config_path: str | Path) -> Config:
     """Load and validate a YAML config file; resolve paths relative to CWD."""
     path = Path(config_path).resolve()
@@ -165,29 +224,7 @@ def load_config(config_path: str | Path) -> Config:
             "supported format (.wav, .mp3, .flac, .ogg)."
         )
 
-    # Reject DISTINCT stimulus files whose paths differ only in extension
-    # (utt1.wav vs utt1.mp3 in one directory). Loudness normalization would
-    # fold such a pair onto one .wav output file - the later write silently
-    # replacing the earlier, making both ids serve identical audio - and
-    # allowing the pair only while normalization is off would make config
-    # validity depend on an unrelated setting, so it is rejected
-    # unconditionally. Referencing the SAME file from several stimulus ids
-    # stays allowed - a deliberate repeat of one clip (e.g. an intra-rater
-    # consistency trial), where every id sharing one output is the point.
-    by_basename: dict[tuple[str, str], set[str]] = {}
-    for s in config.stimuli.items:
-        p = Path(s.path)
-        by_basename.setdefault((str(p.parent), p.stem), set()).add(str(p))
-    duplicated = {k: paths for k, paths in by_basename.items() if len(paths) > 1}
-    if duplicated:
-        detail = "; ".join(
-            ", ".join(sorted(paths)) for _, paths in sorted(duplicated.items())
-        )
-        raise ValueError(
-            "Stimulus files in the same directory must not share a basename "
-            f"(paths differing only in extension): {detail}. Rename the files "
-            "so their basenames differ."
-        )
+    _check_no_basename_conflicts(config.stimuli.items)
 
     if config.stimuli is not None and config.stimuli.stimuli_per_session is not None:
         n = config.stimuli.stimuli_per_session
@@ -212,19 +249,7 @@ def load_config(config_path: str | Path) -> Config:
             len(config.stimuli.items) if config.stimuli else 0, "stimuli"
         )
 
-    import soundfile as sf
-
-    for stimulus in config.stimuli.items if config.stimuli else []:
-        if not Path(stimulus.path).is_file():
-            raise FileNotFoundError(f"Audio file not found: {stimulus.path}")
-        try:
-            info = sf.info(stimulus.path)
-        except Exception as exc:
-            raise ValueError(
-                f"Not a readable audio file: {stimulus.path} ({exc})"
-            ) from None
-        if info.frames == 0:
-            raise ValueError(f"Audio file has no audio samples: {stimulus.path}")
+    _check_audio_files_readable(config.stimuli.items if config.stimuli else [])
 
     if isinstance(config, DMOSConfig):
         dmos_trials = build_dmos_trials(

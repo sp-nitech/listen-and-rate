@@ -12,6 +12,7 @@ from pathlib import Path
 
 from listen_and_rate.config import (
     ABXConfig,
+    Config,
     DMOSConfig,
     MUSHRAConfig,
     StimulusConfig,
@@ -244,6 +245,102 @@ def _render_config_data_php(data: dict) -> str:
     return f"<?php\n\nreturn {_php_value(data)};\n"
 
 
+def _build_config_data(
+    config: Config,
+    experiment_id: str,
+    all_items: list[StimulusConfig],
+    audio_urls: dict[str, str],
+) -> dict:
+    """Assemble the static experiment definition written to config_data.php.
+
+    Everything config.php needs to rebuild the browser-facing response on each
+    request (re-applying per-session sampling/randomize), plus the server-side
+    only fields (reference_system, x_secret, ...) that must never reach the
+    browser - see each field's comment.
+    """
+    reference_system = (
+        config.reference_system
+        if isinstance(config, (DMOSConfig, XABConfig, MUSHRAConfig))
+        and config.reference_system
+        else None
+    )
+    anchor_system = config.anchor_system if isinstance(config, MUSHRAConfig) else None
+    stimuli = [
+        {
+            "id": s.id,
+            "label": s.label,
+            "utterance": s.utterance,
+            "audio_url": audio_urls[s.id],
+            # Not sensitive (unlike 'system') - it's the same distinction
+            # already visible to the listener as the "Reference"/"Test" label.
+            "reference": reference_system is not None and s.system == reference_system,
+            # Also disclosed (per MUSHRA's design): the anchor slider is
+            # always shown last and labeled "Anchor" to the listener.
+            "anchor": anchor_system is not None and s.system == anchor_system,
+        }
+        for s in all_items
+    ]
+
+    practice = config.practice
+
+    return {
+        "experiment_id": experiment_id,
+        "test_type": config.test_type,
+        "title": config.title,
+        "instructions": config.instructions,
+        "randomize": config.randomize,
+        "preload_audio": config.preload_audio,
+        "output_format": config.output.format,
+        # save.php resolves this against the bundle directory when relative
+        # (see its resolve_results_dir()), mirroring the FastAPI deployment's
+        # use of output.path - both layouts are <deployment root>/<output.path>.
+        "output_path": config.output.path,
+        "metadata": [f.model_dump() for f in config.metadata],
+        "shortcuts": config.shortcuts.browser_dict(),
+        "rating_labels": getattr(config, "rating_labels", None),
+        # Server-side only (never echoed to the browser response) - used by
+        # config.php to identify the reference stimulus in each utterance
+        # group via stimulus_map.php, the same way save.php already looks up
+        # 'system' there without exposing it to the client.
+        "reference_system": reference_system,
+        # Also server-side only: config.php's group_mushra_trials() needs to
+        # know how many rateable (non-reference) systems make up one
+        # complete trial, since its public 'stimuli' list withholds 'system'
+        # names (a stimulus's 'reference'/'anchor' flags are the only system
+        # identity it carries) and so can't derive this count on its own.
+        "mushra_rateable_system_count": (
+            len(
+                {
+                    s.resolved_system
+                    for s in (
+                        config.stimuli_dirs.systems if config.stimuli_dirs else []
+                    )
+                    if not s.reference
+                }
+            )
+            if isinstance(config, MUSHRAConfig)
+            else None
+        ),
+        "allow_tie": getattr(config, "allow_tie", None),
+        # Stable per-deployment secret for blinding ABX's hidden "X" reference
+        # (see listen_and_rate/x_token.py); generated once at export time
+        # so it stays the same across every request to this deployment.
+        "x_secret": secrets.token_hex(32) if isinstance(config, ABXConfig) else None,
+        "stimuli_per_session": (
+            config.stimuli.stimuli_per_session if config.stimuli else None
+        ),
+        # Practice stage - config.php re-samples practice_count pages
+        # (stimuli for MOS, trials otherwise) from the full pool on every
+        # request, independently of the session sampling above.
+        "practice_count": (practice.count if practice else 0),
+        "practice_instructions": (practice.instructions if practice else None),
+        "utterances_per_session": (
+            config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
+        ),
+        "stimuli": stimuli,
+    }
+
+
 def main() -> None:
     """Load YAML config, resolve stimuli, and write a full PHP deployment bundle.
 
@@ -316,87 +413,9 @@ def main() -> None:
         )
         for s in all_items
     }
-    reference_system = (
-        config.reference_system
-        if isinstance(config, (DMOSConfig, XABConfig, MUSHRAConfig))
-        and config.reference_system
-        else None
+    config_data = _build_config_data(
+        config, Path(args.config).stem, all_items, audio_urls
     )
-    anchor_system = config.anchor_system if isinstance(config, MUSHRAConfig) else None
-    stimuli = [
-        {
-            "id": s.id,
-            "label": s.label,
-            "utterance": s.utterance,
-            "audio_url": audio_urls[s.id],
-            # Not sensitive (unlike 'system') - it's the same distinction
-            # already visible to the listener as the "Reference"/"Test" label.
-            "reference": reference_system is not None and s.system == reference_system,
-            # Also disclosed (per MUSHRA's design): the anchor slider is
-            # always shown last and labeled "Anchor" to the listener.
-            "anchor": anchor_system is not None and s.system == anchor_system,
-        }
-        for s in all_items
-    ]
-
-    practice = config.practice
-
-    config_data = {
-        "experiment_id": Path(args.config).stem,
-        "test_type": config.test_type,
-        "title": config.title,
-        "instructions": config.instructions,
-        "randomize": config.randomize,
-        "preload_audio": config.preload_audio,
-        "output_format": config.output.format,
-        # save.php resolves this against the bundle directory when relative
-        # (see its resolve_results_dir()), mirroring the FastAPI deployment's
-        # use of output.path - both layouts are <deployment root>/<output.path>.
-        "output_path": config.output.path,
-        "metadata": [f.model_dump() for f in config.metadata],
-        "shortcuts": config.shortcuts.browser_dict(),
-        "rating_labels": getattr(config, "rating_labels", None),
-        # Server-side only (never echoed to the browser response) - used by
-        # config.php to identify the reference stimulus in each utterance
-        # group via stimulus_map.php, the same way save.php already looks up
-        # 'system' there without exposing it to the client.
-        "reference_system": reference_system,
-        # Also server-side only: config.php's group_mushra_trials() needs to
-        # know how many rateable (non-reference) systems make up one
-        # complete trial, since its public 'stimuli' list withholds 'system'
-        # names (a stimulus's 'reference'/'anchor' flags are the only system
-        # identity it carries) and so can't derive this count on its own.
-        "mushra_rateable_system_count": (
-            len(
-                {
-                    s.resolved_system
-                    for s in (
-                        config.stimuli_dirs.systems if config.stimuli_dirs else []
-                    )
-                    if not s.reference
-                }
-            )
-            if isinstance(config, MUSHRAConfig)
-            else None
-        ),
-        "allow_tie": getattr(config, "allow_tie", None),
-        # Stable per-deployment secret for blinding ABX's hidden "X" reference
-        # (see listen_and_rate/x_token.py); generated once at export time
-        # so it stays the same across every request to this deployment.
-        "x_secret": secrets.token_hex(32) if isinstance(config, ABXConfig) else None,
-        "stimuli_per_session": (
-            config.stimuli.stimuli_per_session if config.stimuli else None
-        ),
-        # Practice stage - config.php re-samples practice_count pages
-        # (stimuli for MOS, trials otherwise) from the full pool on every
-        # request, independently of the session sampling above.
-        "practice_count": (practice.count if practice else 0),
-        "practice_instructions": (practice.instructions if practice else None),
-        "utterances_per_session": (
-            config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
-        ),
-        "stimuli": stimuli,
-    }
 
     outdir = Path(args.outdir)
     results_subpath = _bundle_results_subpath(config.output.path)

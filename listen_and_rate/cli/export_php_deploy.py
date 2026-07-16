@@ -279,10 +279,9 @@ def main() -> None:
         action=argparse.BooleanOptionalAction,
         default=False,
         help=(
-            "Regenerate --outdir if it already exists (default: false, to avoid "
-            "clobbering the wrong directory by accident). results/ is always "
-            "preserved regardless of this flag, since collected listener data "
-            "can't be regenerated."
+            "Regenerate --outdir if it already exists (default: false). The results "
+            "directory within the bundle is always preserved regardless of this flag "
+            "to avoid losing collected listener data."
         ),
     )
     parser.add_argument(

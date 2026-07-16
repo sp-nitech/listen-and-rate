@@ -65,6 +65,8 @@ stimuli_dirs:
 # Each key must be a single character (e.g. "a", "1") or a named key such as
 # Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).
 # shortcuts:
+#   play: Space
+#   rewind: r
 #   choose_a: 1
 #   choose_b: 2
 #   prev: ArrowLeft

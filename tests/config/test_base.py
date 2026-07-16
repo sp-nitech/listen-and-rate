@@ -91,6 +91,7 @@ def test_shortcuts_defaults(tmp_path, test_audio_file):
     assert s.next == "ArrowRight"
     assert s.confirm == "Enter"
     assert s.play == "Space"
+    assert s.rewind == "r"
     assert s.choose_a == "1"
     assert s.choose_b == "2"
     assert s.tie == "3"
@@ -284,6 +285,7 @@ def test_custom_shortcuts_loaded(tmp_path, test_audio_file):
     "field",
     [
         "play",
+        "rewind",
         "prev",
         "next",
         "confirm",

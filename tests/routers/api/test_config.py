@@ -72,6 +72,7 @@ def test_config_includes_preload_audio_true(tmp_path, test_audio_file, monkeypat
 
 def test_config_shortcuts(client):
     shortcuts = client.get("/api/config").json()["shortcuts"]
+    assert shortcuts["rewind"] == "r"
     assert shortcuts["rating"]["1"] == 1
     assert shortcuts["rating"]["5"] == 5
     assert shortcuts["prev"] == "ArrowLeft"

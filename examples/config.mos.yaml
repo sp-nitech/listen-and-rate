@@ -85,6 +85,7 @@ stimuli_dirs:
 # Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).
 # shortcuts:
 #   play: Space
+#   rewind: r
 #   rating:
 #     1: 1
 #     2: 2

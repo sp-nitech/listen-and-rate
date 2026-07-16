@@ -14,7 +14,12 @@
  * MUSHRA overrides _buildPage/_syncPage entirely (sliders, no native controls).
  */
 
-import { audioPlayerHtml, bindAudioPlayer, resetAudioPlayer } from '../audio-player.js';
+import {
+  audioPlayerHtml,
+  bindAudioPlayer,
+  resetAudioPlayer,
+  rewindAudio,
+} from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
 import {
   finalButtonLabel,
@@ -323,6 +328,20 @@ export class PairedTrialTest {
     this._playCursor.set(this.currentIndex, audios.indexOf(audio));
   }
 
+  /**
+   * Rewind the clip the listener is (or was most recently) listening to:
+   * the currently playing clip if any, else the one last started via the
+   * play cursor. A no-op before anything has been started on this trial -
+   * every clip is still at its beginning then.
+   */
+  _handleRewindShortcut() {
+    const audios = [...this._pageSlot.querySelectorAll('audio')];
+    const playing = audios.find((a) => !a.paused);
+    const lastPos = this._playCursor.get(this.currentIndex) ?? -1;
+    const target = playing ?? (lastPos >= 0 ? audios[lastPos] : null);
+    if (target) rewindAudio(target);
+  }
+
   // -- keyboard shortcuts ----------------------------------------------------
 
   /**
@@ -342,6 +361,11 @@ export class PairedTrialTest {
     if (e.key === playKey) {
       e.preventDefault();
       this._handlePlayShortcut();
+      return;
+    }
+    if (e.key === shortcuts.rewind) {
+      e.preventDefault();
+      this._handleRewindShortcut();
       return;
     }
 
@@ -393,10 +417,11 @@ export class PairedTrialTest {
   _shortcutHintHtml(isLast) {
     const { shortcuts } = this;
     const playKey = escapeHtml(shortcuts.play);
+    const rewindKey = escapeHtml(shortcuts.rewind);
     const prevKey = shortcuts.prev === 'ArrowLeft' ? '←' : escapeHtml(shortcuts.prev);
     const nextKey = shortcuts.next === 'ArrowRight' ? '→' : escapeHtml(shortcuts.next);
     const confirmKey = shortcuts.confirm === 'Enter' ? 'Enter' : escapeHtml(shortcuts.confirm);
-    return `<kbd>${playKey}</kbd> play/pause &nbsp;·&nbsp;${this._choiceHintHtml()} &nbsp;·&nbsp;<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate &nbsp;·&nbsp;<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`;
+    return `<kbd>${playKey}</kbd> play/pause &nbsp;·&nbsp;<kbd>${rewindKey}</kbd> rewind &nbsp;·&nbsp;${this._choiceHintHtml()} &nbsp;·&nbsp;<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate &nbsp;·&nbsp;<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`;
   }
 
   /** The type-specific middle segment of the shortcut hint; default matches _handleChoiceKey's choose-A/B keys. */

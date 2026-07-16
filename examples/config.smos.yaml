@@ -88,6 +88,7 @@ rating_labels:
 # Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).
 # shortcuts:
 #   play: Space
+#   rewind: r
 #   rating:
 #     1: 1
 #     2: 2

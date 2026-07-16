@@ -263,6 +263,10 @@ class KeyboardShortcuts(_StrictModel):
     next: str = "ArrowRight"
     confirm: str = "Enter"
     play: str = "Space"
+    # Rewind the current clip to its start (keeps playing/paused state).
+    # Gate-safe: unlike seeking forward, jumping to 0 can never skip content,
+    # so the play-to-completion gate is unaffected.
+    rewind: str = "r"
     # Paired-choice tests (AB, ABX, XAB): select the 1st/2nd sample of the
     # pair - one shared name regardless of what the choice means per test
     # (preferred / matches X / closer to X).
@@ -279,6 +283,7 @@ class KeyboardShortcuts(_StrictModel):
         "next",
         "confirm",
         "play",
+        "rewind",
         "choose_a",
         "choose_b",
         "tie",
@@ -296,6 +301,7 @@ class KeyboardShortcuts(_StrictModel):
         "next",
         "confirm",
         "play",
+        "rewind",
         "choose_a",
         "choose_b",
         "tie",

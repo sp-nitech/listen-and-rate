@@ -1,6 +1,9 @@
 /**
- * Custom audio player: a play/pause button and a (non-seekable) progress bar
- * wrapped around a bare <audio> element (no `controls` attribute).
+ * Custom audio player: rewind and play/pause buttons and a (non-seekable)
+ * progress bar wrapped around a bare <audio> element (no `controls`
+ * attribute). The bar stays non-seekable because seeking forward to the end
+ * would fire `ended` and defeat the play-to-completion gate; rewinding
+ * (rewindAudio) is the one safe seek - it can only ever add listening.
  *
  * Using a bare <audio> instead of the native control means:
  *   - swapping the src per trial no longer re-renders a native shadow-DOM
@@ -22,6 +25,9 @@ export const PLAY_SVG =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
 export const PAUSE_SVG =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
+// Skip-to-start (bar + left-pointing triangle), the universal rewind-to-start icon.
+const REWIND_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zm12 0v12l-9-6z"/></svg>';
 
 /**
  * Markup for one player. `localIndex` identifies the clip within a trial
@@ -31,6 +37,7 @@ export const PAUSE_SVG =
 export function audioPlayerHtml(localIndex, preload) {
   return `
     <div class="audio-player">
+      <button class="audio-rewind-btn" type="button" aria-label="Rewind to start">${REWIND_SVG}</button>
       <button class="audio-play-btn" type="button" aria-label="Play">${PLAY_SVG}</button>
       <div class="audio-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div class="audio-progress-fill"></div>
@@ -56,27 +63,43 @@ function playerParts(audio) {
   const player = audio.closest('.audio-player');
   return {
     player,
-    btn: player.querySelector('.audio-play-btn'),
+    playBtn: player.querySelector('.audio-play-btn'),
+    rewindBtn: player.querySelector('.audio-rewind-btn'),
     bar: player.querySelector('.audio-progress'),
     fill: player.querySelector('.audio-progress-fill'),
     time: player.querySelector('.audio-time'),
   };
 }
 
+/**
+ * Rewind to the start, preserving the play/pause state. Gate-safe: unlike
+ * seeking forward, jumping to 0 can never skip content, so the
+ * play-to-completion gate is unaffected. The player repaints itself via its
+ * own `seeked` listener (see bindAudioPlayer), so callers just seek.
+ */
+export function rewindAudio(audio) {
+  if (audio.currentTime !== 0) audio.currentTime = 0;
+}
+
 /** Wire the play button, play/pause icon, and progress bar for one <audio>. */
 export function bindAudioPlayer(audio) {
-  const { btn, bar, fill, time } = playerParts(audio);
+  const { playBtn, rewindBtn, bar, fill, time } = playerParts(audio);
 
-  btn.addEventListener('click', () => {
+  playBtn.addEventListener('click', () => {
     audio.paused ? audio.play() : audio.pause();
     // Drop focus so a later Enter reaches the document-level confirm shortcut
     // (advance/submit) instead of re-toggling this button.
-    btn.blur();
+    playBtn.blur();
+  });
+
+  rewindBtn.addEventListener('click', () => {
+    rewindAudio(audio);
+    rewindBtn.blur();
   });
 
   const setPlaying = (playing) => {
-    btn.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
-    btn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    playBtn.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
+    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   };
 
   const renderBar = () => {
@@ -117,14 +140,20 @@ export function bindAudioPlayer(audio) {
     renderBar();
     time.textContent = timeText(audio);
   });
+  // Repaint after an external seek (the rewind button/shortcut) - while
+  // paused, the rAF loop above isn't running to pick the new position up.
+  audio.addEventListener('seeked', () => {
+    renderBar();
+    time.textContent = timeText(audio);
+  });
 }
 
 /** Reset a player's UI to the start (used when its <audio> is rewound on navigation). */
 export function resetAudioPlayer(audio) {
-  const { player, btn, bar, fill, time } = playerParts(audio);
+  const { player, playBtn, bar, fill, time } = playerParts(audio);
   if (!player) return;
-  btn.innerHTML = PLAY_SVG;
-  btn.setAttribute('aria-label', 'Play');
+  playBtn.innerHTML = PLAY_SVG;
+  playBtn.setAttribute('aria-label', 'Play');
   fill.style.width = '0%';
   bar.setAttribute('aria-valuenow', '0');
   time.textContent = `0.0 / ${formatSec(audio.duration)}`;

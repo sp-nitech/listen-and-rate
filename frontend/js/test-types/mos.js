@@ -6,7 +6,12 @@
  * All keyboard shortcuts are configurable via the server-side YAML config.
  */
 
-import { audioPlayerHtml, bindAudioPlayer, resetAudioPlayer } from '../audio-player.js';
+import {
+  audioPlayerHtml,
+  bindAudioPlayer,
+  resetAudioPlayer,
+  rewindAudio,
+} from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
 import { ratingKeysHint } from '../hints.js';
 import {
@@ -289,6 +294,12 @@ export class MOSTest {
       }
       return;
     }
+    if (e.key === this.shortcuts.rewind) {
+      e.preventDefault();
+      const audio = this._el?.audio;
+      if (audio) rewindAudio(audio);
+      return;
+    }
 
     const { shortcuts } = this;
     const s = this.stimuli[this.currentIndex];
@@ -328,7 +339,8 @@ export class MOSTest {
     const nextKey = shortcuts.next === 'ArrowRight' ? '→' : escapeHtml(shortcuts.next);
     const confirmKey = shortcuts.confirm === 'Enter' ? 'Enter' : escapeHtml(shortcuts.confirm);
     const playKey = escapeHtml(shortcuts.play);
-    return `<kbd>${playKey}</kbd> play/pause &nbsp;·&nbsp;${ratingHint} rate &nbsp;·&nbsp;<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate &nbsp;·&nbsp;<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`;
+    const rewindKey = escapeHtml(shortcuts.rewind);
+    return `<kbd>${playKey}</kbd> play/pause &nbsp;·&nbsp;<kbd>${rewindKey}</kbd> rewind &nbsp;·&nbsp;${ratingHint} rate &nbsp;·&nbsp;<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate &nbsp;·&nbsp;<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`;
   }
 
   _updateProgressBar() {

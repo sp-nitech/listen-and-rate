@@ -315,6 +315,53 @@ audio {
   outline-offset: 3px;
 }
 
+/* Rewind-to-start button: a deliberately secondary, ghost-styled sibling of
+   the play button - smaller and low-contrast so the filled play button stays
+   the unmistakable primary action for the gated first listen. The negative
+   margins compensate for the transparent hit-area ring around the 18px icon
+   ((34 - 18) / 2 = 8px per side), so the icon aligns with the card's content
+   inset and sits the usual gap away from the play button instead of adding
+   the invisible ring on top of both. */
+.audio-rewind-btn {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  margin: 0 -8px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--transition),
+    color var(--transition),
+    transform var(--transition);
+}
+
+.audio-rewind-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+  display: block;
+}
+
+.audio-rewind-btn:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+.audio-rewind-btn:active {
+  transform: scale(0.93);
+}
+
+.audio-rewind-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
 .audio-progress {
   flex: 1 1 auto;
   height: 6px;

@@ -332,6 +332,35 @@ def test_shortcuts_rating_rejects_invalid_key_value(tmp_path, test_audio_file):
         load_config(write_config(tmp_path, data))
 
 
+@pytest.mark.parametrize(
+    "reserved",
+    [
+        "system",
+        "system_a",
+        "utterance",
+        "rating",
+        "winner",
+        "session_id",
+        # Case variants don't corrupt storage (distinct CSV columns), but a
+        # 'System' column next to 'system' in one result file is a misreading
+        # trap and almost certainly a mistake - rejected case-insensitively.
+        "System",
+        "RATING",
+    ],
+)
+def test_metadata_key_colliding_with_result_column_rejected(
+    tmp_path, test_audio_file, reserved
+):
+    # A metadata key named like a saver-written result column would silently
+    # corrupt stored results (duplicate CSV columns where the stimulus value
+    # wins; JSON analysis overwriting in the other direction) - reject it at
+    # load time instead.
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = [{"key": reserved, "label": "x", "type": "text"}]
+    with pytest.raises(ValidationError, match="reserved"):
+        load_config(write_config(tmp_path, data))
+
+
 def test_loudness_check_defaults_to_none(tmp_path, test_audio_file):
     result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
     assert result.loudness_check is None

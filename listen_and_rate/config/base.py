@@ -43,6 +43,28 @@ class _StrictModel(BaseModel):
         return data
 
 
+# Result columns written by the savers themselves (both deployments, every
+# test type). Metadata keys must not collide with them: metadata columns sit
+# in the same flat row as these, so a collision would silently corrupt stored
+# results (a duplicate CSV column where the stimulus-side value wins, and the
+# JSON analysis overwriting in the other direction). Also the boundary
+# analysis/report.py uses to tell metadata columns from built-in ones when
+# validating report-config group filters.
+_RESULT_COLUMNS = {
+    "session_id",
+    "timestamp",
+    "test_type",
+    "system",
+    "system_a",
+    "system_b",
+    "utterance",
+    "rating",
+    "winner",
+    "correct",
+    "closer",
+}
+
+
 class MetadataFieldConfig(_StrictModel):
     """A single field in the pre-test listener metadata form."""
 
@@ -55,12 +77,23 @@ class MetadataFieldConfig(_StrictModel):
 
     @model_validator(mode="after")
     def check_key_and_options(self) -> MetadataFieldConfig:
-        """Validate key format, options presence, and default validity."""
+        """Validate key format, reserved names, options presence, and default."""
         if not _KEY_RE.match(self.key):
             raise PydanticCustomError(
                 "metadata_key_format",
                 "metadata key must start with a letter and contain only letters, "
                 "digits, or underscores; got: {key}",
+                {"key": repr(self.key)},
+            )
+        # Case-insensitive: a case variant ('System') wouldn't corrupt storage
+        # the way an exact collision does (the columns stay distinct), but a
+        # 'System' column next to 'system' in one result file is a misreading
+        # trap and almost certainly a mistake rather than intent.
+        if self.key.lower() in _RESULT_COLUMNS:
+            raise PydanticCustomError(
+                "metadata_key_reserved",
+                "metadata key {key} is reserved (a result column the savers "
+                "write); choose another name",
                 {"key": repr(self.key)},
             )
         if self.type == "select" and not self.options:

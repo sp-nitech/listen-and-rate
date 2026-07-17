@@ -24,3 +24,21 @@ confidence: 0.95
 # labels:
 #   A: Proposed
 #   B: Baseline
+
+# Stacked report sections (optional). Each group renders its own full set of
+# figures and tables under an <h2> heading, one section after another. A group
+# without filters covers every session; metadata_filter keys name listener
+# metadata fields (a non-matching session drops entirely), stimuli_filter keys
+# name stimulus-side columns (utterance = the results' utterance column, i.e.
+# the file stem in stimuli_dirs mode; or system) and drop individual trials.
+# Values are glob patterns (* and ?; a plain value is an exact match), a list
+# of patterns is OR, and multiple keys/filters combine with AND. Omit groups
+# entirely for the usual single-section report.
+# groups:
+#   - label: All listeners
+#   - label: Headphones only
+#     metadata_filter:
+#       device: Headphones
+#   - label: Speaker m001
+#     stimuli_filter:
+#       utterance: "*_m001_*"

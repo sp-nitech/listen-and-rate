@@ -78,9 +78,10 @@ def main() -> None:
         metavar="PATH",
         help=(
             "Path to a report (figure) YAML controlling presentation: figure "
-            "scale (width/height multipliers), font, confidence level, and "
-            "system display order/labels. Optional; defaults are used when "
-            "omitted. See examples/report-config.yaml."
+            "scale (width/height multipliers), font, confidence level, "
+            "system display order/labels, and stacked filtered sections "
+            "(groups). Optional; defaults are used when omitted. See "
+            "examples/report-config.yaml."
         ),
     )
     args = parser.parse_args()
@@ -155,6 +156,11 @@ def main() -> None:
         system_labels=report.labels,
         height_scale=report.scale.height,
         require_full_order=require_full_order,
+        groups=(
+            [g.model_dump() for g in report.groups]
+            if report.groups is not None
+            else None
+        ),
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -70,7 +70,15 @@ def _render_summary_stats_table_html(df, font_family: str, font_size: int) -> st
 def _wrap_report_html(
     title: str, body_html: str, font_family: str, font_size: int, width: int
 ) -> str:
-    """Wrap chart/table HTML in the report page shell shared by all reports."""
+    """Wrap chart/table HTML in the report page shell shared by all reports.
+
+    plotly.js is embedded here, exactly once, rather than by the first chart's
+    to_html(include_plotlyjs=True) - the generators return composable body
+    fragments (every chart uses include_plotlyjs=False), so a report stacking
+    several sections doesn't embed the ~3MB bundle per section.
+    """
+    from plotly.offline import get_plotlyjs
+
     body = (
         f'<div style="max-width:{width}px;margin:0 auto;font-family:{font_family}">'
         f'<h1 style="text-align:center;font-size:{font_size + 11}px">'
@@ -79,7 +87,8 @@ def _wrap_report_html(
         "</div>"
     )
     return (
-        f"<!doctype html><html><head><meta charset='utf-8'></head><body>"
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        f'<script type="text/javascript">{get_plotlyjs()}</script></head><body>'
         f"{body}</body></html>"
     )
 
@@ -206,7 +215,7 @@ def _render_ci_bar_chart(
         font=dict(family=font_family, size=font_size),
     )
 
-    return rate_fig.to_html(include_plotlyjs=True, full_html=False)
+    return rate_fig.to_html(include_plotlyjs=False, full_html=False)
 
 
 def _render_counts_bar_chart(

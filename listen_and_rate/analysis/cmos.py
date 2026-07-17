@@ -7,7 +7,6 @@ from ._render import (
     _render_ci_bar_chart,
     _render_pvalue_table_html,
     _render_summary_stats_table_html,
-    _wrap_report_html,
 )
 
 _CMOS_CATEGORIES = [-3, -2, -1, 0, 1, 2, 3]
@@ -60,11 +59,9 @@ def _render_cmos_category_chart(
 
 def _generate_cmos_report(
     df,
-    title: str,
     confidence: float,
     font_family: str,
     font_size: int,
-    width: int,
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
@@ -150,10 +147,4 @@ def _generate_cmos_report(
         font_size,
     )
     stats_html = _render_summary_stats_table_html(df, font_family, font_size)
-    return _wrap_report_html(
-        title,
-        f"{ci_html}{category_html}{table_html}{stats_html}",
-        font_family,
-        font_size,
-        width,
-    )
+    return f"{ci_html}{category_html}{table_html}{stats_html}"

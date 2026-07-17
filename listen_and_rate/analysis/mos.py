@@ -6,17 +6,14 @@ from ._render import (
     _render_pvalue_table_html,
     _render_summary_stats_table_html,
     _system_sort_key,
-    _wrap_report_html,
 )
 
 
 def _generate_mos_report(
     df,
-    title: str,
     confidence: float,
     font_family: str,
     font_size: int,
-    width: int,
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
@@ -193,7 +190,7 @@ def _generate_mos_report(
         font=dict(family=font_family, size=font_size),
     )
 
-    mos_html = mos_fig.to_html(include_plotlyjs=True, full_html=False)
+    mos_html = mos_fig.to_html(include_plotlyjs=False, full_html=False)
     dist_html = dist_fig.to_html(include_plotlyjs=False, full_html=False)
 
     n_pairs = math.comb(len(systems), 2)
@@ -240,10 +237,4 @@ def _generate_mos_report(
     )
     stats_html = _render_summary_stats_table_html(df, font_family, font_size)
 
-    return _wrap_report_html(
-        title,
-        f"{mos_html}{dist_html}{table_html}{stats_html}",
-        font_family,
-        font_size,
-        width,
-    )
+    return f"{mos_html}{dist_html}{table_html}{stats_html}"

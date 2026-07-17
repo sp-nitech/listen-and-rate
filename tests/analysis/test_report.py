@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from ._helpers import (
@@ -248,6 +250,161 @@ def test_significance_alpha_follows_confidence(tmp_path):
     )
     assert "α=0.01" in html
     assert "α=0.05" not in html
+
+
+# -- groups (stacked filtered sections) ---------------------------------------
+
+
+def _mos_row(session_id, device, system, utterance, rating):
+    return {
+        "session_id": session_id,
+        "timestamp": "t",
+        "test_type": "mos",
+        "device": device,
+        "system": system,
+        "utterance": utterance,
+        "rating": rating,
+    }
+
+
+_GROUPED_ROWS = [
+    _mos_row("s1", "Headphones", "A", "F01_a", 4),
+    _mos_row("s1", "Headphones", "B", "F01_a", 2),
+    _mos_row("s2", "Speakers", "A", "F02_a", 5),
+    _mos_row("s2", "Speakers", "B", "F02_a", 1),
+]
+
+
+def _section_chunks(html: str) -> list[str]:
+    """Split the report at its <h2 section headings; chunk 0 is the preamble."""
+    return html.split("<h2")
+
+
+def test_groups_render_labeled_sections_in_order(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        groups=[
+            {"label": "All listeners"},
+            {"label": "Headphones", "metadata_filter": {"device": "Headphones"}},
+        ],
+    )
+    chunks = _section_chunks(html)
+    assert len(chunks) == 3  # preamble + 2 sections
+    assert "All listeners" in chunks[1]
+    assert "Headphones" in chunks[2]
+    # Session/record counts per section: all = 2/4, filtered = 1/2.
+    assert ">2</td>" in chunks[1] and ">4</td>" in chunks[1]
+    assert ">1</td>" in chunks[2] and ">2</td>" in chunks[2]
+
+
+def test_groups_stimuli_filter_globs_on_utterance(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        groups=[{"label": "Speaker F01", "stimuli_filter": {"utterance": "F01_*"}}],
+    )
+    section = _section_chunks(html)[1]
+    assert ">2</td>" in section  # 2 of the 4 records match F01_*
+
+
+def test_groups_filters_combine_with_and(tmp_path):
+    rows = _GROUPED_ROWS + [
+        _mos_row("s3", "Headphones", "A", "F02_b", 3),
+    ]
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", rows)],
+        groups=[
+            {
+                "label": "F01 on headphones",
+                "metadata_filter": {"device": "Headphones"},
+                "stimuli_filter": {"utterance": "F01_*"},
+            }
+        ],
+    )
+    section = _section_chunks(html)[1]
+    # s1's two F01 rows survive; s2 (Speakers) and s3's F02_b row do not.
+    assert ">1</td>" in section and ">2</td>" in section
+
+
+def test_groups_unknown_metadata_key_raises_with_label(tmp_path):
+    with pytest.raises(ValueError, match="Headphones group"):
+        generate_report_html(
+            [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+            groups=[{"label": "Headphones group", "metadata_filter": {"devise": "x"}}],
+        )
+
+
+def test_groups_builtin_column_in_metadata_filter_raises(tmp_path):
+    # 'rating' exists as a column but is an outcome, not a metadata field;
+    # filtering on it would be self-serving selection and must be rejected.
+    with pytest.raises(ValueError, match="rating"):
+        generate_report_html(
+            [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+            groups=[{"label": "g", "metadata_filter": {"rating": "5"}}],
+        )
+
+
+def test_groups_no_match_raises_with_label(tmp_path):
+    with pytest.raises(ValueError, match="Bone conduction"):
+        generate_report_html(
+            [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+            groups=[
+                {
+                    "label": "Bone conduction",
+                    "metadata_filter": {"device": "BoneConduction"},
+                }
+            ],
+        )
+
+
+def test_groups_stimuli_filter_system_on_pair_results_raises(tmp_path):
+    # Pair-based results carry system_a/system_b, not a 'system' column, so a
+    # system stimuli_filter cannot apply and must fail loudly.
+    with pytest.raises(ValueError, match="system"):
+        generate_report_html(
+            [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)],
+            groups=[{"label": "g", "stimuli_filter": {"system": "A"}}],
+        )
+
+
+def test_groups_label_is_escaped(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        groups=[{"label": "A <b>& B"}],
+    )
+    assert "A &lt;b&gt;&amp; B" in html
+
+
+def test_no_groups_renders_no_section_headings(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
+    assert "<h2" not in html
+
+
+def test_groups_underline_each_label(tmp_path):
+    # Each section label reads as a title: an underline below the text (not a
+    # separate rule above it), with sections separated by whitespace alone.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        groups=[
+            {"label": "All listeners"},
+            {"label": "Headphones", "metadata_filter": {"device": "Headphones"}},
+        ],
+    )
+    h2_tags = re.findall(r"<h2[^>]*>", html)
+    assert len(h2_tags) == 2
+    assert all("border-bottom" in tag for tag in h2_tags)
+
+
+def test_plotlyjs_embedded_once_across_sections(tmp_path):
+    from plotly.offline import get_plotlyjs
+
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        groups=[
+            {"label": "All"},
+            {"label": "Headphones", "metadata_filter": {"device": "Headphones"}},
+        ],
+    )
+    assert html.count(get_plotlyjs()[:200]) == 1
 
 
 # -- require_full_order -----------------------------------------------------

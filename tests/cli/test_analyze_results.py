@@ -393,3 +393,46 @@ def test_report_config_is_optional(tmp_path, monkeypatch):
     html = out_path.read_text()
     assert "max-width:900px" in html  # default scale = 1.0
     assert "α=0.05" in html  # default confidence 0.95
+
+
+def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):
+    pytest.importorskip("plotly")
+    rows = [
+        {
+            "session_id": sid,
+            "timestamp": "t",
+            "test_type": "mos",
+            "device": device,
+            "system": system,
+            "utterance": "u1",
+            "rating": rating,
+        }
+        for sid, device, ratings in [
+            ("s1", "Headphones", (4, 2)),
+            ("s2", "Speakers", (5, 1)),
+        ]
+        for system, rating in zip(("A", "B"), ratings, strict=True)
+    ]
+    csv_path = _write_csv(tmp_path / "s.csv", rows)
+    report_yaml = _write_report_config(
+        tmp_path,
+        {
+            "groups": [
+                {"label": "All listeners"},
+                {"label": "Headphones", "metadata_filter": {"device": "Headphones"}},
+            ]
+        },
+    )
+    out_path = tmp_path / "report.html"
+    _run_analyze(
+        monkeypatch,
+        str(csv_path),
+        "--report-config",
+        str(report_yaml),
+        "--output",
+        str(out_path),
+    )
+    html = out_path.read_text()
+    assert html.count("<h2") == 2
+    assert "All listeners" in html
+    assert "Headphones" in html

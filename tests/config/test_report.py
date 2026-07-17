@@ -72,6 +72,59 @@ def test_unknown_scale_field_rejected():
         ReportConfig(scale={"depth": 1.0})
 
 
+def test_groups_default_to_none():
+    assert ReportConfig().groups is None
+
+
+def test_groups_parse_label_and_filters():
+    rc = ReportConfig(
+        groups=[
+            {"label": "All"},
+            {
+                "label": "Speaker F01 on headphones",
+                "metadata_filter": {"device": "Headphones"},
+                "stimuli_filter": {"utterance": ["F01_*", "F02_*"]},
+            },
+        ]
+    )
+    assert rc.groups is not None
+    assert rc.groups[0].label == "All"
+    assert rc.groups[0].metadata_filter is None
+    assert rc.groups[0].stimuli_filter is None
+    assert rc.groups[1].metadata_filter == {"device": "Headphones"}
+    assert rc.groups[1].stimuli_filter == {"utterance": ["F01_*", "F02_*"]}
+
+
+def test_groups_coerce_numeric_filter_values_to_str():
+    # An unquoted numeric YAML value (e.g. `age: 30`) must match the stored
+    # string form, like the shortcut key coercions elsewhere in the config.
+    rc = ReportConfig(groups=[{"label": "g", "metadata_filter": {"age": 30}}])
+    assert rc.groups is not None
+    assert rc.groups[0].metadata_filter == {"age": "30"}
+
+
+def test_groups_duplicate_labels_rejected():
+    with pytest.raises(ValidationError):
+        ReportConfig(groups=[{"label": "same"}, {"label": "same"}])
+
+
+def test_groups_stimuli_filter_rejects_non_stimulus_key():
+    # stimuli_filter keys are a fixed allowlist (utterance/system); an outcome
+    # column like 'rating' must be rejected at load time.
+    with pytest.raises(ValidationError):
+        ReportConfig(groups=[{"label": "g", "stimuli_filter": {"rating": "5"}}])
+
+
+def test_groups_unknown_field_rejected():
+    with pytest.raises(ValidationError):
+        ReportConfig(groups=[{"label": "g", "bogus": 1}])
+
+
+def test_groups_label_required():
+    with pytest.raises(ValidationError):
+        ReportConfig(groups=[{"metadata_filter": {"device": "Headphones"}}])
+
+
 def test_load_report_config_or_exit_reads_yaml(tmp_path):
     path = _write(tmp_path, {"confidence": 0.9, "labels": {"A": "Proposed"}})
     rc = load_report_config_or_exit(path)

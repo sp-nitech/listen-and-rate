@@ -1,4 +1,9 @@
-"""Report entry point: read result files, dispatch to the per-test-type report."""
+"""Report entry point: read result files, dispatch to the per-test-type report.
+
+Also implements the optional `groups` sections: the per-test-type generators
+return composable body fragments, so this module can stack one labeled,
+row-filtered section per group into a single page (see _filter_group_rows).
+"""
 
 from __future__ import annotations
 

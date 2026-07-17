@@ -13,6 +13,7 @@ from ._utils import (
     _check_rating_labels_keys,
     _coerce_dict_keys_and_values_to_str,
     _coerce_scalar_to_str,
+    _duplicates,
 )
 
 
@@ -383,7 +384,7 @@ class KeyboardShortcuts(_StrictModel):
         key, which would leave one of them unreachable from the keyboard.
         """
         keys_pressed = list(v.values())
-        duplicates = sorted({k for k in keys_pressed if keys_pressed.count(k) > 1})
+        duplicates = _duplicates(keys_pressed)
         if duplicates:
             raise PydanticCustomError(
                 "shortcuts_rating_duplicate_key",
@@ -429,7 +430,7 @@ def _merge_rating_shortcuts(
         )
     merged = {**defaults, **rating}
     keys_pressed = list(merged.values())
-    duplicates = sorted({k for k in keys_pressed if keys_pressed.count(k) > 1})
+    duplicates = _duplicates(keys_pressed)
     if duplicates:
         raise PydanticCustomError(
             "shortcuts_rating_duplicate_key",

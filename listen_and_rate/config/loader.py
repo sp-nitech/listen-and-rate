@@ -9,7 +9,7 @@ from typing import Annotated
 import yaml
 from pydantic import Field, TypeAdapter, ValidationError
 
-from ._utils import _AUDIO_EXTENSIONS, _normalize, _safe_id
+from ._utils import _AUDIO_EXTENSIONS, _duplicates, _normalize, _safe_id
 from .ab import ABConfig, build_ab_trials
 from .abx import ABXConfig
 from .base import StimuliConfig, StimuliDirsConfig, StimulusConfig
@@ -56,7 +56,7 @@ def _expand_stimuli_dirs(dirs_config: StimuliDirsConfig) -> list[StimulusConfig]
         dir_entries.append((dir_name, entry.resolved_system, audio_files))
 
     systems_seen = [system for _, system, _ in dir_entries]
-    duplicate_systems = sorted({s for s in systems_seen if systems_seen.count(s) > 1})
+    duplicate_systems = _duplicates(systems_seen)
     if duplicate_systems:
         raise ValueError(
             f"stimuli_dirs.systems has duplicate system name(s): {duplicate_systems}. "

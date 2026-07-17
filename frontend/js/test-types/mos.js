@@ -284,8 +284,10 @@ export class MOSTest {
     // Let buttons handle their own Enter activation; Space is reserved for audio below.
     if (tag === 'BUTTON' && e.key === 'Enter') return;
 
+    const { shortcuts } = this;
+
     // play shortcut toggles audio play/pause regardless of which element has focus.
-    const playKey = this.shortcuts.play === 'Space' ? ' ' : this.shortcuts.play;
+    const playKey = shortcuts.play === 'Space' ? ' ' : shortcuts.play;
     if (e.key === playKey) {
       e.preventDefault();
       const audio = this._el?.audio;
@@ -294,14 +296,13 @@ export class MOSTest {
       }
       return;
     }
-    if (e.key === this.shortcuts.rewind) {
+    if (e.key === shortcuts.rewind) {
       e.preventDefault();
       const audio = this._el?.audio;
       if (audio) rewindAudio(audio);
       return;
     }
 
-    const { shortcuts } = this;
     const s = this.stimuli[this.currentIndex];
 
     if (Object.hasOwn(shortcuts.rating, e.key)) {

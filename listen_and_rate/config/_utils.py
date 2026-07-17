@@ -19,6 +19,15 @@ def _safe_id(s: str) -> str:
     return _ID_UNSAFE.sub("_", s)
 
 
+def _duplicates(values: list[str]) -> list[str]:
+    """Return the values occurring more than once, deduplicated and sorted.
+
+    Shared by every "reject duplicate names" validation (system names,
+    shortcut keys, group labels); an empty result means all values are unique.
+    """
+    return sorted({v for v in values if values.count(v) > 1})
+
+
 def _coerce_scalar_to_str(v: object) -> object:
     """Coerce a bare int/float YAML scalar to its string form.
 

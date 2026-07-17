@@ -1,9 +1,10 @@
 """Report (figure) config: presentation options for lar-analyze-results.
 
 Separate from the experiment config (which locates results and defines the
-default system order): this file only controls how the report figures look -
-scale, font, confidence level, and system display order/labels. All fields
-are optional; an empty file yields the defaults.
+default system order): this file only controls the generated report - scale,
+font, confidence level, system display order/labels, and the optional
+stacked filtered sections (groups). All fields are optional; an empty file
+yields the defaults.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import yaml
 from pydantic import Field, ValidationError, field_validator
 from pydantic_core import PydanticCustomError
 
-from ._utils import _coerce_scalar_to_str
+from ._utils import _coerce_scalar_to_str, _duplicates
 from .base import _StrictModel
 from .errors import format_config_error
 
@@ -98,7 +99,9 @@ class ReportConfig(_StrictModel):
     order is given it must list every system present in the data (enforced at
     report-generation time, since the data isn't known here). labels maps a
     raw name to its display name (charts/tables only; the stored data keeps
-    its raw names).
+    its raw names). groups, when given, stacks one labeled, filtered report
+    section per entry (see ReportGroupConfig) instead of the single
+    unlabeled report.
     """
 
     scale: ScaleConfig = Field(default_factory=ScaleConfig)
@@ -117,7 +120,7 @@ class ReportConfig(_StrictModel):
         if v is None:
             return v
         seen = [g.label for g in v]
-        duplicates = sorted({x for x in seen if seen.count(x) > 1})
+        duplicates = _duplicates(seen)
         if duplicates:
             raise PydanticCustomError(
                 "groups_duplicate_label",

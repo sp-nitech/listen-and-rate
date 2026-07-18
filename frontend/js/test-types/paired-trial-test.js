@@ -316,16 +316,41 @@ export class PairedTrialTest {
       // the clip itself instead of skipping past a stopped-mid-way clip.
       const lastPos = this._playCursor.get(this.currentIndex) ?? -1;
       const lastStarted = lastPos >= 0 ? audios[lastPos] : null;
-      const resumable = lastStarted && lastStarted.currentTime > 0 && !lastStarted.ended;
+      // Without resume there is nothing to come back to, so the shortcut
+      // advances to the next clip instead of re-targeting the paused one.
+      const resumable =
+        this._supportsResume() && lastStarted && lastStarted.currentTime > 0 && !lastStarted.ended;
       target = resumable ? lastStarted : audios[(lastPos + 1) % audios.length];
     }
-    target.play();
+    this._startPlayback(target);
+  }
+
+  /**
+   * Start playback of one clip. The seam the play shortcut goes through
+   * (MUSHRA routes its own play buttons through it too; the standard
+   * player's button is bound in audio-player.js and always resumes).
+   */
+  _startPlayback(audio) {
+    if (!this._supportsResume()) rewindAudio(audio);
+    audio.play();
   }
 
   /** Record that `audio` is the clip most recently started, for _handlePlayShortcut's cycling. */
   _recordPlayCursor(audio) {
     const audios = [...this._pageSlot.querySelectorAll('audio')];
     this._playCursor.set(this.currentIndex, audios.indexOf(audio));
+  }
+
+  /**
+   * Whether pausing preserves the playback position. When false (MUSHRA),
+   * one concept drives three behaviors: every start plays from the beginning
+   * (_startPlayback), the play shortcut advances to the NEXT clip after a
+   * pause rather than re-targeting the paused one (_handlePlayShortcut), and
+   * the rewind shortcut/hint are dropped as redundant - restarting is what
+   * plain play already does.
+   */
+  _supportsResume() {
+    return true;
   }
 
   /**
@@ -363,7 +388,7 @@ export class PairedTrialTest {
       this._handlePlayShortcut();
       return;
     }
-    if (e.key === shortcuts.rewind) {
+    if (e.key === shortcuts.rewind && this._supportsResume()) {
       e.preventDefault();
       this._handleRewindShortcut();
       return;
@@ -421,7 +446,14 @@ export class PairedTrialTest {
     const prevKey = shortcuts.prev === 'ArrowLeft' ? '←' : escapeHtml(shortcuts.prev);
     const nextKey = shortcuts.next === 'ArrowRight' ? '→' : escapeHtml(shortcuts.next);
     const confirmKey = shortcuts.confirm === 'Enter' ? 'Enter' : escapeHtml(shortcuts.confirm);
-    return `<kbd>${playKey}</kbd> play/pause &nbsp;·&nbsp;<kbd>${rewindKey}</kbd> rewind &nbsp;·&nbsp;${this._choiceHintHtml()} &nbsp;·&nbsp;<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate &nbsp;·&nbsp;<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`;
+    const segments = [
+      `<kbd>${playKey}</kbd> play/pause`,
+      ...(this._supportsResume() ? [`<kbd>${rewindKey}</kbd> rewind`] : []),
+      this._choiceHintHtml(),
+      `<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate`,
+      `<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`,
+    ];
+    return segments.join(' &nbsp;·&nbsp;');
   }
 
   /** The type-specific middle segment of the shortcut hint; default matches _handleChoiceKey's choose-A/B keys. */

@@ -15,11 +15,17 @@
  * presence, same slider count), so each trial only swaps audio srcs, the
  * per-column stimulus id, slider values, and unlock state.
  *
- * Each slider unlocks individually as soon as its own clip has played to
- * completion once (not gated on every other clip first). Next/Submit still
- * requires every clip in the trial to have played at least once (including
- * the Reference) and every slider to have been explicitly moved at least
- * once, mirroring DMOSTest's playback-gated rating.
+ * Each slider unlocks the moment its own clip STARTS playing, so listeners
+ * can adjust the rating while the clip is still sounding. With a Reference
+ * configured, every other clip's play button stays disabled (dimmed) until
+ * the Reference has been heard to completion once - the reference anchors
+ * the scale, so it must come first. Next/Submit requires every slider to
+ * have been explicitly moved at least once; that transitively requires
+ * hearing the Reference and starting every clip, so no separate
+ * played-to-completion gate is needed. Playback never resumes mid-clip
+ * (_supportsResume is false): every start plays from the beginning and the
+ * play shortcut advances to the next clip after a pause, so successive
+ * plays compare the same passage across systems.
  */
 
 import { PAUSE_SVG, PLAY_SVG } from '../audio-player.js';
@@ -38,6 +44,24 @@ const MUSHRA_LABELS_DEFAULT = {
 };
 const MUSHRA_TICKS = [100, 80, 60, 40, 20, 0];
 
+/**
+ * Whether Shift is a FREE modifier for the given configured key - i.e. not
+ * consumed by typing the key itself. Only then can Shift+key mean "big step":
+ * for an uppercase letter (or a shifted symbol like "%"), producing the key
+ * already requires Shift, so the x10 multiplier is not offered and (in the
+ * hint) not advertised. Named keys (ArrowUp, ...) and Space are unaffected
+ * by Shift, so they qualify.
+ */
+function shiftIsFree(key) {
+  return key.length > 1 || key === ' ';
+}
+
+/** Reset a play button to its idle look (play icon, no now-playing marker). */
+function resetPlayButton(btn) {
+  btn.innerHTML = PLAY_SVG;
+  btn.classList.remove('is-playing');
+}
+
 export class MUSHRATest extends PairedTrialTest {
   /**
    * @param {Object} config - Server config from /api/config (has `trials`).
@@ -47,7 +71,12 @@ export class MUSHRATest extends PairedTrialTest {
   constructor(config, sessionId, onSubmit) {
     super(config, sessionId, onSubmit);
     // choices: trial index → Map<stimulus_id, value> (one trial has N sliders)
-    // played: trial index → Set of local indices (reused from PairedTrialTest)
+    // played: trial index → Set of local indices whose listening requirement
+    // is met (reused from PairedTrialTest, persisted for resume). The
+    // requirement differs per role: the Reference must play to COMPLETION
+    // (it anchors the scale and gates the other play buttons); a slider's
+    // clip only has to START (its slider unlocks so the listener can rate
+    // while listening).
     this.shortcuts = config.shortcuts ?? {
       play: 'Space',
       prev: 'ArrowLeft',
@@ -64,12 +93,6 @@ export class MUSHRATest extends PairedTrialTest {
   /** All rateable (slider-bearing) stimuli for a trial, in render order: blind systems, then the anchor last. */
   _sliderStimuli(trial) {
     return trial.anchor ? [...trial.systems, trial.anchor] : trial.systems;
-  }
-
-  /** All audio clips for a trial, in DOM/playback order: reference first, then every slider stimulus. */
-  _audioStimuli(trial) {
-    const sliders = this._sliderStimuli(trial);
-    return trial.reference ? [trial.reference, ...sliders] : sliders;
   }
 
   // -- build once -----------------------------------------------------------
@@ -219,23 +242,20 @@ export class MUSHRATest extends PairedTrialTest {
     for (const audio of this._pageSlot.querySelectorAll('audio')) {
       const localIndex = Number.parseInt(audio.dataset.localIndex, 10);
       const playBtn = audio.parentElement.querySelector('.mushra-play-btn');
+      const isReference = !!audio.closest('.mushra-reference-col');
 
+      // A slider clip's listening requirement is met the moment it STARTS:
+      // unlock its slider right away so the listener can rate while the clip
+      // is still sounding. (The Reference has no slider; its requirement is
+      // completion, handled in 'ended' below.)
       audio.addEventListener('play', () => {
         this._recordPlayCursor(audio);
-        if (playBtn) playBtn.innerHTML = PAUSE_SVG;
-      });
-      audio.addEventListener('pause', () => {
-        if (playBtn) playBtn.innerHTML = PLAY_SVG;
-      });
-
-      audio.addEventListener('error', () => {
-        audio.closest('.mushra-col')?.classList.add('audio-error-state');
-      });
-
-      // Unlock only this clip's own slider (if it has one - the Reference
-      // doesn't) as soon as it finishes, rather than waiting for every clip
-      // in the trial to be played first.
-      audio.addEventListener('ended', () => {
+        if (playBtn) {
+          playBtn.innerHTML = PAUSE_SVG;
+          // Now-playing marker (solid primary fill via CSS .is-playing).
+          playBtn.classList.add('is-playing');
+        }
+        if (isReference) return;
         const played = this._playedSet(this.currentIndex);
         if (!played.has(localIndex)) {
           played.add(localIndex);
@@ -245,14 +265,32 @@ export class MUSHRATest extends PairedTrialTest {
             range.setAttribute('aria-disabled', 'false');
             range.tabIndex = 0;
           }
-          this._updateNextButtonState();
           this._onChange?.();
         }
-        // Advance the step indicator to "② Listen to others and rate" once
-        // the Reference itself has been heard.
-        if (audio.closest('.mushra-reference-col')) {
-          this._el.steps?.classList.add('played');
+      });
+      audio.addEventListener('pause', () => {
+        if (playBtn) resetPlayButton(playBtn);
+      });
+
+      audio.addEventListener('error', () => {
+        audio.closest('.mushra-col')?.classList.add('audio-error-state');
+      });
+
+      // The Reference anchors the rating scale, so it must be heard to
+      // completion once before anything else: only then are the other play
+      // buttons enabled (and the step indicator advanced to step ②).
+      audio.addEventListener('ended', () => {
+        // Browsers fire 'pause' before 'ended', but clear the marker here
+        // too so it can never stick after a natural end.
+        playBtn?.classList.remove('is-playing');
+        if (!isReference) return;
+        const played = this._playedSet(this.currentIndex);
+        if (!played.has(localIndex)) {
+          played.add(localIndex);
+          this._onChange?.();
         }
+        this._setSystemPlayButtonsEnabled(true);
+        this._el.steps?.classList.add('played');
       });
 
       if (playBtn) {
@@ -262,7 +300,7 @@ export class MUSHRATest extends PairedTrialTest {
             for (const other of this._pageSlot.querySelectorAll('audio')) {
               if (other !== audio && !other.paused) other.pause();
             }
-            audio.play();
+            this._startPlayback(audio);
           } else {
             audio.pause();
           }
@@ -275,6 +313,59 @@ export class MUSHRATest extends PairedTrialTest {
   }
 
   // -- per-trial sync -------------------------------------------------------
+
+  /**
+   * Enable/disable every system clip's play button (never the Reference's).
+   * Disabled buttons are dimmed via CSS (.mushra-play-btn:disabled) while the
+   * Reference hasn't been heard to completion yet.
+   */
+  _setSystemPlayButtonsEnabled(enabled) {
+    for (const col of this._el.sliderCols) {
+      const btn = col.querySelector('.mushra-play-btn');
+      if (btn) btn.disabled = !enabled;
+    }
+  }
+
+  /** Step size for one rate keypress: x10 with Shift, but only when Shift isn't consumed producing `key`. */
+  _rateStep(e, key) {
+    return e.shiftKey && shiftIsFree(key) ? 10 : 1;
+  }
+
+  /**
+   * Show whether this slider has been rated yet. Unrated sliders hide their
+   * thumb/fill (CSS .is-unrated) and read "–" instead of a number - a thumb
+   * parked at 0 with a "0" readout could be misread as a deliberate
+   * lowest-possible score rather than "not rated yet". aria-valuetext keeps
+   * the same distinction audible: without it a screen reader would announce
+   * the placeholder aria-valuenow of 0 as if it were a real score.
+   */
+  _setSliderRated(range, hasRating) {
+    range.classList.toggle('is-unrated', !hasRating);
+    if (hasRating) {
+      range.removeAttribute('aria-valuetext');
+    } else {
+      range.setAttribute('aria-valuetext', 'not rated yet');
+      const valueEl = range.closest('.mushra-slider-col')?.querySelector('.mushra-slider-value');
+      if (valueEl) valueEl.textContent = '–';
+    }
+  }
+
+  /**
+   * The single write path for every user-initiated rating: clamp the value,
+   * update the slider DOM, mark it rated, and record the choice. Pointer
+   * drags pass an absolute value; the rate keys go through _nudgeSlider.
+   */
+  _applySliderValue(range, rawValue) {
+    const value = Math.max(0, Math.min(100, Math.round(rawValue)));
+    this._setSliderValue(range, value);
+    this._setSliderRated(range, true);
+    this._setChoice(this.currentIndex, range.dataset.stimulusId, value);
+  }
+
+  /** Step a slider's value by delta relative to its current position. */
+  _nudgeSlider(range, delta) {
+    this._applySliderValue(range, Number.parseInt(range.dataset.value, 10) + delta);
+  }
 
   /** Apply value to a hand-built slider's DOM (thumb, fill, readout, aria/data). */
   _setSliderValue(range, value) {
@@ -305,7 +396,7 @@ export class MUSHRATest extends PairedTrialTest {
       const refCol = this._el.referenceAudio.closest('.mushra-col');
       refCol?.classList.remove('audio-error-state');
       const refBtn = refCol?.querySelector('.mushra-play-btn');
-      if (refBtn) refBtn.innerHTML = PLAY_SVG;
+      if (refBtn) resetPlayButton(refBtn);
     }
 
     const sliderStimuli = this._sliderStimuli(trial);
@@ -319,6 +410,7 @@ export class MUSHRATest extends PairedTrialTest {
       const range = col.querySelector('.mushra-range');
       range.dataset.stimulusId = s.id;
       this._setSliderValue(range, value);
+      this._setSliderRated(range, !!rated?.has(s.id));
       range.classList.toggle('is-disabled', !enabled);
       range.setAttribute('aria-disabled', enabled ? 'false' : 'true');
       range.tabIndex = enabled ? 0 : -1;
@@ -328,9 +420,12 @@ export class MUSHRATest extends PairedTrialTest {
       if (audio.getAttribute('src') !== url) audio.src = url;
       col.classList.remove('audio-error-state');
       const playBtn = col.querySelector('.mushra-play-btn');
-      if (playBtn) playBtn.innerHTML = PLAY_SVG;
+      if (playBtn) resetPlayButton(playBtn);
     });
 
+    // Reference-first gating: system play buttons stay disabled until this
+    // trial's Reference has been heard to completion (no-op without one).
+    this._setSystemPlayButtonsEnabled(!this._hasReference || played.has(0));
     this._el.steps?.classList.toggle('played', this._hasReference && played.has(0));
 
     this._el.prev.disabled = this.currentIndex === 0;
@@ -344,17 +439,14 @@ export class MUSHRATest extends PairedTrialTest {
   /**
    * Wire up one hand-built vertical slider: pointer drag (via pointer
    * capture, so movement outside the element still tracks) and keyboard
-   * (shortcuts.rate_up/rate_down by 1, Shift+ for 10 - configurable, like
-   * prev/next). The "is-active" class (double-ring thumb outline) is only
-   * applied while a drag or key-adjustment is actually in progress, not as
-   * a persistent focus indicator.
+   * (shortcuts.rate_up/rate_down by 1; Shift steps by 10 when it isn't
+   * consumed producing the key itself - see _rateStep/shiftIsFree). The
+   * "is-active" class (double-ring thumb outline) is only applied while a
+   * drag or key-adjustment is actually in progress, not as a persistent
+   * focus indicator.
    */
   _bindRangeSlider(el) {
-    const setValue = (rawValue) => {
-      const value = Math.max(0, Math.min(100, Math.round(rawValue)));
-      this._setSliderValue(el, value);
-      this._setChoice(this.currentIndex, el.dataset.stimulusId, value);
-    };
+    const setValue = (rawValue) => this._applySliderValue(el, rawValue);
 
     const isDisabled = () => el.getAttribute('aria-disabled') === 'true';
     const activate = () => el.classList.add('is-active');
@@ -397,18 +489,16 @@ export class MUSHRATest extends PairedTrialTest {
 
     el.addEventListener('keydown', (e) => {
       if (isDisabled()) return;
-      const current = Number.parseInt(el.dataset.value, 10);
-      const step = e.shiftKey ? 10 : 1;
       if (e.key === this.shortcuts.rate_up) {
         e.preventDefault();
         e.stopPropagation();
         activate();
-        setValue(current + step);
+        this._nudgeSlider(el, this._rateStep(e, this.shortcuts.rate_up));
       } else if (e.key === this.shortcuts.rate_down) {
         e.preventDefault();
         e.stopPropagation();
         activate();
-        setValue(current - step);
+        this._nudgeSlider(el, -this._rateStep(e, this.shortcuts.rate_down));
       }
     });
     el.addEventListener('keyup', (e) => {
@@ -417,23 +507,16 @@ export class MUSHRATest extends PairedTrialTest {
     el.addEventListener('blur', deactivate);
   }
 
-  /** True once every clip (reference + all sliders) in this trial has played to completion at least once. */
-  _canChoose(trialIndex) {
-    const trial = this.trials[trialIndex];
-    return this._playedSet(trialIndex).size >= this._audioStimuli(trial).length;
-  }
-
-  _isTrialFullyRated(trialIndex, sliderStimuli) {
-    const rated = this.choices.get(trialIndex);
-    return !!rated && sliderStimuli.every((s) => rated.has(s.id));
-  }
-
-  /** A trial counts as done once every clip has played AND every slider has been explicitly moved. */
+  /**
+   * A trial counts as done once every slider has been explicitly moved at
+   * least once. A slider only unlocks when its clip starts, and no clip can
+   * start before the Reference (if any) has been heard to completion, so
+   * all-sliders-moved transitively implies the whole listening flow.
+   */
   _isTrialComplete(trialIndex) {
-    const trial = this.trials[trialIndex];
-    return (
-      this._canChoose(trialIndex) && this._isTrialFullyRated(trialIndex, this._sliderStimuli(trial))
-    );
+    const rated = this.choices.get(trialIndex);
+    const sliderStimuli = this._sliderStimuli(this.trials[trialIndex]);
+    return !!rated && sliderStimuli.every((s) => rated.has(s.id));
   }
 
   _allTrialsComplete() {
@@ -442,7 +525,7 @@ export class MUSHRATest extends PairedTrialTest {
 
   /**
    * Override PairedTrialTest's weaker "has any entry" gate: MUSHRA requires
-   * the whole trial to be complete (every clip played, every slider moved)
+   * the whole trial to be complete (every slider moved at least once)
    * before advancing, not just one slider touched.
    */
   _navigate(delta) {
@@ -510,16 +593,53 @@ export class MUSHRATest extends PairedTrialTest {
     if (bar) bar.style.width = `${pct}%`;
   }
 
-  /** MUSHRA has no document-level choice keys - ratings are adjusted on the focused slider (rate_up/rate_down, see _bindSlider). */
-  _handleChoiceKey() {
+  /**
+   * Pausing never preserves position in MUSHRA: comparing systems means
+   * re-listening to the same passage (often just the opening) clip after
+   * clip, and a mid-clip resume would silently compare different passages.
+   * Via the base class this single choice makes every start play from the
+   * beginning, makes the play shortcut advance to the NEXT clip after a
+   * pause, and drops the redundant rewind shortcut/hint.
+   */
+  _supportsResume() {
     return false;
+  }
+
+  /**
+   * rate_up/rate_down adjust the slider of the clip being listened to (the
+   * playing clip, or the most recently started one), so listeners can rate
+   * without moving focus off the play controls. A focused slider still
+   * handles its own keys first (its keydown handler stops propagation), so
+   * explicit slider-by-slider keyboard operation keeps working. Consumed
+   * even without a target slider (e.g. the Reference is playing) so the
+   * arrows never scroll the page mid-trial.
+   */
+  _handleChoiceKey(e) {
+    const { shortcuts } = this;
+    const isUp = e.key === shortcuts.rate_up;
+    if (!isUp && e.key !== shortcuts.rate_down) return false;
+    e.preventDefault();
+    const audios = [...this._pageSlot.querySelectorAll('audio')];
+    const lastPos = this._playCursor.get(this.currentIndex) ?? -1;
+    const target = audios.find((a) => !a.paused) ?? (lastPos >= 0 ? audios[lastPos] : null);
+    const range = target?.closest('.mushra-slider-col')?.querySelector('.mushra-range');
+    if (range && range.getAttribute('aria-disabled') !== 'true') {
+      const key = isUp ? shortcuts.rate_up : shortcuts.rate_down;
+      this._nudgeSlider(range, (isUp ? 1 : -1) * this._rateStep(e, key));
+    }
+    return true;
   }
 
   _choiceHintHtml() {
     const { shortcuts } = this;
     const rateUpKey = shortcuts.rate_up === 'ArrowUp' ? '↑' : escapeHtml(shortcuts.rate_up);
     const rateDownKey = shortcuts.rate_down === 'ArrowDown' ? '↓' : escapeHtml(shortcuts.rate_down);
-    return `<kbd>${rateUpKey}</kbd><kbd>${rateDownKey}</kbd> rate`;
+    const base = `<kbd>${rateUpKey}</kbd><kbd>${rateDownKey}</kbd> rate`;
+    // Advertise the x10 modifier only when it actually works for BOTH keys
+    // (see shiftIsFree) - the hint must never promise an unreachable step.
+    return shiftIsFree(shortcuts.rate_up) && shiftIsFree(shortcuts.rate_down)
+      ? `${base} (<kbd>Shift</kbd>: ±10)`
+      : base;
   }
 
   async _submit() {

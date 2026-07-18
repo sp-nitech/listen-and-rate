@@ -664,9 +664,28 @@ audio {
   display: block;
 }
 
-.mushra-play-btn:hover {
+.mushra-play-btn:hover:not(:disabled) {
   border-color: var(--color-primary);
   background: var(--color-primary-light);
+}
+
+/* Reference-first gating: system clips stay unplayable (dimmed) until the
+   Reference has been heard to completion once (see mushra.js). */
+.mushra-play-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Now-playing marker: solid primary fill - categorically different from the
+   hover state's light tint, so the active clip reads at a glance even though
+   the button is small. The :hover variant is listed too (same specificity as
+   the hover rule above, later in the file) so hovering the playing button
+   doesn't fall back to the lighter hover styling. */
+.mushra-play-btn.is-playing,
+.mushra-play-btn.is-playing:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .mushra-value-row {
@@ -740,8 +759,9 @@ audio {
    everywhere except near the middle. The thumb here is positioned via the
    exact same `top: N%` math as the gridlines/ticks (see mushra.js), so it
    always lines up exactly, at any track height. width is a generous
-   pointer/touch hit target - the visible line itself is the thinner
-   ::before below.
+   pointer/touch hit target (44px, the recommended minimum touch-target
+   size; it fits within the 60px column) - the visible line itself is the
+   thinner ::before below.
    .mushra-range (the interactive one) is deliberately TALLER than the
    track by the thumb's own size, so a value-0/100 thumb sitting right at
    the track's edge can still be grabbed by clicking the half of it that
@@ -754,7 +774,7 @@ audio {
    never dragged, so it stays exactly track-sized with no inner wrapper. */
 .mushra-range {
   position: relative;
-  width: 24px;
+  width: 44px;
   align-self: center;
   height: calc(100% + 18px);
   margin-top: -9px;
@@ -781,10 +801,10 @@ audio {
   top: 0;
   bottom: 0;
   left: 50%;
-  width: 6px;
+  width: 8px;
   transform: translateX(-50%);
   background: var(--color-border);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 /* Solid "filled" indicator from the bottom up to the current value -
@@ -795,10 +815,10 @@ audio {
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 6px;
+  width: 8px;
   transform: translateX(-50%);
   background: var(--color-primary);
-  border-radius: 3px;
+  border-radius: 4px;
   pointer-events: none;
 }
 
@@ -843,6 +863,15 @@ audio {
 .mushra-range-fixed .mushra-range-thumb {
   background: var(--color-text-muted);
   box-shadow: none;
+}
+
+/* Not-yet-rated sliders hide their thumb/fill and read "–" instead of a
+   number (see mushra.js's _setSliderRated): a thumb parked at 0 with a "0"
+   readout could be misread as a deliberate lowest-possible score rather
+   than "not rated yet". */
+.mushra-range.is-unrated .mushra-range-thumb,
+.mushra-range.is-unrated .mushra-range-fill {
+  display: none;
 }
 
 /* The double-ring outline is a "currently moving" indicator (added/removed

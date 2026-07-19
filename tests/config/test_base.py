@@ -77,9 +77,25 @@ def test_stimuli_dirs_system_list_value_still_rejected(tmp_path, test_audio_file
 
 def test_config_defaults(tmp_path, test_audio_file):
     result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
-    assert result.randomize is True
+    assert result.presentation_order == "random"
+    assert result.shuffle_order is True
     assert result.output.format == "csv"
     assert result.output.path == "./results/"
+
+
+def test_presentation_order_fixed_disables_shuffle(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["presentation_order"] = "fixed"
+    result = load_config(write_config(tmp_path, data))
+    assert result.presentation_order == "fixed"
+    assert result.shuffle_order is False
+
+
+def test_presentation_order_rejects_unknown_value(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["presentation_order"] = "sorted"
+    with pytest.raises(ValidationError, match="presentation_order"):
+        load_config(write_config(tmp_path, data))
 
 
 def test_shortcuts_defaults(tmp_path, test_audio_file):

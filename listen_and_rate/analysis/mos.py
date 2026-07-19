@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from ._render import (
-    _render_pvalue_table_html,
-    _render_summary_stats_table_html,
+    _render_data_summary_table_html,
+    _render_table_html,
     _system_sort_key,
+    _table_heading_html,
 )
 
 
@@ -224,7 +225,7 @@ def _generate_mos_report(
                 "*" if adj_p < alpha else "",
             ]
         )
-    table_html = _render_pvalue_table_html(
+    significance_test_table = _render_table_html(
         [
             "Pair",
             "p-value (t-test)",
@@ -235,6 +236,12 @@ def _generate_mos_report(
         font_family,
         font_size,
     )
-    stats_html = _render_summary_stats_table_html(df, font_family, font_size)
+    data_summary_table = _render_data_summary_table_html(df, font_family, font_size)
 
-    return f"{mos_html}{dist_html}{table_html}{stats_html}"
+    significance_test_heading = _table_heading_html("Significance tests", font_size)
+    data_summary_heading = _table_heading_html("Data summary", font_size)
+    return (
+        f"{mos_html}{dist_html}"
+        f"{significance_test_heading}{significance_test_table}"
+        f"{data_summary_heading}{data_summary_table}"
+    )

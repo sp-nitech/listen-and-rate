@@ -12,10 +12,10 @@ from ._helpers import (
 )
 
 
-def test_ab_config_utterances_per_session_preserves_order_when_not_randomized(
+def test_ab_config_utterances_per_session_preserves_order_when_presentation_fixed(
     tmp_path, test_audio_file, monkeypatch
 ):
-    """With randomize=False, the sampled trial subset must keep its original
+    """With presentation_order="fixed", the sampled trial subset must keep its original
     utterance order (utt0 < utt1 < ...), not an arbitrary permutation."""
     with _ab_client(
         tmp_path,
@@ -23,7 +23,7 @@ def test_ab_config_utterances_per_session_preserves_order_when_not_randomized(
         monkeypatch,
         n_utterances=6,
         utterances_per_session=4,
-        randomize=False,
+        presentation_order="fixed",
     ) as tc:
         for _ in range(20):
             trials = tc.get("/api/config").json()["trials"]

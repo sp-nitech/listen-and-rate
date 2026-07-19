@@ -31,6 +31,19 @@ def test_generate_report_returns_html(tmp_path):
     assert "<html>" in html
 
 
+def test_mos_report_labels_main_tables(tmp_path):
+    # The two main tables (pairwise significance, data counts) carry headings.
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
+    assert ">Significance tests</h3>" in html
+    assert ">Data summary</h3>" in html
+
+
+def test_ab_report_labels_main_tables(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)])
+    assert ">Significance tests</h3>" in html
+    assert ">Data summary</h3>" in html
+
+
 def test_generate_report_default_confidence(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
     assert "95% CI" in html

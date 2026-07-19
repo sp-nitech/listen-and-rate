@@ -18,6 +18,13 @@ output:
 # listener's first play click (default: false) - useful on slow connections.
 # preload_audio: true
 
+# Presentation order of the per-session stimuli/trials (default: random).
+# "random" shuffles the order per listener to cancel order effects; "fixed"
+# keeps the configured order. This governs ordering ONLY - which subset each
+# listener is sampled, and the within-trial position blinding, are always
+# randomized.
+# presentation_order: random
+
 # ABX tests compare exactly 2 systems, defined via directories (each dir
 # should contain the same filenames - explicit `stimuli:` lists are not
 # supported for ABX tests).

@@ -32,7 +32,7 @@ def config_yaml(tmp_path, test_audio_file) -> Path:
         "title": "Test Evaluation",
         "instructions": "Rate the quality.",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "randomize": False,
+        "presentation_order": "fixed",
         "stimuli": {
             "items": [
                 {"id": "s001", "path": str(test_audio_file)},

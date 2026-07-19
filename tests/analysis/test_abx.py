@@ -40,6 +40,8 @@ def test_generate_abx_report_shows_summary_stats(tmp_path):
     html = generate_report_html([csv_path, json_path])
     assert ">2<" in html  # 2 participants (s1, s2)
     assert ">8<" in html  # 8 guesses collected (4 rows each)
+    assert ">Significance tests</h3>" in html
+    assert ">Data summary</h3>" in html
 
 
 def test_generate_abx_report_counts_chart_is_vertical(tmp_path):

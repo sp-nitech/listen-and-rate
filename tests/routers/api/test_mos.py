@@ -53,10 +53,10 @@ def test_stimuli_per_session_samples_correctly(tmp_path, test_audio_file, monkey
         assert len(ids) == len(set(ids))
 
 
-def test_stimuli_per_session_keeps_order_when_randomize_false(
+def test_stimuli_per_session_keeps_order_when_presentation_fixed(
     tmp_path, test_audio_file, monkeypatch
 ):
-    """randomize:false means the sampled subset keeps the configured order.
+    """presentation_order:fixed means the sampled subset keeps the configured order.
 
     Mirrors frontend/config.php's sample_keep_order(); random.sample() alone
     would return the subset in random order.
@@ -66,7 +66,7 @@ def test_stimuli_per_session_keeps_order_when_randomize_false(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "randomize": False,
+        "presentation_order": "fixed",
         "stimuli": {
             "stimuli_per_session": 3,
             "items": [

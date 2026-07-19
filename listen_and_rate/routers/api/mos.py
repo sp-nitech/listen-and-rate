@@ -40,7 +40,7 @@ def _get_mos_test_config(config: MOSConfig) -> dict:
     else:
         items = list(all_items)
 
-    if config.randomize:
+    if config.shuffle_order:
         items = random.sample(items, len(items))
 
     stimuli = _stimuli_to_response(items)

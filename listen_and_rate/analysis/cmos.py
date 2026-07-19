@@ -5,8 +5,9 @@ from __future__ import annotations
 from ._render import (
     _ordered_pairs,
     _render_ci_bar_chart,
-    _render_pvalue_table_html,
-    _render_summary_stats_table_html,
+    _render_data_summary_table_html,
+    _render_table_html,
+    _table_heading_html,
 )
 
 _CMOS_CATEGORIES = [-3, -2, -1, 0, 1, 2, 3]
@@ -135,7 +136,7 @@ def _generate_cmos_report(
     category_html = _render_cmos_category_chart(
         pair_labels, counts_per_pair, font_family, font_size, height_scale
     )
-    table_html = _render_pvalue_table_html(
+    significance_test_table = _render_table_html(
         [
             "Pair",
             "Mean rating",
@@ -146,5 +147,12 @@ def _generate_cmos_report(
         font_family,
         font_size,
     )
-    stats_html = _render_summary_stats_table_html(df, font_family, font_size)
-    return f"{ci_html}{category_html}{table_html}{stats_html}"
+    data_summary_table = _render_data_summary_table_html(df, font_family, font_size)
+
+    significance_test_heading = _table_heading_html("Significance tests", font_size)
+    data_summary_heading = _table_heading_html("Data summary", font_size)
+    return (
+        f"{ci_html}{category_html}"
+        f"{significance_test_heading}{significance_test_table}"
+        f"{data_summary_heading}{data_summary_table}"
+    )

@@ -460,7 +460,12 @@ class BaseTestConfig(_StrictModel):
     title: str
     instructions: str
     output: OutputConfig = Field(default_factory=OutputConfig)
-    randomize: bool = True
+    # How the per-session stimuli/trials are ordered. "random" (default)
+    # shuffles the presentation order per listener to cancel order effects;
+    # "fixed" keeps the configured order (systems as listed, files by name).
+    # This governs ordering ONLY - which subset a listener is sampled and the
+    # within-trial A/B position blinding are always randomized regardless.
+    presentation_order: Literal["random", "fixed"] = "random"
     # Fetch each page's audio as soon as the page is shown instead of on the
     # listener's first play click - trades bandwidth for less waiting on slow
     # connections.
@@ -488,6 +493,11 @@ class BaseTestConfig(_StrictModel):
     def experiment_id(self) -> str:
         """Experiment identifier derived from the config file's stem."""
         return self._experiment_id
+
+    @property
+    def shuffle_order(self) -> bool:
+        """Whether the presentation order should be shuffled per session."""
+        return self.presentation_order == "random"
 
     @model_validator(mode="after")
     def check_stimuli_source(self) -> BaseTestConfig:

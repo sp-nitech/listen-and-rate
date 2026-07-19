@@ -178,6 +178,9 @@ def test_export_php_deploy_config_data_includes_session_sampling_params(
     text = (outdir / "config_data.php").read_text()
     assert "'utterances_per_session' => 1" in text
     assert "'stimuli_per_session' => null" in text
+    # config.php re-applies presentation_order per request, so the bundle must
+    # carry it (defaulting to "random").
+    assert "'presentation_order' => 'random'" in text
 
 
 def test_export_php_deploy_config_data_includes_survey_fields(

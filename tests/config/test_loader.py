@@ -39,7 +39,7 @@ def test_load_config_with_all_fields(tmp_path, test_audio_file):
         "test_type": "mos",
         "title": "Full Test",
         "instructions": "Listen carefully.",
-        "randomize": True,
+        "presentation_order": "random",
         "output": {"format": "json", "path": "./out/"},
         "stimuli": {
             "items": [
@@ -49,7 +49,7 @@ def test_load_config_with_all_fields(tmp_path, test_audio_file):
         },
     }
     result = load_config(write_config(tmp_path, data))
-    assert result.randomize is True
+    assert result.presentation_order == "random"
     assert result.output.format == "json"
     assert len(result.stimuli.items) == 2
     assert result.stimuli.items[0].label == "A"

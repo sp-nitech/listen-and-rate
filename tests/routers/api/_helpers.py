@@ -37,7 +37,7 @@ def _two_system_client(
     test_type,
     n_utterances=2,
     utterances_per_session=None,
-    randomize=True,
+    presentation_order="random",
     **extra,
 ):
     da, db = _two_system_dirs(tmp_path, test_audio_file, n_utterances)
@@ -54,7 +54,7 @@ def _two_system_client(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "randomize": randomize,
+        "presentation_order": presentation_order,
         "stimuli_dirs": stimuli_dirs,
         **extra,
     }
@@ -103,7 +103,7 @@ def _dmos_client(
     n_utterances=2,
     n_test_systems=1,
     utterances_per_session=None,
-    randomize=True,
+    presentation_order="random",
     **extra,
 ):
     d_ref = tmp_path / "sys_ref"
@@ -126,7 +126,7 @@ def _dmos_client(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "randomize": randomize,
+        "presentation_order": presentation_order,
         "stimuli_dirs": stimuli_dirs,
         **extra,
     }
@@ -139,7 +139,7 @@ def _cmos_client(
     monkeypatch,
     n_utterances=2,
     utterances_per_session=None,
-    randomize=True,
+    presentation_order="random",
     **extra,
 ):
     return _two_system_client(
@@ -149,7 +149,7 @@ def _cmos_client(
         "cmos",
         n_utterances,
         utterances_per_session,
-        randomize,
+        presentation_order,
         **extra,
     )
 
@@ -161,7 +161,7 @@ def _ab_client(
     n_utterances=2,
     allow_tie=True,
     utterances_per_session=None,
-    randomize=True,
+    presentation_order="random",
     **extra,
 ):
     return _two_system_client(
@@ -171,7 +171,7 @@ def _ab_client(
         "ab",
         n_utterances,
         utterances_per_session,
-        randomize,
+        presentation_order,
         allow_tie=allow_tie,
         **extra,
     )
@@ -183,7 +183,7 @@ def _abx_client(
     monkeypatch,
     n_utterances=2,
     utterances_per_session=None,
-    randomize=True,
+    presentation_order="random",
     **extra,
 ):
     return _two_system_client(
@@ -193,7 +193,7 @@ def _abx_client(
         "abx",
         n_utterances,
         utterances_per_session,
-        randomize,
+        presentation_order,
         **extra,
     )
 
@@ -204,7 +204,7 @@ def _xab_client(
     monkeypatch,
     n_utterances=2,
     utterances_per_session=None,
-    randomize=True,
+    presentation_order="random",
     **extra,
 ):
     dirs = []
@@ -228,7 +228,7 @@ def _xab_client(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "randomize": randomize,
+        "presentation_order": presentation_order,
         "stimuli_dirs": stimuli_dirs,
         **extra,
     }
@@ -244,7 +244,7 @@ def _mushra_client(
     with_reference=True,
     with_anchor=True,
     utterances_per_session=None,
-    randomize=True,
+    presentation_order="random",
     **extra,
 ):
     systems = []
@@ -275,7 +275,7 @@ def _mushra_client(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "randomize": randomize,
+        "presentation_order": presentation_order,
         "stimuli_dirs": stimuli_dirs,
         **extra,
     }

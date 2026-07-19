@@ -88,7 +88,7 @@ final class ConfigTest extends TestCase
                 'test_type' => $testType,
                 'title' => 'T',
                 'instructions' => 'I',
-                'randomize' => true,
+                'presentation_order' => 'random',
                 'metadata' => ['title' => 'Listener Information', 'fields' => []],
                 'survey' => ['title' => 'Questionnaire', 'fields' => []],
                 'stimuli_per_session' => null,
@@ -119,12 +119,6 @@ final class ConfigTest extends TestCase
         foreach ($response['stimuli'] as $s) {
             $this->assertSame(['id', 'label', 'audio_url'], array_keys($s));
         }
-    }
-
-    public function testBuildConfigResponseForcesRandomizeFalse(): void
-    {
-        $response = build_config_response($this->fakeConfigData());
-        $this->assertFalse($response['randomize']);
     }
 
     public function testBuildConfigResponsePassesThroughTopLevelFields(): void

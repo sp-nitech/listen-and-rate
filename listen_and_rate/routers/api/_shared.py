@@ -85,8 +85,9 @@ def _sample_keep_order(items: list[T], n: int) -> list[T]:
     """Randomly select n items, preserving their original relative order.
 
     random.sample() alone returns items in random order, which would ignore
-    randomize=False's "keep the fixed/deterministic order" contract; mirrors
-    frontend/config.php's sample_keep_order().
+    presentation_order="fixed"'s "keep the configured order" contract (the
+    later shuffle applies it for "random"); mirrors frontend/config.php's
+    sample_keep_order().
     """
     n = min(n, len(items))
     indices = sorted(random.sample(range(len(items)), n))
@@ -135,8 +136,9 @@ def _test_config_response(config: Config, **extras: object) -> dict:
     """Build the /api/config response fields shared by every test type.
 
     Type-specific fields (stimuli/trials, rating_labels, allow_tie, ...) are
-    passed as keyword arguments. randomize is always False in the response
-    because shuffling already happened server-side.
+    passed as keyword arguments. The stimuli/trials are already in final
+    order (presentation_order is applied server-side), so nothing about
+    ordering is echoed to the browser.
     """
     return {
         "experiment_id": config.experiment_id,
@@ -144,7 +146,6 @@ def _test_config_response(config: Config, **extras: object) -> dict:
         "test_type": config.test_type,
         "title": config.title,
         "instructions": config.instructions,
-        "randomize": False,
         "preload_audio": config.preload_audio,
         # Each form is one {title, fields} block, the same shape as the YAML,
         # so the concept keeps a single shape across every layer.
@@ -249,7 +250,7 @@ def _build_response_trials(
     n = config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
     if n is not None:
         trials = _sample_keep_order(trials, n)
-    if config.randomize:
+    if config.shuffle_order:
         trials = random.sample(trials, len(trials))
     return trials
 

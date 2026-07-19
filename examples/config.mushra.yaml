@@ -21,6 +21,13 @@ output:
 # listener's first play click (default: false) - useful on slow connections.
 # preload_audio: true
 
+# Presentation order of the per-session stimuli/trials (default: random).
+# "random" shuffles the order per listener to cancel order effects; "fixed"
+# keeps the configured order. This governs ordering ONLY - which subset each
+# listener is sampled, and the within-trial position blinding, are always
+# randomized.
+# presentation_order: random
+
 # MUSHRA tests rate 2+ systems (test systems and/or a hidden/disclosed
 # anchor) against an OPTIONAL shared reference, defined via directories.
 # - At most one system may be flagged `reference: true` (non-rateable,

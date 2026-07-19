@@ -291,15 +291,6 @@ async function main() {
     `;
   }
 
-  // Server already shuffles (randomize is always false in the response), so
-  // this is defensive-only and only applies to MOS's flat stimuli list.
-  if (config.randomize && config.stimuli) {
-    for (let i = config.stimuli.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [config.stimuli[i], config.stimuli[j]] = [config.stimuli[j], config.stimuli[i]];
-    }
-  }
-
   const test = new TestClass(config, sessionId, onSubmit);
   test._onChange = () => persist(test);
   test.render(container);

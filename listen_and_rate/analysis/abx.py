@@ -6,8 +6,9 @@ from ._render import (
     _binomial_pair_stats,
     _ordered_pairs,
     _render_binary_outcome_charts,
-    _render_pvalue_table_html,
-    _render_summary_stats_table_html,
+    _render_data_summary_table_html,
+    _render_table_html,
+    _table_heading_html,
 )
 
 
@@ -34,7 +35,7 @@ def _generate_abx_report(
 
     pair_labels: list[str] = []
     accuracy: list[float] = []
-    acc_errors: list[float] = []
+    accuracy_errors: list[float] = []
     hover_text: list[str] = []
     count_labels: list[str] = []
     count_values: list[int] = []
@@ -49,7 +50,7 @@ def _generate_abx_report(
 
         pair_labels.append(f"{_disp(system_a)} vs {_disp(system_b)}")
         accuracy.append(rate)
-        acc_errors.append(err)
+        accuracy_errors.append(err)
         hover_text.append(f"Correct: {n_correct}/{n_total} ({rate:.0%})")
         # ABXConfig requires exactly 2 systems, so there is only ever one
         # pair and generic "Correct"/"Incorrect" labels stay unambiguous.
@@ -63,10 +64,10 @@ def _generate_abx_report(
             ]
         )
 
-    acc_html, counts_html = _render_binary_outcome_charts(
+    accuracy_html, counts_html = _render_binary_outcome_charts(
         pair_labels,
         accuracy,
-        acc_errors,
+        accuracy_errors,
         hover_text,
         count_labels,
         count_values,
@@ -76,11 +77,18 @@ def _generate_abx_report(
         font_size,
         height_scale,
     )
-    table_html = _render_pvalue_table_html(
+    significance_test_table = _render_table_html(
         ["Pair", "p-value (binomial)", f"Significant (α={alpha:.2f})"],
         table_rows,
         font_family,
         font_size,
     )
-    stats_html = _render_summary_stats_table_html(df, font_family, font_size)
-    return f"{acc_html}{counts_html}{table_html}{stats_html}"
+    data_summary_table = _render_data_summary_table_html(df, font_family, font_size)
+
+    significance_test_heading = _table_heading_html("Significance tests", font_size)
+    data_summary_heading = _table_heading_html("Data summary", font_size)
+    return (
+        f"{accuracy_html}{counts_html}"
+        f"{significance_test_heading}{significance_test_table}"
+        f"{data_summary_heading}{data_summary_table}"
+    )

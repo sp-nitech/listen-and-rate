@@ -240,7 +240,8 @@ def _render_config_data_php(data: dict) -> str:
 
     config.php includes this at request time to build the browser-facing
     response, re-sampling stimuli_per_session/utterances_per_session and
-    randomize fresh on every request (see frontend/config.php).
+    re-applying presentation_order fresh on every request (see
+    frontend/config.php).
     """
     return f"<?php\n\nreturn {_php_value(data)};\n"
 
@@ -254,9 +255,9 @@ def _build_config_data(
     """Assemble the static experiment definition written to config_data.php.
 
     Everything config.php needs to rebuild the browser-facing response on each
-    request (re-applying per-session sampling/randomize), plus the server-side
-    only fields (reference_system, x_secret, ...) that must never reach the
-    browser - see each field's comment.
+    request (re-applying per-session sampling and presentation_order), plus the
+    server-side only fields (reference_system, x_secret, ...) that must never
+    reach the browser - see each field's comment.
     """
     reference_system = (
         config.reference_system
@@ -288,7 +289,7 @@ def _build_config_data(
         "test_type": config.test_type,
         "title": config.title,
         "instructions": config.instructions,
-        "randomize": config.randomize,
+        "presentation_order": config.presentation_order,
         "preload_audio": config.preload_audio,
         "output_format": config.output.format,
         # save.php resolves this against the bundle directory when relative
@@ -358,8 +359,9 @@ def main() -> None:
     stimulus_map.php there too, so --outdir ends up as a self-contained bundle
     ready to upload as-is. config_data.php holds the raw experiment
     definition (including stimuli_per_session/utterances_per_session); it is
-    read by config.php, which re-applies per-session sampling and randomize
-    on every request rather than baking in one fixed subset, and withholds
+    read by config.php, which re-applies per-session sampling and
+    presentation_order on every request rather than baking in one fixed
+    subset, and withholds
     'system' from its response to keep listeners blind to the underlying
     system under test. stimulus_map.php carries that mapping for save.php.
     """

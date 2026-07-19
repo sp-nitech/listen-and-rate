@@ -39,7 +39,7 @@ def _build_mushra_response_trials(
     n = config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
     if n is not None:
         trials = _sample_trials_by_utterance(trials, n)
-    if config.randomize:
+    if config.shuffle_order:
         trials = random.sample(trials, len(trials))
     return trials
 

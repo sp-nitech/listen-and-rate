@@ -6,8 +6,9 @@ from ._render import (
     _binomial_pair_stats,
     _ordered_pairs,
     _render_binary_outcome_charts,
-    _render_pvalue_table_html,
-    _render_summary_stats_table_html,
+    _render_data_summary_table_html,
+    _render_table_html,
+    _table_heading_html,
 )
 
 
@@ -85,11 +86,18 @@ def _generate_ab_report(
         font_size,
         height_scale,
     )
-    table_html = _render_pvalue_table_html(
+    significance_test_table = _render_table_html(
         ["Pair", "p-value (binomial)", f"Significant (α={alpha:.2f})"],
         table_rows,
         font_family,
         font_size,
     )
-    stats_html = _render_summary_stats_table_html(df, font_family, font_size)
-    return f"{pref_html}{counts_html}{table_html}{stats_html}"
+    data_summary_table = _render_data_summary_table_html(df, font_family, font_size)
+
+    significance_test_heading = _table_heading_html("Significance tests", font_size)
+    data_summary_heading = _table_heading_html("Data summary", font_size)
+    return (
+        f"{pref_html}{counts_html}"
+        f"{significance_test_heading}{significance_test_table}"
+        f"{data_summary_heading}{data_summary_table}"
+    )

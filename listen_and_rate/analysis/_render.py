@@ -32,14 +32,29 @@ def _reorder_pair(a: str, b: str, system_order: list[str] | None) -> tuple[str, 
     return a, b
 
 
-def _render_pvalue_table_html(
+def _table_heading_html(label: str, font_size: int) -> str:
+    """Render a centered h3 heading sitting just above a report table.
+
+    Shared by the per-test-type main tables (significance, data summary) and
+    the Participants section's per-form (Metadata/Survey) subsections, so
+    every table heading looks the same.
+    """
+    return (
+        f'<h3 style="text-align:center;font-size:{font_size + 2}px;'
+        f'margin:24px 0 0">{_escape_html(label)}</h3>'
+    )
+
+
+def _render_table_html(
     headers: list[str], rows: list[list[str]], font_family: str, font_size: int
 ) -> str:
-    """Render a significance table as a standalone, bordered HTML <table>.
+    """Render a headers+rows grid as a standalone, bordered HTML <table>.
 
-    Headers/cells are HTML-escaped: they carry system names (and rename
-    labels) straight from the admin's config, so a stray '<' shouldn't be able
-    to break the page - matching the browser-tab title's own escaping.
+    The generic table painter shared by every report table (significance,
+    data summary, participant distributions). Headers/cells are HTML-escaped:
+    they carry system names (and rename labels) straight from the admin's
+    config, so a stray '<' shouldn't be able to break the page - matching the
+    browser-tab title's own escaping.
     """
     thead = "".join(f'<th style="{_TH_STYLE}">{_escape_html(h)}</th>' for h in headers)
     tbody = "".join(
@@ -55,11 +70,11 @@ def _render_pvalue_table_html(
     )
 
 
-def _render_summary_stats_table_html(df, font_family: str, font_size: int) -> str:
-    """Render the session/record-count summary table shared by all reports."""
+def _render_data_summary_table_html(df, font_family: str, font_size: int) -> str:
+    """Render the session/record-count data summary table shared by all reports."""
     n_participants = df["session_id"].nunique() if "session_id" in df.columns else 0
     n_rows = len(df)
-    return _render_pvalue_table_html(
+    return _render_table_html(
         ["Session count", "Record count"],
         [[str(n_participants), str(n_rows)]],
         font_family,

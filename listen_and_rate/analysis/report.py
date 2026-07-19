@@ -85,7 +85,7 @@ def _participants_section_html(
     no config was given) fall back to the key, so config-less reports are
     unchanged.
     """
-    from ._render import _render_pvalue_table_html
+    from ._render import _render_table_html, _table_heading_html
 
     labels = form_labels or {}
     per_session = df.drop_duplicates("session_id") if "session_id" in df.columns else df
@@ -104,9 +104,8 @@ def _participants_section_html(
             for response, n in counts.sort_index().items():
                 rows.append([field, str(response), str(int(n))])
         subsections.append(
-            f'<h3 style="text-align:center;font-size:{font_size + 2}px;'
-            f'margin:24px 0 0">{form_label}</h3>'
-            + _render_pvalue_table_html(
+            _table_heading_html(form_label, font_size)
+            + _render_table_html(
                 ["Field", "Response", "Sessions"], rows, font_family, font_size
             )
         )

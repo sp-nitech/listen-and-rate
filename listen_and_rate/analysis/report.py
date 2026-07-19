@@ -12,7 +12,7 @@ from html import escape as _escape_html
 from pathlib import Path
 
 from ..storage import METADATA_COLUMN_PREFIX, SURVEY_COLUMN_PREFIX
-from ._render import _wrap_report_html
+from ._render import _render_table_html, _table_heading_html, _wrap_report_html
 from .ab import _generate_ab_report
 from .abx import _generate_abx_report
 from .cmos import _generate_cmos_report
@@ -85,8 +85,6 @@ def _participants_section_html(
     no config was given) fall back to the key, so config-less reports are
     unchanged.
     """
-    from ._render import _render_table_html, _table_heading_html
-
     labels = form_labels or {}
     per_session = df.drop_duplicates("session_id") if "session_id" in df.columns else df
     subsections = []

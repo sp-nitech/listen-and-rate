@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from ._render import (
-    _render_data_summary_table_html,
-    _render_table_html,
+    _render_trailing_tables_html,
     _system_sort_key,
-    _table_heading_html,
 )
 
 
@@ -225,7 +223,7 @@ def _generate_mos_report(
                 "*" if adj_p < alpha else "",
             ]
         )
-    significance_test_table = _render_table_html(
+    trailing_tables = _render_trailing_tables_html(
         [
             "Pair",
             "p-value (t-test)",
@@ -233,15 +231,8 @@ def _generate_mos_report(
             f"Significant (α={alpha:.2f})",
         ],
         table_rows,
+        df,
         font_family,
         font_size,
     )
-    data_summary_table = _render_data_summary_table_html(df, font_family, font_size)
-
-    significance_test_heading = _table_heading_html("Significance tests", font_size)
-    data_summary_heading = _table_heading_html("Data summary", font_size)
-    return (
-        f"{mos_html}{dist_html}"
-        f"{significance_test_heading}{significance_test_table}"
-        f"{data_summary_heading}{data_summary_table}"
-    )
+    return f"{mos_html}{dist_html}{trailing_tables}"

@@ -149,6 +149,8 @@ def _test_config_response(config: Config, **extras: object) -> dict:
         "audio_preload": config.audio_preload,
         # {stimulus_id: seconds}, so the player's time bar shows clip length
         # immediately instead of flickering from "--" once metadata loads.
+        # Deliberately covers EVERY stimulus, not just this session's sample:
+        # practice clips are drawn from the full pool (_practice_extras).
         "durations": config.durations,
         # Each form is one {title, fields} block, the same shape as the YAML,
         # so the concept keeps a single shape across every layer.

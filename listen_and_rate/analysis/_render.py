@@ -82,6 +82,30 @@ def _render_data_summary_table_html(df, font_family: str, font_size: int) -> str
     )
 
 
+def _render_trailing_tables_html(
+    significance_test_headers: list[str],
+    significance_test_rows: list[list[str]],
+    df,
+    font_family: str,
+    font_size: int,
+) -> str:
+    """Render the labeled tables trailing every per-test-type report body.
+
+    A "Significance tests" heading over the type-specific pairwise table
+    (headers/rows assembled by the caller), then a "Data summary" heading
+    over the session/record counts - shared so all report types end the
+    same way.
+    """
+    return (
+        _table_heading_html("Significance tests", font_size)
+        + _render_table_html(
+            significance_test_headers, significance_test_rows, font_family, font_size
+        )
+        + _table_heading_html("Data summary", font_size)
+        + _render_data_summary_table_html(df, font_family, font_size)
+    )
+
+
 def _wrap_report_html(
     title: str, body_html: str, font_family: str, font_size: int, width: int
 ) -> str:

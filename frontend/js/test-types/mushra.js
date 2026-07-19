@@ -280,9 +280,10 @@ export class MUSHRATest extends PairedTrialTest {
       // completion once before anything else: only then are the other play
       // buttons enabled (and the step indicator advanced to step ②).
       audio.addEventListener('ended', () => {
-        // Browsers fire 'pause' before 'ended', but clear the marker here
-        // too so it can never stick after a natural end.
-        playBtn?.classList.remove('is-playing');
+        // Browsers fire 'pause' before 'ended' (which already resets the
+        // button), but reset here too so neither the icon nor the marker
+        // can ever stick after a natural end.
+        if (playBtn) resetPlayButton(playBtn);
         if (!isReference) return;
         const played = this._playedSet(this.currentIndex);
         if (!played.has(localIndex)) {

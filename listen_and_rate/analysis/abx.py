@@ -6,9 +6,7 @@ from ._render import (
     _binomial_pair_stats,
     _ordered_pairs,
     _render_binary_outcome_charts,
-    _render_data_summary_table_html,
-    _render_table_html,
-    _table_heading_html,
+    _render_trailing_tables_html,
 )
 
 
@@ -77,18 +75,11 @@ def _generate_abx_report(
         font_size,
         height_scale,
     )
-    significance_test_table = _render_table_html(
+    trailing_tables = _render_trailing_tables_html(
         ["Pair", "p-value (binomial)", f"Significant (α={alpha:.2f})"],
         table_rows,
+        df,
         font_family,
         font_size,
     )
-    data_summary_table = _render_data_summary_table_html(df, font_family, font_size)
-
-    significance_test_heading = _table_heading_html("Significance tests", font_size)
-    data_summary_heading = _table_heading_html("Data summary", font_size)
-    return (
-        f"{accuracy_html}{counts_html}"
-        f"{significance_test_heading}{significance_test_table}"
-        f"{data_summary_heading}{data_summary_table}"
-    )
+    return f"{accuracy_html}{counts_html}{trailing_tables}"

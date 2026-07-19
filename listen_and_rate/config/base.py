@@ -466,10 +466,13 @@ class BaseTestConfig(_StrictModel):
     # This governs ordering ONLY - which subset a listener is sampled and the
     # within-trial A/B position blinding are always randomized regardless.
     presentation_order: Literal["random", "fixed"] = "random"
-    # Fetch each page's audio as soon as the page is shown instead of on the
-    # listener's first play click - trades bandwidth for less waiting on slow
-    # connections.
-    preload_audio: bool = False
+    # How much of each page's audio is fetched - the value is the HTML
+    # <audio preload> attribute served to the browser. "none" fetches nothing
+    # until first play; "auto" (default) fetches the whole clip on show so
+    # playback is instant (a hint - browsers may fetch less on metered
+    # connections). The clip duration is served directly (see the response's
+    # `durations`), so the time bar shows length regardless of this setting.
+    audio_preload: Literal["none", "auto"] = "auto"
     stimuli: StimuliConfig | None = None
     stimuli_dirs: StimuliDirsConfig | None = None
     shortcuts: KeyboardShortcuts = Field(default_factory=KeyboardShortcuts)
@@ -488,11 +491,20 @@ class BaseTestConfig(_StrictModel):
     # Not user-configurable: always derived from the config file's stem by
     # load_config(). Kept as a private attribute so it cannot be set via YAML.
     _experiment_id: str = PrivateAttr(default="")
+    # {stimulus_id: duration_seconds}, measured from the audio headers by
+    # load_config(); served to the browser so the time bar shows clip length
+    # without a per-clip metadata fetch. Private so it can't be set via YAML.
+    _durations: dict[str, float] = PrivateAttr(default_factory=dict)
 
     @property
     def experiment_id(self) -> str:
         """Experiment identifier derived from the config file's stem."""
         return self._experiment_id
+
+    @property
+    def durations(self) -> dict[str, float]:
+        """{stimulus_id: duration_seconds} measured at load time."""
+        return self._durations
 
     @property
     def shuffle_order(self) -> bool:

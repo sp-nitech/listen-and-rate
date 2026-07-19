@@ -89,6 +89,8 @@ final class ConfigTest extends TestCase
                 'title' => 'T',
                 'instructions' => 'I',
                 'presentation_order' => 'random',
+                'audio_preload' => 'auto',
+                'durations' => ['A__u1' => 1.5, 'A__u2' => 1.5, 'B__u1' => 1.5, 'B__u2' => 1.5],
                 'metadata' => ['title' => 'Listener Information', 'fields' => []],
                 'survey' => ['title' => 'Questionnaire', 'fields' => []],
                 'stimuli_per_session' => null,
@@ -165,18 +167,22 @@ final class ConfigTest extends TestCase
         $this->assertSame('アンケート', $response['survey']['title']);
     }
 
-    public function testBuildConfigResponsePreloadAudioDefaultsToFalse(): void
+    public function testBuildConfigResponsePassesThroughAudioPreload(): void
     {
+        // The <audio preload> level is echoed to the browser unchanged.
         $response = build_config_response($this->fakeConfigData());
-        $this->assertFalse($response['preload_audio']);
+        $this->assertSame('auto', $response['audio_preload']);
+
+        $data = $this->fakeConfigData();
+        $data['audio_preload'] = 'none';
+        $this->assertSame('none', build_config_response($data)['audio_preload']);
     }
 
-    public function testBuildConfigResponsePassesThroughPreloadAudio(): void
+    public function testBuildConfigResponsePassesThroughDurations(): void
     {
-        $data = $this->fakeConfigData();
-        $data['preload_audio'] = true;
-        $response = build_config_response($data);
-        $this->assertTrue($response['preload_audio']);
+        // Clip lengths are echoed so the browser can show them immediately.
+        $response = build_config_response($this->fakeConfigData());
+        $this->assertSame(1.5, $response['durations']['A__u1']);
     }
 
     // -- config_version (resume fingerprint) -------------------------------

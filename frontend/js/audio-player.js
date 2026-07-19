@@ -34,7 +34,8 @@ const REWIND_SVG =
  * (a number, or 'x' for ABX/XAB's reference); the test types read it back off
  * the <audio> via dataset.localIndex.
  */
-export function audioPlayerHtml(localIndex, preload) {
+export function audioPlayerHtml(localIndex, preload, durationSec) {
+  const dur = Number.isFinite(durationSec) ? durationSec : '';
   return `
     <div class="audio-player">
       <button class="audio-rewind-btn" type="button" aria-label="Rewind to start">${REWIND_SVG}</button>
@@ -42,21 +43,40 @@ export function audioPlayerHtml(localIndex, preload) {
       <div class="audio-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div class="audio-progress-fill"></div>
       </div>
-      <span class="audio-time">0.0 / --</span>
-      <audio data-local-index="${localIndex}" preload="${preload}"></audio>
+      <span class="audio-time">0.0 / ${formatSec(durationSec)}</span>
+      <audio data-local-index="${localIndex}" data-duration="${dur}" preload="${preload}"></audio>
     </div>
   `;
 }
 
 // Listening-test clips are short, so the readout is seconds (one decimal),
-// e.g. "3.4 / 5.3" - never M:SS. The total is '--' until the clip's metadata
-// has loaded (which, with preload="none", is only once it's first played).
+// e.g. "3.4 / 5.3" - never M:SS. The total shows '--' only if no duration is
+// known at all.
 function formatSec(seconds) {
   return Number.isFinite(seconds) ? seconds.toFixed(1) : '--';
 }
 
+// The clip's total length. The server-provided duration (data-duration, set by
+// the test type per clip) is authoritative and available on render, so the
+// readout never flickers from '--'. A clip marked 'hidden' (ABX's X reference)
+// must never reveal its length - showing it, even from the loaded audio's own
+// metadata, would leak which stimulus X duplicates - so it stays '--'.
+function totalDuration(audio) {
+  if (audio.dataset.duration === 'hidden') return Number.NaN;
+  const served = Number(audio.dataset.duration);
+  return served > 0 ? served : audio.duration;
+}
+
+// A blinded clip (ABX's X) shows no numbers at all - not even elapsed, since
+// playing to the end would otherwise reveal the length. The progress bar stays
+// (visual only), so listeners keep their position feedback.
+function isBlinded(audio) {
+  return audio.dataset.duration === 'hidden';
+}
+
 function timeText(audio) {
-  return `${formatSec(audio.currentTime)} / ${formatSec(audio.duration)}`;
+  if (isBlinded(audio)) return '-- / --';
+  return `${formatSec(audio.currentTime)} / ${formatSec(totalDuration(audio))}`;
 }
 
 function playerParts(audio) {
@@ -103,7 +123,10 @@ export function bindAudioPlayer(audio) {
   };
 
   const renderBar = () => {
-    const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+    // Prefer the real element duration once loaded (exact during playback);
+    // fall back to the served duration before the first play.
+    const dur = audio.duration || totalDuration(audio);
+    const pct = dur ? (audio.currentTime / dur) * 100 : 0;
     fill.style.width = `${pct}%`;
     bar.setAttribute('aria-valuenow', String(Math.round(pct)));
   };
@@ -156,5 +179,5 @@ export function resetAudioPlayer(audio) {
   playBtn.setAttribute('aria-label', 'Play');
   fill.style.width = '0%';
   bar.setAttribute('aria-valuenow', '0');
-  time.textContent = `0.0 / ${formatSec(audio.duration)}`;
+  time.textContent = isBlinded(audio) ? '-- / --' : `0.0 / ${formatSec(totalDuration(audio))}`;
 }

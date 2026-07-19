@@ -290,7 +290,11 @@ def _build_config_data(
         "title": config.title,
         "instructions": config.instructions,
         "presentation_order": config.presentation_order,
-        "preload_audio": config.preload_audio,
+        "audio_preload": config.audio_preload,
+        # {stimulus_id: seconds}, baked in at export time (config.php has no
+        # soundfile) so the browser can show clip length without a metadata
+        # fetch. See _shared.py's _test_config_response.
+        "durations": config.durations,
         "output_format": config.output.format,
         # save.php resolves this against the bundle directory when relative
         # (see its resolve_results_dir()), mirroring the FastAPI deployment's

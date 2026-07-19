@@ -81,8 +81,8 @@ export class DMOSTest extends PairedTrialTest {
 
   // -- per-trial sync -------------------------------------------------------
 
-  _trialAudioSrcs(trial) {
-    return { 0: this._audioUrl(trial.reference), 1: this._audioUrl(trial.test) };
+  _trialAudioClips(trial) {
+    return { 0: this._clip(trial.reference), 1: this._clip(trial.test) };
   }
 
   _syncChoiceButtons() {

@@ -87,11 +87,14 @@ export class ABXTest extends PairedTrialTest {
 
   // -- per-trial sync -------------------------------------------------------
 
-  _trialAudioSrcs(trial) {
+  _trialAudioClips(trial) {
     return {
-      0: this._audioUrl(trial.stimuli[0]),
-      1: this._audioUrl(trial.stimuli[1]),
-      x: this._xAudioUrl(trial),
+      0: this._clip(trial.stimuli[0]),
+      1: this._clip(trial.stimuli[1]),
+      // The X reference is a hidden duplicate of stimulus 0 or 1; showing its
+      // length would leak which, so id is null - _syncAudioSrcs marks it
+      // 'hidden' and the readout never reveals a total for it.
+      x: { url: this._xAudioUrl(trial), id: null },
     };
   }
 

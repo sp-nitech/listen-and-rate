@@ -533,17 +533,27 @@ def test_loudness_check_and_normalization_are_mutually_exclusive(
         load_config(write_config(tmp_path, data))
 
 
-def test_preload_audio_defaults_to_false(tmp_path, test_audio_file):
+def test_audio_preload_defaults_to_auto(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
     result = load_config(write_config(tmp_path, data))
-    assert result.preload_audio is False
+    assert result.audio_preload == "auto"
 
 
-def test_preload_audio_accepts_true(tmp_path, test_audio_file):
+def test_audio_preload_accepts_each_level(tmp_path, test_audio_file):
+    for level in ("none", "auto"):
+        data = minimal_config(str(test_audio_file))
+        data["audio_preload"] = level
+        result = load_config(write_config(tmp_path, data))
+        assert result.audio_preload == level
+
+
+def test_audio_preload_rejects_dropped_metadata_value(tmp_path, test_audio_file):
+    # "metadata" was removed once the clip duration is served directly (the
+    # time bar no longer needs a client-side metadata fetch to show length).
     data = minimal_config(str(test_audio_file))
-    data["preload_audio"] = True
-    result = load_config(write_config(tmp_path, data))
-    assert result.preload_audio is True
+    data["audio_preload"] = "metadata"
+    with pytest.raises(ValidationError, match="audio_preload"):
+        load_config(write_config(tmp_path, data))
 
 
 def test_partial_rating_shortcuts_merge_over_defaults(tmp_path, test_audio_file):

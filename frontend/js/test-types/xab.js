@@ -78,11 +78,11 @@ export class XABTest extends PairedTrialTest {
 
   // -- per-trial sync -------------------------------------------------------
 
-  _trialAudioSrcs(trial) {
+  _trialAudioClips(trial) {
     return {
-      x: this._audioUrl(trial.reference),
-      0: this._audioUrl(trial.stimuli[0]),
-      1: this._audioUrl(trial.stimuli[1]),
+      x: this._clip(trial.reference),
+      0: this._clip(trial.stimuli[0]),
+      1: this._clip(trial.stimuli[1]),
     };
   }
 

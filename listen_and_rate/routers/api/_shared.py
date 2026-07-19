@@ -146,7 +146,10 @@ def _test_config_response(config: Config, **extras: object) -> dict:
         "test_type": config.test_type,
         "title": config.title,
         "instructions": config.instructions,
-        "preload_audio": config.preload_audio,
+        "audio_preload": config.audio_preload,
+        # {stimulus_id: seconds}, so the player's time bar shows clip length
+        # immediately instead of flickering from "--" once metadata loads.
+        "durations": config.durations,
         # Each form is one {title, fields} block, the same shape as the YAML,
         # so the concept keeps a single shape across every layer.
         "metadata": {

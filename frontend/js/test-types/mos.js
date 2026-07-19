@@ -99,7 +99,7 @@ export class MOSTest {
           <span class="stimulus-label"></span>
         </div>
         <div class="audio-card">
-          ${audioPlayerHtml(0, this.config.preload_audio ? 'auto' : 'none')}
+          ${audioPlayerHtml(0, this.config.audio_preload)}
           <p class="audio-error" hidden>⚠ Audio file could not be loaded. Please contact the administrator.</p>
         </div>
         <div class="rating-section">
@@ -191,6 +191,9 @@ export class MOSTest {
       this._el.audio.pause();
       if (this._el.audio.currentTime !== 0) this._el.audio.currentTime = 0;
     }
+    // Served duration for the current clip, so the time bar shows length
+    // immediately (no '--' flicker) before the audio metadata loads.
+    this._el.audio.dataset.duration = this.config.durations?.[s.id] ?? '';
     resetAudioPlayer(this._el.audio);
     this._el.player.hidden = false;
     this._el.audioError.hidden = true;

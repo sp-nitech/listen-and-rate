@@ -499,13 +499,16 @@ def test_export_php_deploy_config_data_omits_x_secret_for_mos(
     assert "'x_secret' => null" in text
 
 
-def test_export_php_deploy_config_data_includes_preload_audio(
+def test_export_php_deploy_config_data_includes_audio_preload(
     config_yaml, tmp_path, monkeypatch
 ):
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text()
-    assert "'preload_audio' => false" in text
+    assert "'audio_preload' => 'auto'" in text
+    # Clip durations are baked in so config.php can serve them without soundfile.
+    assert "'durations' => [" in text
+    assert "'s001' => 0.1" in text
 
 
 def _config_with_output_path(tmp_path, test_audio_file, output_path=None) -> Path:

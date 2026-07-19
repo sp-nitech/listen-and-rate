@@ -8,7 +8,7 @@
  * player (audio-player.js) around a bare <audio> - so nothing flickers on
  * prev/next and there's no native control to right-click-save. Subclasses
  * supply the type-specific pieces via hooks: _audioRegionHtml, _choiceButtonsHtml,
- * _ratingButtonsClass, _listenStepsHtml, _stimulusLabel, _trialAudioSrcs,
+ * _ratingButtonsClass, _listenStepsHtml, _stimulusLabel, _trialAudioClips,
  * _syncChoiceButtons, _onChoiceButton, _canChoose, _handleChoiceKey,
  * _choiceHintHtml, _submit.
  * MUSHRA overrides _buildPage/_syncPage entirely (sliders, no native controls).
@@ -122,9 +122,14 @@ export class PairedTrialTest {
     return s.audio_url ?? `/audio/${encodeURIComponent(s.id)}`;
   }
 
+  /** A clip descriptor {url, id} for _trialAudioClips; id resolves the served duration. */
+  _clip(s) {
+    return { url: this._audioUrl(s), id: s.id };
+  }
+
   /** One blinded audio card (persistent custom player; only its src changes per trial). */
   _audioCardHtml(label, localIndex) {
-    const preload = this.config.preload_audio ? 'auto' : 'none';
+    const preload = this.config.audio_preload;
     return `
       <div class="audio-card">
         <span class="audio-card-label">${label}</span>
@@ -204,9 +209,15 @@ export class PairedTrialTest {
 
   /** Swap only the src on each persistent <audio> for the current trial. */
   _syncAudioSrcs() {
-    const srcs = this._trialAudioSrcs(this.trials[this.currentIndex]);
+    const clips = this._trialAudioClips(this.trials[this.currentIndex]);
     for (const audio of this._el.audios) {
-      this._resetAudio(audio, srcs[audio.dataset.localIndex]);
+      const clip = clips[audio.dataset.localIndex];
+      this._resetAudio(audio, clip.url);
+      // Served duration keeps the time bar from flickering '--' on swap. A clip
+      // with no id (ABX's hidden X reference) is marked 'hidden' so its length
+      // is never shown - revealing it would leak which stimulus X duplicates.
+      audio.dataset.duration =
+        clip.id == null ? 'hidden' : (this.config.durations?.[clip.id] ?? '');
       resetAudioPlayer(audio);
       const card = audio.closest('.audio-card');
       card.querySelector('.audio-player').hidden = false;

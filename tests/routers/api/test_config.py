@@ -53,21 +53,29 @@ def test_config_blinds_sensitive_fields(client):
     assert "system" not in text
 
 
-def test_config_includes_preload_audio_default_false(client):
-    assert client.get("/api/config").json()["preload_audio"] is False
+def test_config_includes_audio_preload_default_auto(client):
+    assert client.get("/api/config").json()["audio_preload"] == "auto"
 
 
-def test_config_includes_preload_audio_true(tmp_path, test_audio_file, monkeypatch):
+def test_config_includes_clip_durations(client):
+    # Served so the player's time bar shows length without a metadata fetch.
+    # The fixture clip is 1600 frames at 16 kHz = 0.1 s.
+    durations = client.get("/api/config").json()["durations"]
+    assert durations["s001"] == 0.1
+    assert durations["s002"] == 0.1
+
+
+def test_config_includes_audio_preload_level(tmp_path, test_audio_file, monkeypatch):
     config = {
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "preload_audio": True,
+        "audio_preload": "none",
         "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
-        assert tc.get("/api/config").json()["preload_audio"] is True
+        assert tc.get("/api/config").json()["audio_preload"] == "none"
 
 
 def test_config_includes_survey_fields(tmp_path, test_audio_file, monkeypatch):

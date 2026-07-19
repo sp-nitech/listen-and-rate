@@ -135,8 +135,10 @@ def _check_no_basename_conflicts(items: list[StimulusConfig]) -> None:
         )
 
 
-def _check_audio_files_readable(items: list[StimulusConfig]) -> None:
-    """Reject a stimulus file that is missing or isn't decodable, non-empty audio.
+def _check_audio_and_measure_durations(
+    items: list[StimulusConfig],
+) -> dict[str, float]:
+    """Validate each stimulus file and return {stimulus_id: duration_seconds}.
 
     Reads only the audio header (soundfile.info), not the samples, so the cost
     is constant per file regardless of clip length - cheap enough to run
@@ -147,12 +149,18 @@ def _check_audio_files_readable(items: list[StimulusConfig]) -> None:
     header is intact but whose body is truncated still slips through -
     detecting that needs a full decode, left to the opt-in loudness check.
 
+    The header already carries frames/samplerate, so the clip duration falls
+    out for free; it is served to the browser (see the config response's
+    `durations`) so the player's time bar can show the length immediately,
+    without waiting on a per-clip metadata fetch.
+
     soundfile (a core dependency) is imported here, not at module top, to keep
     importing this package cheap when no config is being loaded - matching
     loudness.py's lazy-import style.
     """
     import soundfile as sf
 
+    durations: dict[str, float] = {}
     for stimulus in items:
         if not Path(stimulus.path).is_file():
             raise FileNotFoundError(f"Audio file not found: {stimulus.path}")
@@ -164,6 +172,8 @@ def _check_audio_files_readable(items: list[StimulusConfig]) -> None:
             ) from None
         if info.frames == 0:
             raise ValueError(f"Audio file has no audio samples: {stimulus.path}")
+        durations[stimulus.id] = round(info.frames / info.samplerate, 3)
+    return durations
 
 
 def load_config(config_path: str | Path) -> Config:
@@ -249,7 +259,9 @@ def load_config(config_path: str | Path) -> Config:
             len(config.stimuli.items) if config.stimuli else 0, "stimuli"
         )
 
-    _check_audio_files_readable(config.stimuli.items if config.stimuli else [])
+    config._durations = _check_audio_and_measure_durations(
+        config.stimuli.items if config.stimuli else []
+    )
 
     if isinstance(config, DMOSConfig):
         dmos_trials = build_dmos_trials(

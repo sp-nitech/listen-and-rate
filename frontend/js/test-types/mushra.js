@@ -108,7 +108,7 @@ export class MUSHRATest extends PairedTrialTest {
     this._hasReference = !!trial0.reference;
     this._hasAnchor = !!trial0.anchor;
     const sliderCount = this._sliderStimuli(trial0).length;
-    const preload = this.config.preload_audio ? 'auto' : 'none';
+    const preload = this.config.audio_preload;
 
     // Ticks/bands are positioned as percentages of the track's own height
     // (not fixed pixels), so they always land exactly on the gridlines drawn

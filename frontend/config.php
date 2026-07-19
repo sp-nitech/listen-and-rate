@@ -138,7 +138,12 @@ function base_config_response(array $data, array $extras): array
         'test_type' => $data['test_type'],
         'title' => $data['title'],
         'instructions' => $data['instructions'],
-        'preload_audio' => $data['preload_audio'] ?? false,
+        // The HTML <audio preload> level ("none"/"auto"); the browser reads it
+        // straight onto each <audio> element.
+        'audio_preload' => $data['audio_preload'],
+        // {stimulus_id: seconds}, baked in at export time so the time bar can
+        // show clip length immediately (see _shared.py's _test_config_response).
+        'durations' => $data['durations'],
         // Each form is one {title, fields} block, passed through unchanged -
         // the export tool always writes both, so no fallback is needed.
         'metadata' => $data['metadata'],

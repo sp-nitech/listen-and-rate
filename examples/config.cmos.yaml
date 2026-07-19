@@ -15,9 +15,12 @@ output:
   format: csv # "csv" or "json" - each session is saved as a separate file
   path: ./results/
 
-# Fetch each page's audio as soon as the page is shown instead of on the
-# listener's first play click (default: false) - useful on slow connections.
-# preload_audio: true
+# How much of each page's audio to fetch up front (default: auto).
+#   none - fetch nothing until the listener first presses play
+#   auto - fetch the whole clip on show so playback is instant (a hint;
+#          browsers may fetch less on metered/mobile connections)
+# The clip length is shown on the time bar regardless of this setting.
+# audio_preload: auto
 
 # Presentation order of the per-session stimuli/trials (default: random).
 # "random" shuffles the order per listener to cancel order effects; "fixed"

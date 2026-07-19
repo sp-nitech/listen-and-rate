@@ -80,8 +80,8 @@ export class ABTest extends PairedTrialTest {
 
   // -- per-trial sync -------------------------------------------------------
 
-  _trialAudioSrcs(trial) {
-    return { 0: this._audioUrl(trial.stimuli[0]), 1: this._audioUrl(trial.stimuli[1]) };
+  _trialAudioClips(trial) {
+    return { 0: this._clip(trial.stimuli[0]), 1: this._clip(trial.stimuli[1]) };
   }
 
   _syncChoiceButtons() {

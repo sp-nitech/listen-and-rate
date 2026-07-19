@@ -228,6 +228,7 @@ body {
   padding: 4px 10px;
   border-radius: 99px;
   letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
 }
 
 .stimulus-label {

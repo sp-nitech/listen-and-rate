@@ -31,9 +31,17 @@ const CMOS_LABELS_DEFAULT = {
   3: 'Much better',
 };
 
-/** Format a signed rating value for display, e.g. -2 -> "-2", 0 -> "0", 2 -> "+2". */
+/**
+ * Format a signed rating value for the button display: 0 -> "0", 2 -> "+2",
+ * and a negative like -2 to the digit prefixed with the typographic MINUS SIGN
+ * (U+2212), not the ASCII hyphen-minus JS would otherwise produce: the hyphen
+ * glyph is short and sits high, reading off-center next to the full,
+ * math-axis-centered "+".
+ */
 function formatScore(v) {
-  return v > 0 ? `+${v}` : `${v}`;
+  if (v > 0) return `+${v}`;
+  if (v < 0) return `\u2212${Math.abs(v)}`;
+  return `${v}`;
 }
 
 export class CMOSTest extends PairedTrialTest {

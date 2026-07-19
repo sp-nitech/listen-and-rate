@@ -379,12 +379,16 @@ audio {
 
 .audio-time {
   flex: 0 0 auto;
-  min-width: 8ch;
+  min-width: 6ch;
   text-align: right;
   white-space: nowrap;
   font-size: 0.8rem;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.audio-time.is-blinded {
+  text-align: left;
 }
 
 /* -- AB paired audio cards ---------------------------------------------- */

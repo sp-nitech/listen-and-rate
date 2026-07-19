@@ -28,6 +28,14 @@ export const PAUSE_SVG =
 // Skip-to-start (bar + left-pointing triangle), the universal rewind-to-start icon.
 const REWIND_SVG =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zm12 0v12l-9-6z"/></svg>';
+// Padlock shown in place of the time readout for a blinded clip (ABX's X), so
+// its intentionally hidden length reads as deliberate rather than a broken
+// "-- / --". fill:currentColor keeps it monochrome (the readout's own text
+// colour), never the coloured 🔒 emoji.
+const LOCK_SVG =
+  '<svg viewBox="0 0 24 24" width="1em" height="1em" role="img" aria-label="Length hidden" ' +
+  'style="vertical-align:-0.12em;fill:currentColor">' +
+  '<path d="M12 2a5 5 0 0 0-5 5v2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 7V7a3 3 0 0 1 6 0v2H9z"/></svg>';
 
 /**
  * Markup for one player. `localIndex` identifies the clip within a trial
@@ -76,9 +84,31 @@ function totalDuration(audio) {
   return served > 0 ? served : audio.duration;
 }
 
+// Left-pad `seconds`' integer part to `intDigits` with figure spaces (U+2007,
+// one digit wide under tabular-nums). Keeps the elapsed field constant-width as
+// its integer grows a digit (e.g. 9.9 -> 10.0 on a 10s+ clip), so the readout
+// never widens mid-playback and shove the flex:1 progress bar's right edge in.
+function padSec(seconds, intDigits) {
+  const text = formatSec(seconds);
+  const pad = intDigits - text.split('.')[0].length;
+  return (pad > 0 ? '\u2007'.repeat(pad) : '') + text;
+}
+
 function timeText(audio) {
-  if (isBlinded(audio)) return '-- / --';
-  return `${formatSec(audio.currentTime)} / ${formatSec(totalDuration(audio))}`;
+  const totalText = formatSec(totalDuration(audio));
+  // Match the elapsed's integer width to the total's DISPLAYED digits (which
+  // already account for rounding, e.g. 9.96 -> "10.0"). Clips under 10s have a
+  // single integer digit, so nothing is padded and their readout is unchanged.
+  const intDigits = totalText.split('.')[0].length;
+  return `${padSec(audio.currentTime, intDigits)} / ${totalText}`;
+}
+
+// Paint the time readout. A blinded clip's readout is static (the lock icon,
+// set once by resetAudioPlayer on trial sync), so playback/seek events leave
+// it untouched; every other clip shows elapsed / total.
+function renderTime(timeEl, audio) {
+  if (isBlinded(audio)) return;
+  timeEl.textContent = timeText(audio);
 }
 
 function playerParts(audio) {
@@ -143,7 +173,7 @@ export function bindAudioPlayer(audio) {
   const tick = (now) => {
     renderBar();
     if (now - lastTextAt >= 80) {
-      time.textContent = timeText(audio);
+      renderTime(time, audio);
       lastTextAt = now;
     }
     rafId = audio.paused || audio.ended ? 0 : requestAnimationFrame(tick);
@@ -157,19 +187,19 @@ export function bindAudioPlayer(audio) {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = 0;
     renderBar();
-    time.textContent = timeText(audio);
+    renderTime(time, audio);
   };
   audio.addEventListener('pause', stop);
   audio.addEventListener('ended', stop);
   audio.addEventListener('loadedmetadata', () => {
     renderBar();
-    time.textContent = timeText(audio);
+    renderTime(time, audio);
   });
   // Repaint after an external seek (the rewind button/shortcut) - while
   // paused, the rAF loop above isn't running to pick the new position up.
   audio.addEventListener('seeked', () => {
     renderBar();
-    time.textContent = timeText(audio);
+    renderTime(time, audio);
   });
 }
 
@@ -181,5 +211,17 @@ export function resetAudioPlayer(audio) {
   playBtn.setAttribute('aria-label', 'Play');
   fill.style.width = '0%';
   bar.setAttribute('aria-valuenow', '0');
-  time.textContent = isBlinded(audio) ? '-- / --' : `0.0 / ${formatSec(totalDuration(audio))}`;
+  const blinded = isBlinded(audio);
+  // Drop the numeric readout's reserved min-width for the lock so the box hugs
+  // the icon and the flex:1 progress bar reclaims the slack, instead of leaving
+  // a wide gap between the bar and the right-aligned lock (see .is-blinded CSS).
+  time.classList.toggle('is-blinded', blinded);
+  if (blinded) {
+    time.innerHTML = LOCK_SVG;
+  } else {
+    // currentTime is 0 here (callers rewind first), so this is the padded
+    // "0.0 / total" - matching the tick handler's format so the elapsed
+    // field's width doesn't jump between reset and the first tick.
+    time.textContent = timeText(audio);
+  }
 }

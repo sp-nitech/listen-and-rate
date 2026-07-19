@@ -29,14 +29,22 @@ export function practiceCounterPrefix(config) {
   return config.isPractice ? 'Practice ' : '';
 }
 
-/** The final page's button label: Start ends the practice, Submit ends the real test. */
+/**
+ * The final page's button label: Start ends the practice; with a post-test
+ * survey configured the last trial concludes the rating phase irreversibly
+ * (the survey page follows and owns the real Submit; there is no way back,
+ * so the survey's reflection can never contaminate the frozen ratings) -
+ * "Finish" says exactly that, where "Next" would imply a Prev counterpart.
+ */
 export function finalButtonLabel(config) {
-  return config.isPractice ? 'Start' : 'Submit';
+  if (config.isPractice) return 'Start';
+  return config.survey?.fields?.length > 0 ? 'Finish' : 'Submit';
 }
 
 /** The final page's confirm-shortcut hint, matching finalButtonLabel(). */
 export function finalConfirmHint(config) {
-  return config.isPractice ? 'start' : 'submit';
+  if (config.isPractice) return 'start';
+  return config.survey?.fields?.length > 0 ? 'finish' : 'submit';
 }
 
 /**

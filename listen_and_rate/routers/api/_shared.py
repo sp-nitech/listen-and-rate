@@ -146,7 +146,16 @@ def _test_config_response(config: Config, **extras: object) -> dict:
         "instructions": config.instructions,
         "randomize": False,
         "preload_audio": config.preload_audio,
-        "metadata": [f.model_dump() for f in config.metadata],
+        # Each form is one {title, fields} block, the same shape as the YAML,
+        # so the concept keeps a single shape across every layer.
+        "metadata": {
+            "title": config.metadata.title,
+            "fields": [f.model_dump() for f in config.metadata.fields],
+        },
+        "survey": {
+            "title": config.survey.title,
+            "fields": [f.model_dump() for f in config.survey.fields],
+        },
         "shortcuts": config.shortcuts.browser_dict(),
         **extras,
     }
@@ -184,17 +193,21 @@ def _require_non_empty(items: list, name: str) -> None:
 def _save_and_ok(
     body: SubmitRequest, config: Config, saver: ResultSaver, rows: list[dict]
 ) -> dict:
-    """Validate metadata, persist one session's rows, and return the ok response.
+    """Validate form answers, persist one session's rows, and return ok.
 
     The shared tail of every _submit_* handler - rows are the already
     validated, storage-shaped dicts built by the type-specific validator.
+    The metadata and survey forms share one validator (same field schema,
+    different collection timing).
     """
-    metadata = _validate_metadata(config.metadata, body.metadata)
+    metadata = _validate_metadata(config.metadata.fields, body.metadata)
+    survey = _validate_metadata(config.survey.fields, body.survey)
     saver.save(
         session_id=body.session_id,
         test_type=config.test_type,
         ratings=rows,
         metadata=metadata,
+        survey=survey,
     )
     return {"status": "ok", "session_id": body.session_id}
 

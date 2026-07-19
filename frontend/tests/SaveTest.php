@@ -256,6 +256,20 @@ final class SaveTest extends TestCase
         $this->assertSame([], $result);
     }
 
+    // -- prefix_keys --------------------------------------------------------
+
+    public function testPrefixKeysNamespacesFormAnswersForCsvColumns(): void
+    {
+        // Mirrors listen_and_rate/storage.py's METADATA_/SURVEY_ column
+        // prefixes: CSV form columns are namespaced so they can never collide
+        // with the saver-written result columns.
+        $this->assertSame(
+            ['metadata_device' => 'Headphones', 'metadata_system' => 'windows'],
+            prefix_keys('metadata_', ['device' => 'Headphones', 'system' => 'windows'])
+        );
+        $this->assertSame([], prefix_keys('survey_', []));
+    }
+
     public function testValidateMetadataRejectsNonStringTextValue(): void
     {
         // A crafted body can send an array (or other non-string) where a text

@@ -97,15 +97,32 @@ stimuli_dirs:
 # When defined, a form is shown before the test starts to collect listener
 # information. Omit this section entirely to skip the form.
 # metadata:
-#   - key: listener
-#     label: "User name"
-#     type: text
-#     required: true
-#   - key: device
-#     label: "Playback device"
-#     type: select
-#     options:
-#       - Headphones
-#       - Earphones
-#       - Speakers
-#     default: Headphones
+#   title: "Listener Information" # optional page heading
+#   fields:
+#     - key: listener
+#       label: "User name"
+#       type: text
+#       required: true
+#     - key: device
+#       label: "Playback device"
+#       type: select
+#       options:
+#         - Headphones
+#         - Earphones
+#         - Speakers
+#       default: Headphones
+
+# -- Post-test survey (optional) ----------------------------------------------
+# When defined, a questionnaire is shown after the last trial to collect
+# listener feedback. Omit this section entirely to skip the form.
+# survey:
+#   title: "Questionnaire"
+#   fields:
+#     - key: trial_count
+#       label: "Was the number of trials appropriate?"
+#       type: select
+#       options:
+#         - "Too Few"
+#         - "Appropriate"
+#         - "Too Many"
+#       required: true

@@ -50,16 +50,49 @@ def test_csv_saver_writes_correct_values(tmp_path):
     assert rows[0]["rating"] == "4"
 
 
-def test_csv_saver_with_metadata_inserts_columns(tmp_path):
+def test_csv_saver_with_metadata_inserts_prefixed_columns(tmp_path):
+    # Form answers are namespaced with a metadata_/survey_ column prefix, so
+    # they can never collide with the saver-written result columns and stay
+    # distinguishable from each other in the flat CSV.
     saver = CSVResultSaver(tmp_path, EXPERIMENT_ID, metadata_keys=list(METADATA.keys()))
     saver.save(SESSION_ID, TEST_TYPE, RATINGS, metadata=METADATA)
     rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
-    assert rows[0]["listener"] == "Alice"
-    assert rows[0]["device"] == "Headphones"
-    assert list(rows[0].keys()).index("listener") > list(rows[0].keys()).index(
-        "test_type"
+    assert rows[0]["metadata_listener"] == "Alice"
+    assert rows[0]["metadata_device"] == "Headphones"
+    keys = list(rows[0].keys())
+    assert keys.index("metadata_listener") > keys.index("test_type")
+    assert keys.index("system") > keys.index("metadata_device")
+
+
+def test_csv_saver_metadata_key_named_like_result_column_cannot_collide(tmp_path):
+    # The prefix namespace is what allows a metadata field literally named
+    # 'system': it lands in metadata_system, never touching the stimulus one.
+    saver = CSVResultSaver(tmp_path, EXPERIMENT_ID, metadata_keys=["system"])
+    saver.save(SESSION_ID, TEST_TYPE, RATINGS, metadata={"system": "windows"})
+    rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
+    assert rows[0]["metadata_system"] == "windows"
+    assert rows[0]["system"] == "sys_a"
+
+
+def test_csv_saver_with_survey_appends_prefixed_columns_after_metadata(tmp_path):
+    saver = CSVResultSaver(
+        tmp_path,
+        EXPERIMENT_ID,
+        metadata_keys=list(METADATA.keys()),
+        survey_keys=["trial_count"],
     )
-    assert list(rows[0].keys()).index("system") > list(rows[0].keys()).index("device")
+    saver.save(
+        SESSION_ID,
+        TEST_TYPE,
+        RATINGS,
+        metadata=METADATA,
+        survey={"trial_count": "adequate"},
+    )
+    rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
+    assert rows[0]["survey_trial_count"] == "adequate"
+    keys = list(rows[0].keys())
+    assert keys.index("survey_trial_count") > keys.index("metadata_device")
+    assert keys.index("system") > keys.index("survey_trial_count")
 
 
 def test_csv_saver_each_session_is_separate_file(tmp_path):
@@ -165,6 +198,25 @@ def test_json_saver_includes_metadata(tmp_path):
     )
     data = json.loads((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text())
     assert data["metadata"] == METADATA
+
+
+def test_json_saver_includes_survey_as_separate_object(tmp_path):
+    JSONResultSaver(tmp_path, EXPERIMENT_ID).save(
+        SESSION_ID,
+        TEST_TYPE,
+        RATINGS,
+        metadata=METADATA,
+        survey={"trial_count": "adequate"},
+    )
+    data = json.loads((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text())
+    assert data["survey"] == {"trial_count": "adequate"}
+    assert data["metadata"] == METADATA
+
+
+def test_json_saver_survey_defaults_to_empty_object(tmp_path):
+    JSONResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
+    data = json.loads((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text())
+    assert data["survey"] == {}
 
 
 def test_json_saver_each_session_is_separate_file(tmp_path):

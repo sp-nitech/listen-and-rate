@@ -8,6 +8,18 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 
+# Column-name prefixes namespacing per-session form answers in CSV results.
+# The prefix makes a form key structurally unable to collide with the
+# saver-written result columns (a metadata field literally named 'system'
+# lands in metadata_system), keeps metadata and survey answers
+# distinguishable in the flat CSV, and is what analysis/report.py's
+# metadata_filter/survey_filter validation keys on. JSON results don't need
+# them (metadata/survey are separate nested objects there); the analysis
+# reader flattens JSON into the same prefixed columns. Mirrored by
+# frontend/save.php for the PHP deployment.
+METADATA_COLUMN_PREFIX = "metadata_"
+SURVEY_COLUMN_PREFIX = "survey_"
+
 
 class ResultExistsError(Exception):
     """Raised when a result file for the session already exists.
@@ -32,6 +44,7 @@ class ResultSaver(ABC):
         test_type: str,
         ratings: list[dict],
         metadata: dict[str, str] | None = None,
+        survey: dict[str, str] | None = None,
     ) -> None:
         """Persist one session's ratings; called once per POST /api/submit."""
         ...
@@ -40,12 +53,13 @@ class ResultSaver(ABC):
 class CSVResultSaver(ResultSaver):
     """Write each session to its own output_dir/experiment_id/{session_id}.csv file.
 
-    Column layout: session_id, timestamp, test_type, [metadata keys...], then
-    whatever keys the row dicts themselves carry (e.g. system/utterance/rating
-    for MOS, utterance/system_a/system_b/winner for AB) - the tail columns are
-    inferred from the first row rather than hardcoded, so this saver works for
-    any test type's row shape. Metadata columns are inserted in the order
-    given by metadata_keys.
+    Column layout: session_id, timestamp, test_type, [metadata_* keys...],
+    [survey_* keys...], then whatever keys the row dicts themselves carry
+    (e.g. system/utterance/rating for MOS, utterance/system_a/system_b/winner
+    for AB) - the tail columns are inferred from the first row rather than
+    hardcoded, so this saver works for any test type's row shape. Form
+    columns are inserted in the order given by metadata_keys/survey_keys and
+    namespaced with METADATA_COLUMN_PREFIX/SURVEY_COLUMN_PREFIX.
     """
 
     _BASE_FIELDS = ["session_id", "timestamp", "test_type"]
@@ -55,9 +69,11 @@ class CSVResultSaver(ResultSaver):
         output_dir: Path,
         experiment_id: str,
         metadata_keys: list[str] | None = None,
+        survey_keys: list[str] | None = None,
     ) -> None:
         self._dir = output_dir / experiment_id
         self._metadata_keys = list(metadata_keys or [])
+        self._survey_keys = list(survey_keys or [])
 
     def save(
         self,
@@ -65,13 +81,17 @@ class CSVResultSaver(ResultSaver):
         test_type: str,
         ratings: list[dict],
         metadata: dict[str, str] | None = None,
+        survey: dict[str, str] | None = None,
     ) -> None:
         """Write one row per rating to {experiment_id}/{session_id}.csv."""
         path = self._dir / f"{session_id}.csv"
         ts = datetime.now().astimezone().isoformat(timespec="seconds")
         meta = metadata or {}
+        answers = survey or {}
+        meta_fields = [METADATA_COLUMN_PREFIX + k for k in self._metadata_keys]
+        survey_fields = [SURVEY_COLUMN_PREFIX + k for k in self._survey_keys]
         row_fields = list(ratings[0].keys()) if ratings else []
-        fields = self._BASE_FIELDS + self._metadata_keys + row_fields
+        fields = self._BASE_FIELDS + meta_fields + survey_fields + row_fields
         self._dir.mkdir(parents=True, exist_ok=True)
         try:
             f = open(path, "x", newline="", encoding="utf-8")
@@ -86,7 +106,14 @@ class CSVResultSaver(ResultSaver):
                         "session_id": session_id,
                         "timestamp": ts,
                         "test_type": test_type,
-                        **{k: meta.get(k, "") for k in self._metadata_keys},
+                        **{
+                            METADATA_COLUMN_PREFIX + k: meta.get(k, "")
+                            for k in self._metadata_keys
+                        },
+                        **{
+                            SURVEY_COLUMN_PREFIX + k: answers.get(k, "")
+                            for k in self._survey_keys
+                        },
                         **r,
                     }
                 )
@@ -104,6 +131,7 @@ class JSONResultSaver(ResultSaver):
         test_type: str,
         ratings: list[dict],
         metadata: dict[str, str] | None = None,
+        survey: dict[str, str] | None = None,
     ) -> None:
         """Write this session's ratings to {experiment_id}/{session_id}.json."""
         self._dir.mkdir(parents=True, exist_ok=True)
@@ -112,6 +140,7 @@ class JSONResultSaver(ResultSaver):
             "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
             "test_type": test_type,
             "metadata": metadata or {},
+            "survey": survey or {},
             "ratings": ratings,
         }
         try:
@@ -127,11 +156,12 @@ def make_result_saver(
     output_dir: str,
     experiment_id: str,
     metadata_keys: list[str] | None = None,
+    survey_keys: list[str] | None = None,
 ) -> ResultSaver:
     """Instantiate the appropriate ResultSaver for the given format string."""
     p = Path(output_dir)
     if fmt == "csv":
-        return CSVResultSaver(p, experiment_id, metadata_keys)
+        return CSVResultSaver(p, experiment_id, metadata_keys, survey_keys)
     if fmt == "json":
         return JSONResultSaver(p, experiment_id)
     raise ValueError(f"Unknown output format: {fmt!r}")

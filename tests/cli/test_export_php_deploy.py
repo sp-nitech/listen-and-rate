@@ -180,6 +180,39 @@ def test_export_php_deploy_config_data_includes_session_sampling_params(
     assert "'stimuli_per_session' => null" in text
 
 
+def test_export_php_deploy_config_data_includes_survey_fields(
+    tmp_path, test_audio_file, monkeypatch
+):
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "survey": {
+            "fields": [
+                {
+                    "key": "trial_count",
+                    "label": "Was the number of trials appropriate?",
+                    "type": "select",
+                    "options": ["TooFew", "Appropriate", "TooMany"],
+                    "required": True,
+                }
+            ]
+        },
+        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    config_yaml = _write_config_yaml(tmp_path, config)
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    text = (outdir / "config_data.php").read_text()
+    assert "'survey' => [" in text
+    assert "'key' => 'trial_count'" in text
+    assert "'Appropriate'" in text
+    # Titles now live inside each form block, not as flat *_title keys.
+    assert "'title' => 'Listener Information'" in text
+    assert "'title' => 'Questionnaire'" in text
+    assert "_title'" not in text
+
+
 def test_export_php_deploy_config_data_includes_practice_params(
     tmp_path, test_audio_file, monkeypatch
 ):

@@ -43,4 +43,5 @@ class SubmitRequest(BaseModel):
     test_type: str
     ratings: list[RatingItem] = Field(default_factory=list)  # MOS, DMOS, MUSHRA
     choices: list[ChoiceItem] = Field(default_factory=list)  # CMOS, AB, ABX, XAB
-    metadata: dict[str, str] = Field(default_factory=dict)
+    metadata: dict[str, str] = Field(default_factory=dict)  # pre-test form answers
+    survey: dict[str, str] = Field(default_factory=dict)  # post-test form answers

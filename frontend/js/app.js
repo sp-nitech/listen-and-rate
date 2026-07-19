@@ -126,6 +126,28 @@ function promptResume(container, record) {
   });
 }
 
+/**
+ * Show a submission-failure screen with a Retry button; resolves when the
+ * listener clicks it. Used on the survey path, where the test UI (and its
+ * own inline retry, see submit.js) is already gone by the time the POST runs.
+ *
+ * @param {HTMLElement} container
+ * @param {Error} err
+ * @returns {Promise<void>}
+ */
+function promptRetry(container, err) {
+  container.innerHTML = `
+    <div class="error-screen">
+      <h2>Submission failed</h2>
+      <p>${escapeHtml(err.message)}</p>
+      <button class="btn btn-primary" id="btn-retry" type="button">Retry</button>
+    </div>
+  `;
+  return new Promise((resolve) => {
+    container.querySelector('#btn-retry').addEventListener('click', () => resolve());
+  });
+}
+
 async function main() {
   const freshConfig = await fetchConfig();
   const container = document.getElementById('app');
@@ -189,8 +211,10 @@ async function main() {
   container.innerHTML = '';
 
   let listenerMetadata = resume ? (saved.metadata ?? {}) : {};
-  if (!resume && config.metadata?.length > 0) {
-    const metaPage = new MetadataPage(config.metadata);
+  if (!resume && config.metadata?.fields?.length > 0) {
+    const metaPage = new MetadataPage(config.metadata.fields, {
+      title: config.metadata.title,
+    });
     listenerMetadata = await metaPage.collect(container);
     container.innerHTML = '';
   }
@@ -219,13 +243,41 @@ async function main() {
   };
 
   async function onSubmit(sid, testType, payload) {
-    await submitRatings({
+    // Post-test survey: shown between the last trial ("Finish") and the
+    // actual POST, so its answers ride along in the same submission.
+    const hasSurvey = config.survey?.fields?.length > 0;
+    let surveyAnswers = {};
+    if (hasSurvey) {
+      const surveyPage = new MetadataPage(config.survey.fields, {
+        title: config.survey.title,
+        submitLabel: 'Submit',
+      });
+      container.innerHTML = '';
+      surveyAnswers = await surveyPage.collect(container);
+    }
+
+    const request = {
       session_id: sid,
       test_type: testType,
       experiment_id: config.experiment_id ?? '',
       metadata: listenerMetadata,
+      survey: surveyAnswers,
       ...payload,
-    });
+    };
+    let submitted = false;
+    while (!submitted) {
+      try {
+        await submitRatings(request);
+        submitted = true;
+      } catch (err) {
+        // Without a survey the test UI still exists: rethrow so submit.js
+        // restores its button/shortcuts and shows the error inline there.
+        // With one, that UI is gone - retry from a dedicated screen instead
+        // (the answers are kept in `request`, nothing is re-entered).
+        if (!hasSurvey) throw err;
+        await promptRetry(container, err);
+      }
+    }
     // The session is complete - it must never be offered for resume again.
     clearRecord(key);
     const bar = document.getElementById('progress-bar');

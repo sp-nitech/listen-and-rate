@@ -108,6 +108,16 @@ def test_groups_duplicate_labels_rejected():
         ReportConfig(groups=[{"label": "same"}, {"label": "same"}])
 
 
+def test_groups_parse_survey_filter():
+    rc = ReportConfig(
+        groups=[
+            {"label": "g", "survey_filter": {"trial_count": ["Appropriate", "TooFew"]}}
+        ]
+    )
+    assert rc.groups is not None
+    assert rc.groups[0].survey_filter == {"trial_count": ["Appropriate", "TooFew"]}
+
+
 def test_groups_stimuli_filter_rejects_non_stimulus_key():
     # stimuli_filter keys are a fixed allowlist (utterance/system); an outcome
     # column like 'rating' must be rejected at load time.

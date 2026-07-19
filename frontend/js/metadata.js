@@ -1,9 +1,11 @@
 /**
- * MetadataPage - pre-test listener information form.
+ * MetadataPage - a standalone form page built from a field definition array.
  *
- * Renders a form from a field definition array (from config.metadata).
- * Returns a Promise that resolves with {key: value, ...} when the listener
- * clicks "Start Test".
+ * Used twice per experiment, once per {title, fields} form block: the
+ * pre-test listener-information form (config.metadata) and the post-test
+ * survey (config.survey). Both are built from the block's fields array plus
+ * its title via the {title, submitLabel} options. Returns a Promise that
+ * resolves with {key: value, ...} when the listener clicks the submit button.
  *
  * Supported field types:
  *   text   - free-text input; only [a-zA-Z0-9\-] allowed
@@ -17,16 +19,21 @@ const _TEXT_PATTERN = /^[a-zA-Z0-9-]+$/;
 export class MetadataPage {
   /**
    * @param {Array<{key:string, label:string, type:string, options?:string[], required:boolean}>} fields
+   * @param {{title?: string, submitLabel?: string}} [options] - Page heading
+   *   and submit-button label; the defaults are the pre-test metadata form's.
    */
-  constructor(fields) {
+  constructor(fields, options = {}) {
     this.fields = fields;
+    this.title = options.title ?? 'Listener Information';
+    this.submitLabel = options.submitLabel ?? 'Start Test';
     this._values = {};
-    // Pre-select default value (or first option if no default) for select fields.
+    // Pre-select a value ONLY when the config explicitly declares a default.
+    // Auto-selecting the first option would bias answers toward it (default
+    // bias - especially harmful for survey questions); without a default the
+    // field starts unanswered, and a required one blocks submission until
+    // the listener actively chooses.
     for (const f of fields) {
-      if (f.type === 'select' && f.options?.length > 0) {
-        this._values[f.key] = f.default ?? f.options[0];
-      }
-      if (f.type === 'text' && f.default) {
+      if (f.default) {
         this._values[f.key] = f.default;
       }
     }
@@ -45,10 +52,10 @@ export class MetadataPage {
       page.className = 'metadata-page';
       page.innerHTML = `
         <div class="metadata-form">
-          <h2 class="metadata-title">Listener Information</h2>
+          <h2 class="metadata-title">${escapeHtml(this.title)}</h2>
           ${this.fields.map((f) => this._renderField(f)).join('')}
           <button class="btn btn-primary metadata-start" id="metadata-start" type="button" disabled>
-            Start Test
+            ${escapeHtml(this.submitLabel)}
           </button>
         </div>
       `;
@@ -71,14 +78,14 @@ export class MetadataPage {
     }
 
     if (f.type === 'select') {
-      const defaultVal = f.default ?? f.options?.[0];
+      // No implicit first-option default: unchecked unless the config says so.
       const radios = (f.options ?? [])
         .map(
           (opt) => `
         <label class="radio-option">
           <input type="radio" name="meta-${escapeHtml(f.key)}"
                  data-key="${escapeHtml(f.key)}" value="${escapeHtml(opt)}"
-                 ${opt === defaultVal ? 'checked' : ''}>
+                 ${opt === f.default ? 'checked' : ''}>
           <span>${escapeHtml(opt)}</span>
         </label>`
         )
@@ -115,6 +122,11 @@ export class MetadataPage {
     page.querySelector('#metadata-start')?.addEventListener('click', () => {
       resolve({ ...this._values });
     });
+
+    // Set the button's initial state - without this, a form whose fields are
+    // all optional (or all selects with defaults) would stay disabled until
+    // the first input event, which never comes if the user changes nothing.
+    this._updateStart(page);
   }
 
   _updateStart(page) {

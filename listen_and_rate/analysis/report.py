@@ -11,7 +11,7 @@ from functools import partial
 from html import escape as _escape_html
 from pathlib import Path
 
-from ..config.base import _RESULT_COLUMNS
+from ..storage import METADATA_COLUMN_PREFIX, SURVEY_COLUMN_PREFIX
 from ._render import _wrap_report_html
 from .ab import _generate_ab_report
 from .abx import _generate_abx_report
@@ -39,41 +39,104 @@ def _systems_in(df) -> set[str]:
     return present
 
 
-# _RESULT_COLUMNS (config.base) = columns written by the result savers
-# themselves; everything else in a result file is a listener-metadata column.
-# metadata_filter may only name the latter, which keeps outcome columns
-# (rating/winner/...) structurally unfilterable (filtering results by their
-# outcome would be self-serving).
+# Filter kinds: YAML block name, the column-name prefix its keys resolve
+# through, and the label used in error messages. Form answers are stored
+# under the metadata_/survey_ prefixes (see storage.py), so each block can
+# only ever reach its own namespace - outcome columns (rating/winner/...)
+# are unreachable by construction, and a survey key inside metadata_filter
+# fails loudly instead of silently matching.
+_FILTER_KINDS = (
+    ("metadata_filter", METADATA_COLUMN_PREFIX, "metadata field"),
+    ("survey_filter", SURVEY_COLUMN_PREFIX, "survey field"),
+    ("stimuli_filter", "", "stimulus column"),
+)
+
+
+def _section_heading_html(label: str, font_size: int) -> str:
+    """Render a centered section title whose underline hugs the label text.
+
+    Shared by the groups sections and the Participants section (see the
+    groups heading rationale in generate_report_html).
+    """
+    style = (
+        f"display:inline-block;font-size:{font_size + 6}px;"
+        "margin:0;padding:0 24px 8px;border-bottom:1px solid #bbb"
+    )
+    return (
+        '<div style="text-align:center;margin-top:64px">'
+        f'<h2 style="{style}">{_escape_html(label)}</h2></div>'
+    )
+
+
+def _participants_section_html(
+    df, font_family: str, font_size: int, form_labels: dict[str, str] | None = None
+) -> str:
+    """Build the trailing "Participants" section: form-answer distributions.
+
+    One table per form (Metadata / Survey) listing, for every prefixed
+    column present in the results, how many SESSIONS gave each response -
+    rows are deduplicated by session_id first, since form answers repeat on
+    every rating row of a session. Returns '' when the results carry no form
+    columns at all, so reports without metadata/survey stay unchanged.
+
+    form_labels maps a prefixed column name (e.g. 'survey_trial_count') to
+    the field's human label from the config; when present it is shown in the
+    Field column instead of the bare key. Columns without a label (or when
+    no config was given) fall back to the key, so config-less reports are
+    unchanged.
+    """
+    from ._render import _render_pvalue_table_html
+
+    labels = form_labels or {}
+    per_session = df.drop_duplicates("session_id") if "session_id" in df.columns else df
+    subsections = []
+    for form_label, prefix in (
+        ("Metadata", METADATA_COLUMN_PREFIX),
+        ("Survey", SURVEY_COLUMN_PREFIX),
+    ):
+        columns = [c for c in df.columns if c.startswith(prefix)]
+        if not columns:
+            continue
+        rows = []
+        for column in columns:
+            field = labels.get(column, column[len(prefix) :])
+            counts = per_session[column].dropna().astype(str).value_counts()
+            for response, n in counts.sort_index().items():
+                rows.append([field, str(response), str(int(n))])
+        subsections.append(
+            f'<h3 style="text-align:center;font-size:{font_size + 2}px;'
+            f'margin:24px 0 0">{form_label}</h3>'
+            + _render_pvalue_table_html(
+                ["Field", "Response", "Sessions"], rows, font_family, font_size
+            )
+        )
+    if not subsections:
+        return ""
+    return _section_heading_html("Participants", font_size) + "".join(subsections)
 
 
 def _filter_group_rows(df, group: dict):
-    """Return df's rows matching one group's metadata_filter/stimuli_filter.
+    """Return df's rows matching one group's metadata/survey/stimuli filters.
 
     Values are fnmatch glob patterns (a value without metacharacters is an
-    exact match); a list of patterns is OR, keys and the two filters are AND.
-    Rows whose column value is missing never match. Raises ValueError - always
-    naming the group - for a metadata_filter key that isn't a metadata column
-    in the results, a stimuli_filter key whose column the result schema
-    doesn't carry (e.g. 'system' on pair-based results), or a filter that
-    matches no rows at all.
+    exact match); a list of patterns is OR, keys and the filter blocks are
+    AND. Rows whose column value is missing never match. Raises ValueError -
+    always naming the group - for a key whose (prefixed) column the results
+    don't carry, or a filter that matches no rows at all.
     """
     from fnmatch import fnmatchcase
 
     label = group["label"]
     sub = df
-    for kind in ("metadata_filter", "stimuli_filter"):
+    for kind, prefix, kind_label in _FILTER_KINDS:
         for key, value in (group.get(kind) or {}).items():
             patterns = [value] if isinstance(value, str) else list(value)
-            if key not in sub.columns or (
-                kind == "metadata_filter" and key in _RESULT_COLUMNS
-            ):
-                kind_label = (
-                    "metadata field" if kind == "metadata_filter" else "stimulus column"
-                )
+            column_name = prefix + key
+            if column_name not in sub.columns:
                 raise ValueError(
                     f"group {label!r}: {key!r} is not a {kind_label} in the results"
                 )
-            column = sub[key]
+            column = sub[column_name]
             matches = column.notna() & column.astype(str).map(
                 lambda v, pats=patterns: any(fnmatchcase(v, p) for p in pats)
             )
@@ -95,6 +158,7 @@ def generate_report_html(
     height_scale: float = 1.0,
     require_full_order: bool = False,
     groups: list[dict] | None = None,
+    form_labels: dict[str, str] | None = None,
 ) -> str:
     """Read result file(s) (CSV or JSON), compute statistics, return standalone HTML.
 
@@ -114,7 +178,12 @@ def generate_report_html(
     <h2> heading (the group's label) followed by the full set of charts and
     tables for the rows selected by its filters (see _filter_group_rows;
     a group without filters covers everything). Without groups the report
-    is a single unlabeled section, as before.
+    is a single unlabeled section, as before. When the results carry
+    metadata/survey form answers, a trailing "Participants" section shows
+    their per-session response distributions (always over the full data,
+    regardless of groups). form_labels maps a prefixed form column
+    (e.g. 'survey_trial_count') to that field's human label from the config,
+    shown in that section's Field column in place of the bare key.
     """
     try:
         import json as _json
@@ -137,8 +206,13 @@ def generate_report_html(
                     "test_type": data.get("test_type", ""),
                     **r,
                 }
+                # Flatten the nested form objects into the same prefixed
+                # columns CSV results carry, so filters and the Participants
+                # section behave identically for both formats.
                 for k, v in data.get("metadata", {}).items():
-                    row[k] = v
+                    row[METADATA_COLUMN_PREFIX + k] = v
+                for k, v in data.get("survey", {}).items():
+                    row[SURVEY_COLUMN_PREFIX + k] = v
                 rows.append(row)
             return pd.DataFrame(rows)
         return pd.read_csv(path)
@@ -239,15 +313,13 @@ def generate_report_html(
         # Each label reads as a section title: an underline hugging the text
         # (inline-block h2 + border-bottom, so its width follows the label),
         # with sections separated by whitespace alone - no full-width rules.
-        heading_style = (
-            f"display:inline-block;font-size:{font_size + 6}px;"
-            "margin:0;padding:0 24px 8px;border-bottom:1px solid #bbb"
-        )
         body = "".join(
-            '<div style="text-align:center;margin-top:64px">'
-            f'<h2 style="{heading_style}">{_escape_html(group["label"])}</h2></div>'
+            _section_heading_html(group["label"], font_size)
             + render(_filter_group_rows(typed_df, group))
             for group in groups
         )
+    # Trailing form-answer distributions, always computed on the FULL data
+    # (never per group) and rendered at most once; '' without form columns.
+    body += _participants_section_html(typed_df, font_family, font_size, form_labels)
     html = _wrap_report_html(title, body, font_family, font_size, width)
     return _set_html_title(html, title)

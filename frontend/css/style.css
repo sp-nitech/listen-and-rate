@@ -996,6 +996,17 @@ audio {
   letter-spacing: 0.01em;
 }
 
+/* On touch-only devices (no hover concept, coarse pointer = phones/tablets)
+   there is no keyboard to use the shortcuts with, so the hint row would be
+   confusing noise - the flip side of the "never advertise a shortcut that
+   doesn't work" principle. Devices with both touch and a keyboard (e.g.
+   convertible laptops) report hover:hover and keep the hints. */
+@media (hover: none) and (pointer: coarse) {
+  .shortcut-hint {
+    display: none;
+  }
+}
+
 .shortcut-hint kbd {
   display: inline-block;
   padding: 1px 5px;

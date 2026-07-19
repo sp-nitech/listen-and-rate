@@ -40,7 +40,8 @@ async def lifespan(app: FastAPI):
         config.output.format,
         config.output.path,
         config.experiment_id,
-        [f.key for f in config.metadata],
+        [f.key for f in config.metadata.fields],
+        [f.key for f in config.survey.fields],
     )
     all_stimuli = config.stimuli.items if config.stimuli else []
     # With loudness_normalization configured, pre-normalize every clip into a temp

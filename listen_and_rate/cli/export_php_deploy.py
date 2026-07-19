@@ -295,7 +295,16 @@ def _build_config_data(
         # (see its resolve_results_dir()), mirroring the FastAPI deployment's
         # use of output.path - both layouts are <deployment root>/<output.path>.
         "output_path": config.output.path,
-        "metadata": [f.model_dump() for f in config.metadata],
+        # One {title, fields} block per form, the same shape as the YAML and
+        # the FastAPI response - a single shape across every layer.
+        "metadata": {
+            "title": config.metadata.title,
+            "fields": [f.model_dump() for f in config.metadata.fields],
+        },
+        "survey": {
+            "title": config.survey.title,
+            "fields": [f.model_dump() for f in config.survey.fields],
+        },
         "shortcuts": config.shortcuts.browser_dict(),
         "rating_labels": getattr(config, "rating_labels", None),
         # Server-side only (never echoed to the browser response) - used by

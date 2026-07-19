@@ -12,6 +12,7 @@ from listen_and_rate.config import (
     load_config_or_exit,
     load_report_config_or_exit,
 )
+from listen_and_rate.storage import METADATA_COLUMN_PREFIX, SURVEY_COLUMN_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +147,16 @@ def main() -> None:
         system_order = None
         require_full_order = False
 
+    # Map each form field's prefixed result column to its human label, so the
+    # Participants section reads "Playback device" instead of "device". Only
+    # available when --config was given; without it the section falls back to
+    # the bare keys.
+    form_labels = None
+    if config is not None:
+        form_labels = {
+            METADATA_COLUMN_PREFIX + f.key: f.label for f in config.metadata.fields
+        } | {SURVEY_COLUMN_PREFIX + f.key: f.label for f in config.survey.fields}
+
     html = generate_report_html(
         paths,
         confidence=report.confidence,
@@ -156,6 +167,7 @@ def main() -> None:
         system_labels=report.labels,
         height_scale=report.scale.height,
         require_full_order=require_full_order,
+        form_labels=form_labels,
         groups=(
             [g.model_dump() for g in report.groups]
             if report.groups is not None

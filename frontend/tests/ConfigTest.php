@@ -89,7 +89,8 @@ final class ConfigTest extends TestCase
                 'title' => 'T',
                 'instructions' => 'I',
                 'randomize' => true,
-                'metadata' => [],
+                'metadata' => ['title' => 'Listener Information', 'fields' => []],
+                'survey' => ['title' => 'Questionnaire', 'fields' => []],
                 'stimuli_per_session' => null,
                 'utterances_per_session' => 1,
                 'stimuli' => $this->stimuliWithTwoSystemsTwoUtterances(),
@@ -133,6 +134,41 @@ final class ConfigTest extends TestCase
         $this->assertSame('mos', $response['test_type']);
         $this->assertSame('T', $response['title']);
         $this->assertSame(['play' => 'Space'], $response['shortcuts']);
+    }
+
+    public function testBuildConfigResponsePassesThroughSurveyBlock(): void
+    {
+        // Each form is one {title, fields} block, passed through unchanged.
+        $survey = [
+            'title'  => 'アンケート',
+            'fields' => [[
+                'key'      => 'trial_count',
+                'label'    => 'Was the number of trials appropriate?',
+                'type'     => 'select',
+                'options'  => ['TooFew', 'Appropriate', 'TooMany'],
+                'required' => true,
+            ]],
+        ];
+        $data = $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+            'survey' => $survey,
+        ]);
+        $response = build_config_response($data);
+        $this->assertSame($survey, $response['survey']);
+    }
+
+    public function testBuildConfigResponsePassesThroughFormPageTitles(): void
+    {
+        $data = $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+            'metadata' => ['title' => '参加者情報', 'fields' => []],
+            'survey' => ['title' => 'アンケート', 'fields' => []],
+        ]);
+        $response = build_config_response($data);
+        $this->assertSame('参加者情報', $response['metadata']['title']);
+        $this->assertSame('アンケート', $response['survey']['title']);
     }
 
     public function testBuildConfigResponsePreloadAudioDefaultsToFalse(): void

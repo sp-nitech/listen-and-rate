@@ -70,6 +70,44 @@ def test_config_includes_preload_audio_true(tmp_path, test_audio_file, monkeypat
         assert tc.get("/api/config").json()["preload_audio"] is True
 
 
+def test_config_includes_survey_fields(tmp_path, test_audio_file, monkeypatch):
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "survey": {
+            "fields": [
+                {
+                    "key": "trial_count",
+                    "label": "Was the number of trials appropriate?",
+                    "type": "select",
+                    "options": ["TooFew", "Appropriate", "TooMany"],
+                    "required": True,
+                }
+            ]
+        },
+        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        survey = tc.get("/api/config").json()["survey"]
+        assert survey["title"] == "Questionnaire"
+        assert survey["fields"][0]["key"] == "trial_count"
+        assert survey["fields"][0]["options"] == ["TooFew", "Appropriate", "TooMany"]
+
+
+def test_config_survey_defaults_to_empty_form(client):
+    assert client.get("/api/config").json()["survey"] == {
+        "title": "Questionnaire",
+        "fields": [],
+    }
+
+
+def test_config_includes_form_page_titles(client):
+    data = client.get("/api/config").json()
+    assert data["metadata"]["title"] == "Listener Information"
+    assert data["survey"]["title"] == "Questionnaire"
+
+
 def test_config_shortcuts(client):
     shortcuts = client.get("/api/config").json()["shortcuts"]
     assert shortcuts["rewind"] == "r"

@@ -402,7 +402,7 @@ def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):
             "session_id": sid,
             "timestamp": "t",
             "test_type": "mos",
-            "device": device,
+            "metadata_device": device,
             "system": system,
             "utterance": "u1",
             "rating": rating,
@@ -433,6 +433,7 @@ def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):
         str(out_path),
     )
     html = out_path.read_text()
-    assert html.count("<h2") == 2
+    assert html.count("<h2") == 3  # 2 group sections + trailing Participants
     assert "All listeners" in html
     assert "Headphones" in html
+    assert "Participants" in html

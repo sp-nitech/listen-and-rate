@@ -72,13 +72,19 @@ def _plotly_call_args(html: str, occurrence: int = 0) -> tuple[list, dict]:
 
 
 def _write_json(
-    path: Path, session_id: str, test_type: str, ratings: list[dict]
+    path: Path,
+    session_id: str,
+    test_type: str,
+    ratings: list[dict],
+    metadata: dict | None = None,
+    survey: dict | None = None,
 ) -> Path:
     data = {
         "session_id": session_id,
         "timestamp": "2026-01-01T00:00:00",
         "test_type": test_type,
-        "metadata": {},
+        "metadata": metadata or {},
+        "survey": survey or {},
         "ratings": ratings,
     }
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")

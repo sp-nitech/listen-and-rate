@@ -44,30 +44,15 @@ class _StrictModel(BaseModel):
         return data
 
 
-# Result columns written by the savers themselves (both deployments, every
-# test type). Metadata keys must not collide with them: metadata columns sit
-# in the same flat row as these, so a collision would silently corrupt stored
-# results (a duplicate CSV column where the stimulus-side value wins, and the
-# JSON analysis overwriting in the other direction). Also the boundary
-# analysis/report.py uses to tell metadata columns from built-in ones when
-# validating report-config group filters.
-_RESULT_COLUMNS = {
-    "session_id",
-    "timestamp",
-    "test_type",
-    "system",
-    "system_a",
-    "system_b",
-    "utterance",
-    "rating",
-    "winner",
-    "correct",
-    "closer",
-}
-
-
 class MetadataFieldConfig(_StrictModel):
-    """A single field in the pre-test listener metadata form."""
+    """One field of the pre-test metadata form or the post-test survey.
+
+    The two forms share this schema; only the collection timing differs.
+    Field keys need no reserved-name restriction: stored answers are
+    namespaced with a metadata_/survey_ column prefix (see storage.py), so
+    even a key literally named 'system' can never collide with a result
+    column.
+    """
 
     key: str
     label: str
@@ -78,23 +63,12 @@ class MetadataFieldConfig(_StrictModel):
 
     @model_validator(mode="after")
     def check_key_and_options(self) -> MetadataFieldConfig:
-        """Validate key format, reserved names, options presence, and default."""
+        """Validate key format, options presence, and default validity."""
         if not _KEY_RE.match(self.key):
             raise PydanticCustomError(
                 "metadata_key_format",
                 "metadata key must start with a letter and contain only letters, "
                 "digits, or underscores; got: {key}",
-                {"key": repr(self.key)},
-            )
-        # Case-insensitive: a case variant ('System') wouldn't corrupt storage
-        # the way an exact collision does (the columns stay distinct), but a
-        # 'System' column next to 'system' in one result file is a misreading
-        # trap and almost certainly a mistake rather than intent.
-        if self.key.lower() in _RESULT_COLUMNS:
-            raise PydanticCustomError(
-                "metadata_key_reserved",
-                "metadata key {key} is reserved (a result column the savers "
-                "write); choose another name",
                 {"key": repr(self.key)},
             )
         if self.type == "select" and not self.options:
@@ -116,6 +90,31 @@ class MetadataFieldConfig(_StrictModel):
                     },
                 )
         return self
+
+
+class FormPageConfig(_StrictModel):
+    """One form page: a heading plus the fields shown on it.
+
+    Two instances exist per experiment - the pre-test metadata form and the
+    post-test survey (see the subclasses below) - sharing this schema and
+    differing only in their default title and collection timing. No fields
+    (the default) means the page is skipped entirely.
+    """
+
+    title: str
+    fields: list[MetadataFieldConfig] = Field(default_factory=list)
+
+
+class MetadataFormConfig(FormPageConfig):
+    """The pre-test listener-information form."""
+
+    title: str = "Listener Information"
+
+
+class SurveyFormConfig(FormPageConfig):
+    """The post-test survey form."""
+
+    title: str = "Questionnaire"
 
 
 class OutputConfig(_StrictModel):
@@ -469,7 +468,14 @@ class BaseTestConfig(_StrictModel):
     stimuli: StimuliConfig | None = None
     stimuli_dirs: StimuliDirsConfig | None = None
     shortcuts: KeyboardShortcuts = Field(default_factory=KeyboardShortcuts)
-    metadata: list[MetadataFieldConfig] = Field(default_factory=list)
+    # Pre-test listener-information form ({title, fields}); no fields (the
+    # default) means the page is skipped.
+    metadata: MetadataFormConfig = Field(default_factory=MetadataFormConfig)
+    # Post-test survey form, shown after the last trial (the final trial
+    # button then reads "Finish" and submission happens from the survey
+    # page). Same shape as metadata; no fields (the default) means no
+    # survey page.
+    survey: SurveyFormConfig = Field(default_factory=SurveyFormConfig)
     practice: PracticeConfig | None = None
     loudness_check: LoudnessCheckConfig | None = None
     loudness_normalization: LoudnessNormalizationConfig | None = None
@@ -498,6 +504,26 @@ class BaseTestConfig(_StrictModel):
                 "stimuli_source_conflict",
                 "'stimuli' and 'stimuli_dirs' are mutually exclusive",
             )
+        return self
+
+    @model_validator(mode="after")
+    def check_form_keys_unique(self) -> BaseTestConfig:
+        """Reject duplicate field keys within the metadata form or the survey.
+
+        Duplicates within one form would collide on a single stored column.
+        The SAME key in metadata and survey is fine - the storage prefixes
+        (metadata_x vs survey_x) keep them distinct, which even allows asking
+        the same question before and after the test.
+        """
+        for form_name, form in (("metadata", self.metadata), ("survey", self.survey)):
+            keys = [f.key for f in form.fields]
+            duplicates = _duplicates(keys)
+            if duplicates:
+                raise PydanticCustomError(
+                    "form_duplicate_key",
+                    "{form} has duplicate field key(s): {duplicates}",
+                    {"form": form_name, "duplicates": duplicates},
+                )
         return self
 
     @model_validator(mode="after")

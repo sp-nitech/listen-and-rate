@@ -139,7 +139,10 @@ function base_config_response(array $data, array $extras): array
         'instructions' => $data['instructions'],
         'randomize' => false,
         'preload_audio' => $data['preload_audio'] ?? false,
+        // Each form is one {title, fields} block, passed through unchanged -
+        // the export tool always writes both, so no fallback is needed.
         'metadata' => $data['metadata'],
+        'survey' => $data['survey'],
         'shortcuts' => $data['shortcuts'],
     ], $extras);
 }

@@ -59,6 +59,22 @@ function sanitize_id(string $s): string
 }
 
 /**
+ * Namespace form answers with a column prefix ('metadata_'/'survey_') for
+ * CSV storage, mirroring listen_and_rate/storage.py's METADATA_/SURVEY_
+ * column prefixes: prefixed form columns can never collide with the
+ * saver-written result columns and stay distinguishable from each other.
+ * JSON results keep the raw keys (metadata/survey are nested objects there).
+ */
+function prefix_keys(string $prefix, array $values): array
+{
+    $prefixed = [];
+    foreach ($values as $key => $value) {
+        $prefixed[$prefix . $key] = $value;
+    }
+    return $prefixed;
+}
+
+/**
  * Resolve the results directory from config_data.php's output_path.
  *
  * Mirrors the FastAPI deployment's treatment of output.path so both
@@ -890,15 +906,28 @@ function handle_save_request(): void
             );
         }
 
+        // Each form config is a {title, fields} block; only its fields drive
+        // validation (the title is display-only, consumed by the frontend).
         $meta = validate_metadata(
-            $config_data['metadata'] ?? [],
+            $config_data['metadata']['fields'],
             (is_array($data['metadata'] ?? null)) ? $data['metadata'] : []
+        );
+        // The post-test survey shares the metadata field schema and validator
+        // (the two forms differ only in collection timing).
+        $survey = validate_metadata(
+            $config_data['survey']['fields'],
+            (is_array($data['survey'] ?? null)) ? $data['survey'] : []
         );
 
         $experiment_dir  = resolve_experiment_dir($results_dir, $data['experiment_id'] ?? '');
         $session_id_safe = sanitize_id($data['session_id']);
-        $meta_keys       = array_keys($meta);
-        $ts              = date('c');
+        // CSV columns are namespaced (metadata_*/survey_*, see prefix_keys);
+        // the builders just lay out whatever keys they are handed, so the
+        // merged prefixed map flows through them unchanged. JSON keeps the
+        // raw keys inside its nested metadata/survey objects instead.
+        $form      = array_merge(prefix_keys('metadata_', $meta), prefix_keys('survey_', $survey));
+        $form_keys = array_keys($form);
+        $ts        = date('c');
 
         if ($output_format === 'json') {
             $json_data = match ($test_type) {
@@ -909,15 +938,18 @@ function handle_save_request(): void
                 'xab' => build_xab_json_result($data, $meta, $stimulus_map, $ts, $config_data['reference_system'] ?? ''),
                 'mushra' => build_json_result($data, $meta, $stimulus_map, $ts),
             };
+            // Survey answers are attached here, once, rather than threaded
+            // through every per-test-type builder.
+            $json_data['survey'] = $survey;
             write_json_file($experiment_dir . '/' . $session_id_safe . '.json', $json_data);
         } else {
             [$fields, $rows] = match ($test_type) {
-                'mos', 'dmos' => build_csv_rows($data, $meta, $meta_keys, $stimulus_map, $ts),
-                'cmos' => build_cmos_csv_rows($data, $meta, $meta_keys, $stimulus_map, $ts),
-                'ab' => build_ab_csv_rows($data, $meta, $meta_keys, $stimulus_map, $ts),
-                'abx' => build_abx_csv_rows($data, $meta, $meta_keys, $stimulus_map, $ts, $x_secret),
-                'xab' => build_xab_csv_rows($data, $meta, $meta_keys, $stimulus_map, $ts, $config_data['reference_system'] ?? ''),
-                'mushra' => build_csv_rows($data, $meta, $meta_keys, $stimulus_map, $ts),
+                'mos', 'dmos' => build_csv_rows($data, $form, $form_keys, $stimulus_map, $ts),
+                'cmos' => build_cmos_csv_rows($data, $form, $form_keys, $stimulus_map, $ts),
+                'ab' => build_ab_csv_rows($data, $form, $form_keys, $stimulus_map, $ts),
+                'abx' => build_abx_csv_rows($data, $form, $form_keys, $stimulus_map, $ts, $x_secret),
+                'xab' => build_xab_csv_rows($data, $form, $form_keys, $stimulus_map, $ts, $config_data['reference_system'] ?? ''),
+                'mushra' => build_csv_rows($data, $form, $form_keys, $stimulus_map, $ts),
             };
             write_csv_file($experiment_dir . '/' . $session_id_safe . '.csv', $fields, $rows, $experiment_dir);
         }

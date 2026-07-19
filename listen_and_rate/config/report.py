@@ -41,20 +41,25 @@ def _coerce_filter_values_to_str(v: object) -> object:
 class ReportGroupConfig(_StrictModel):
     """One vertically stacked report section: a heading label plus row filters.
 
-    Both filters are optional and combine with AND; a group with neither
-    filter covers every session (an "All" section). Values are glob patterns
-    (fnmatch: `*`/`?`; a value without metacharacters is an exact match) and a
-    list of patterns is OR. metadata_filter keys name listener-metadata fields
-    (session-level: a non-matching session's rows all drop); stimuli_filter
-    keys name stimulus-side columns - utterance or system - and drop
-    individual trial rows.
+    All filters are optional and combine with AND; a group with none covers
+    every session (an "All" section). Values are glob patterns (fnmatch:
+    `*`/`?`; a value without metacharacters is an exact match) and a list of
+    patterns is OR. metadata_filter keys name pre-test metadata fields and
+    survey_filter keys name post-test survey fields (both session-level: a
+    non-matching session's rows all drop; the blocks are kept strictly apart
+    via the stored metadata_/survey_ column prefixes); stimuli_filter keys
+    name stimulus-side columns - utterance or system - and drop individual
+    trial rows.
     """
 
     label: str
     metadata_filter: dict[str, str | list[str]] | None = None
+    survey_filter: dict[str, str | list[str]] | None = None
     stimuli_filter: dict[str, str | list[str]] | None = None
 
-    @field_validator("metadata_filter", "stimuli_filter", mode="before")
+    @field_validator(
+        "metadata_filter", "survey_filter", "stimuli_filter", mode="before"
+    )
     @classmethod
     def coerce_values_to_str(cls, v: object) -> object:
         """Coerce bare numeric YAML values (e.g. `age: 30`) to their string form."""

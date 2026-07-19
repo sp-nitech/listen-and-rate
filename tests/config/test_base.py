@@ -332,32 +332,90 @@ def test_shortcuts_rating_rejects_invalid_key_value(tmp_path, test_audio_file):
         load_config(write_config(tmp_path, data))
 
 
-@pytest.mark.parametrize(
-    "reserved",
-    [
-        "system",
-        "system_a",
-        "utterance",
-        "rating",
-        "winner",
-        "session_id",
-        # Case variants don't corrupt storage (distinct CSV columns), but a
-        # 'System' column next to 'system' in one result file is a misreading
-        # trap and almost certainly a mistake - rejected case-insensitively.
-        "System",
-        "RATING",
-    ],
-)
-def test_metadata_key_colliding_with_result_column_rejected(
-    tmp_path, test_audio_file, reserved
-):
-    # A metadata key named like a saver-written result column would silently
-    # corrupt stored results (duplicate CSV columns where the stimulus value
-    # wins; JSON analysis overwriting in the other direction) - reject it at
-    # load time instead.
+def test_metadata_key_named_like_result_column_is_allowed(tmp_path, test_audio_file):
+    # Form answers are stored under a metadata_/survey_ column-name prefix
+    # (see storage.py), so a key literally named 'system' lands in
+    # metadata_system and can never collide with a result column - no
+    # reserved-name list needed.
     data = minimal_config(str(test_audio_file))
-    data["metadata"] = [{"key": reserved, "label": "x", "type": "text"}]
-    with pytest.raises(ValidationError, match="reserved"):
+    data["metadata"] = {"fields": [{"key": "system", "label": "x", "type": "text"}]}
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.fields[0].key == "system"
+
+
+def test_forms_default_to_empty(tmp_path, test_audio_file):
+    result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
+    assert result.metadata.fields == []
+    assert result.survey.fields == []
+
+
+def test_form_page_titles_have_defaults(tmp_path, test_audio_file):
+    result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
+    assert result.metadata.title == "Listener Information"
+    assert result.survey.title == "Questionnaire"
+
+
+def test_form_page_titles_are_configurable(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {"title": "参加者情報"}
+    data["survey"] = {"title": "アンケート"}
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.title == "参加者情報"
+    assert result.survey.title == "アンケート"
+
+
+def test_survey_parses_fields(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {
+        "fields": [
+            {
+                "key": "trial_count",
+                "label": "Was the number of trials appropriate?",
+                "type": "select",
+                "options": ["TooFew", "Appropriate", "TooMany"],
+                "required": True,
+            }
+        ]
+    }
+    result = load_config(write_config(tmp_path, data))
+    # A form block giving only fields still gets its default title.
+    assert result.survey.title == "Questionnaire"
+    assert result.survey.fields[0].key == "trial_count"
+    assert result.survey.fields[0].options == ["TooFew", "Appropriate", "TooMany"]
+
+
+@pytest.mark.parametrize("form", ["metadata", "survey"])
+def test_duplicate_keys_within_a_form_rejected(tmp_path, test_audio_file, form):
+    # Two fields with the same key in ONE form would collide on a single
+    # stored column; the same key in metadata AND survey is fine (the
+    # prefixes keep metadata_x and survey_x distinct).
+    data = minimal_config(str(test_audio_file))
+    data[form] = {
+        "fields": [
+            {"key": "dup", "label": "a", "type": "text"},
+            {"key": "dup", "label": "b", "type": "text"},
+        ]
+    }
+    with pytest.raises(ValidationError, match="dup"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_same_key_in_metadata_and_survey_allowed(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {
+        "fields": [{"key": "expectation", "label": "before", "type": "text"}]
+    }
+    data["survey"] = {
+        "fields": [{"key": "expectation", "label": "after", "type": "text"}]
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.fields[0].key == result.survey.fields[0].key == "expectation"
+
+
+def test_unknown_form_block_field_rejected(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {"titel": "Questionnaire"}
+    with pytest.raises(ValidationError, match="titel"):
         load_config(write_config(tmp_path, data))
 
 
@@ -546,7 +604,9 @@ def test_unknown_stimuli_dirs_systems_field_rejected(tmp_path, test_audio_file):
 
 def test_unknown_metadata_field_rejected(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
-    data["metadata"] = [{"key": "listener", "label": "Listener", "requird": True}]
+    data["metadata"] = {
+        "fields": [{"key": "listener", "label": "Listener", "requird": True}]
+    }
     with pytest.raises(ValidationError, match="requird"):
         load_config(write_config(tmp_path, data))
 

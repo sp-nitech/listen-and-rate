@@ -255,12 +255,15 @@ def test_significance_alpha_follows_confidence(tmp_path):
 # -- groups (stacked filtered sections) ---------------------------------------
 
 
-def _mos_row(session_id, device, system, utterance, rating):
+def _mos_row(session_id, device, system, utterance, rating, trial_count="Appropriate"):
+    # Form answers live under the metadata_/survey_ column prefixes in stored
+    # CSVs (see storage.py); filter keys in report configs stay unprefixed.
     return {
         "session_id": session_id,
         "timestamp": "t",
         "test_type": "mos",
-        "device": device,
+        "metadata_device": device,
+        "survey_trial_count": trial_count,
         "system": system,
         "utterance": utterance,
         "rating": rating,
@@ -270,8 +273,8 @@ def _mos_row(session_id, device, system, utterance, rating):
 _GROUPED_ROWS = [
     _mos_row("s1", "Headphones", "A", "F01_a", 4),
     _mos_row("s1", "Headphones", "B", "F01_a", 2),
-    _mos_row("s2", "Speakers", "A", "F02_a", 5),
-    _mos_row("s2", "Speakers", "B", "F02_a", 1),
+    _mos_row("s2", "Speakers", "A", "F02_a", 5, trial_count="TooMany"),
+    _mos_row("s2", "Speakers", "B", "F02_a", 1, trial_count="TooMany"),
 ]
 
 
@@ -289,9 +292,10 @@ def test_groups_render_labeled_sections_in_order(tmp_path):
         ],
     )
     chunks = _section_chunks(html)
-    assert len(chunks) == 3  # preamble + 2 sections
+    assert len(chunks) == 4  # preamble + 2 group sections + Participants
     assert "All listeners" in chunks[1]
     assert "Headphones" in chunks[2]
+    assert "Participants" in chunks[3]
     # Session/record counts per section: all = 2/4, filtered = 1/2.
     assert ">2</td>" in chunks[1] and ">4</td>" in chunks[1]
     assert ">1</td>" in chunks[2] and ">2</td>" in chunks[2]
@@ -333,13 +337,36 @@ def test_groups_unknown_metadata_key_raises_with_label(tmp_path):
         )
 
 
-def test_groups_builtin_column_in_metadata_filter_raises(tmp_path):
-    # 'rating' exists as a column but is an outcome, not a metadata field;
-    # filtering on it would be self-serving selection and must be rejected.
+def test_groups_outcome_column_in_metadata_filter_raises(tmp_path):
+    # 'rating' exists as a column but is an outcome, not a metadata field:
+    # metadata_filter looks up metadata_rating, which doesn't exist, so
+    # self-serving outcome filtering is unreachable by construction.
     with pytest.raises(ValueError, match="rating"):
         generate_report_html(
             [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
             groups=[{"label": "g", "metadata_filter": {"rating": "5"}}],
+        )
+
+
+def test_groups_survey_filter_selects_sessions(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        groups=[
+            {"label": "Comfortable", "survey_filter": {"trial_count": "Appropriate"}}
+        ],
+    )
+    section = _section_chunks(html)[1]
+    # Only s1 answered "Appropriate": 1 session, 2 records.
+    assert ">1</td>" in section and ">2</td>" in section
+
+
+def test_groups_metadata_filter_does_not_see_survey_columns(tmp_path):
+    # The prefixes make the two filter blocks strictly checkable: a survey
+    # key inside metadata_filter must fail instead of silently matching.
+    with pytest.raises(ValueError, match="trial_count"):
+        generate_report_html(
+            [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+            groups=[{"label": "g", "metadata_filter": {"trial_count": "Appropriate"}}],
         )
 
 
@@ -390,8 +417,90 @@ def test_groups_underline_each_label(tmp_path):
         ],
     )
     h2_tags = re.findall(r"<h2[^>]*>", html)
-    assert len(h2_tags) == 2
+    assert len(h2_tags) == 3  # 2 groups + the trailing Participants section
     assert all("border-bottom" in tag for tag in h2_tags)
+
+
+def test_json_form_answers_flattened_with_prefixes(tmp_path):
+    # JSON results keep metadata/survey as nested objects; the reader must
+    # flatten them into the same prefixed columns CSVs carry, so filters and
+    # the Participants section behave identically for both formats.
+    p = _write_json(
+        tmp_path / "s1.json",
+        "s1",
+        "mos",
+        RATINGS_A_B,
+        metadata={"device": "Headphones"},
+        survey={"trial_count": "Appropriate"},
+    )
+    html = generate_report_html(
+        [p],
+        groups=[
+            {"label": "HP", "metadata_filter": {"device": "Headphones"}},
+            {"label": "OK", "survey_filter": {"trial_count": "Appropriate"}},
+        ],
+    )
+    assert "HP" in html and "OK" in html
+
+
+# -- Participants section -----------------------------------------------------
+
+
+def test_participants_section_shows_per_session_distributions(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)])
+    assert "Participants" in html
+    # Per-session dedupe: s1 has two rows but its answers count as ONE session.
+    assert re.search(r"Headphones</td><td[^>]*>1</td>", html)
+    assert re.search(r"TooMany</td><td[^>]*>1</td>", html)
+    # Field names are shown without the storage prefix, split by form.
+    assert ">device</td>" in html
+    assert ">trial_count</td>" in html
+    assert ">Metadata<" in html and ">Survey<" in html
+
+
+def test_participants_section_uses_field_labels_when_given(tmp_path):
+    # With form_labels (from --config), the Field column shows the human
+    # label, not the storage key.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        form_labels={
+            "metadata_device": "Playback device",
+            "survey_trial_count": "Was the number of trials appropriate?",
+        },
+    )
+    assert ">Playback device</td>" in html
+    assert ">Was the number of trials appropriate?</td>" in html
+    # The raw keys must not leak into the Field column.
+    assert ">device</td>" not in html
+    assert ">trial_count</td>" not in html
+
+
+def test_participants_section_falls_back_to_key_without_label(tmp_path):
+    # A column with no matching label (or no form_labels at all) still shows
+    # the bare key, so config-less reports are unchanged.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        form_labels={"metadata_device": "Playback device"},
+    )
+    assert ">Playback device</td>" in html
+    assert ">trial_count</td>" in html
+
+
+def test_participants_section_absent_without_form_columns(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
+    assert "Participants" not in html
+
+
+def test_participants_section_appears_once_after_group_sections(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        groups=[
+            {"label": "All listeners"},
+            {"label": "HeadphonesOnly", "metadata_filter": {"device": "Headphones"}},
+        ],
+    )
+    assert html.count("Participants") == 1
+    assert html.rfind("Participants") > html.rfind("HeadphonesOnly")
 
 
 def test_plotlyjs_embedded_once_across_sections(tmp_path):

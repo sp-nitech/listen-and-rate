@@ -131,7 +131,7 @@ def test_submit_mos_empty_ratings_returns_400(client):
 
 
 def _client_with_metadata_config(
-    tmp_path, test_audio_file, monkeypatch, metadata_fields
+    tmp_path, test_audio_file, monkeypatch, metadata_fields, survey_fields=None
 ):
     config = {
         "test_type": "mos",
@@ -144,24 +144,26 @@ def _client_with_metadata_config(
                 {"id": "s002", "path": str(test_audio_file)},
             ]
         },
-        "metadata": metadata_fields,
+        "metadata": {"fields": metadata_fields},
     }
+    if survey_fields is not None:
+        config["survey"] = {"fields": survey_fields}
     return _create_app_client(tmp_path, config, monkeypatch)
 
 
-def _submit(tc, metadata):
-    return tc.post(
-        "/api/submit",
-        json={
-            "session_id": "s",
-            "test_type": "mos",
-            "ratings": [
-                {"stimulus_id": "s001", "rating": 5},
-                {"stimulus_id": "s002", "rating": 4},
-            ],
-            "metadata": metadata,
-        },
-    )
+def _submit(tc, metadata, survey=None):
+    body = {
+        "session_id": "s",
+        "test_type": "mos",
+        "ratings": [
+            {"stimulus_id": "s001", "rating": 5},
+            {"stimulus_id": "s002", "rating": 4},
+        ],
+        "metadata": metadata,
+    }
+    if survey is not None:
+        body["survey"] = survey
+    return tc.post("/api/submit", json=body)
 
 
 def test_submit_missing_required_metadata_returns_400(
@@ -226,8 +228,73 @@ def test_submit_valid_metadata_is_saved(tmp_path, test_audio_file, monkeypatch):
         res = _submit(tc, {"listener": "Alice-01", "device": "Headphones"})
         assert res.status_code == 200
         rows = list(csv.DictReader((tmp_path / "results" / "config" / "s.csv").open()))
-        assert rows[0]["listener"] == "Alice-01"
-        assert rows[0]["device"] == "Headphones"
+        # Form answers land in prefixed columns (see storage.py).
+        assert rows[0]["metadata_listener"] == "Alice-01"
+        assert rows[0]["metadata_device"] == "Headphones"
+
+
+_SURVEY_FIELDS = [
+    {
+        "key": "trial_count",
+        "label": "Was the number of trials appropriate?",
+        "type": "select",
+        "options": ["TooFew", "Appropriate", "TooMany"],
+        "required": True,
+    }
+]
+
+
+def test_submit_missing_required_survey_returns_400(
+    tmp_path, test_audio_file, monkeypatch
+):
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=_SURVEY_FIELDS
+    ) as tc:
+        assert _submit(tc, {}, survey={}).status_code == 400
+
+
+def test_submit_survey_value_outside_options_returns_400(
+    tmp_path, test_audio_file, monkeypatch
+):
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=_SURVEY_FIELDS
+    ) as tc:
+        res = _submit(tc, {}, survey={"trial_count": "WayTooMany"})
+        assert res.status_code == 400
+
+
+def test_submit_valid_survey_saved_in_prefixed_csv_column(
+    tmp_path, test_audio_file, monkeypatch
+):
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=_SURVEY_FIELDS
+    ) as tc:
+        res = _submit(tc, {}, survey={"trial_count": "Appropriate"})
+        assert res.status_code == 200
+        rows = list(csv.DictReader((tmp_path / "results" / "config" / "s.csv").open()))
+        assert rows[0]["survey_trial_count"] == "Appropriate"
+
+
+def test_submit_survey_saved_as_json_object(tmp_path, test_audio_file, monkeypatch):
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "json", "path": str(tmp_path / "results")},
+        "stimuli": {
+            "items": [
+                {"id": "s001", "path": str(test_audio_file)},
+                {"id": "s002", "path": str(test_audio_file)},
+            ]
+        },
+        "survey": {"fields": _SURVEY_FIELDS},
+    }
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        res = _submit(tc, {}, survey={"trial_count": "TooMany", "bogus": "x"})
+        assert res.status_code == 200
+        data = json.loads((tmp_path / "results" / "config" / "s.json").read_text())
+        # Undeclared keys are stripped, declared ones stored under 'survey'.
+        assert data["survey"] == {"trial_count": "TooMany"}
 
 
 def test_submit_strips_unknown_metadata_keys(tmp_path, test_audio_file, monkeypatch):

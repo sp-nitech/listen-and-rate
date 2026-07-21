@@ -583,9 +583,7 @@ def test_export_php_deploy_writes_stimulus_map_php(
 
 
 def test_export_php_deploy_requires_outdir_arg(config_yaml, monkeypatch):
-    monkeypatch.setattr(
-        "sys.argv", ["lar-export", "--config", str(config_yaml)]
-    )
+    monkeypatch.setattr("sys.argv", ["lar-export", "--config", str(config_yaml)])
     from listen_and_rate.cli.export_php_deploy import main
 
     with pytest.raises(SystemExit):

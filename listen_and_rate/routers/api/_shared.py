@@ -30,7 +30,8 @@ from ...storage import ResultSaver
 
 T = TypeVar("T")
 
-_METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9-]+$")
+# Text form values. Kept in sync with frontend/js/metadata.js and frontend/save.php.
+_METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9.-]+$")
 
 
 def _validate_metadata(

@@ -192,6 +192,18 @@ def test_submit_invalid_text_metadata_returns_400(
         assert res.status_code == 400
 
 
+def test_submit_text_metadata_allows_dots(tmp_path, test_audio_file, monkeypatch):
+    # The text allowlist includes '.' (e.g. names, version strings like v1.2).
+    fields = [
+        {"key": "listener", "label": "Listener", "type": "text", "required": True}
+    ]
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, fields
+    ) as tc:
+        res = _submit(tc, {"listener": "v1.2-beta"})
+        assert res.status_code == 200
+
+
 def test_submit_select_metadata_not_in_options_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):

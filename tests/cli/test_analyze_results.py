@@ -1,4 +1,4 @@
-"""Tests for the lar-analyze-results CLI."""
+"""Tests for the lar-report CLI."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from ._helpers import _write_config_yaml
 
 
 def _run_analyze(monkeypatch, *args: str) -> None:
-    """Run `lar-analyze-results` with the given extra CLI arguments."""
-    monkeypatch.setattr("sys.argv", ["lar-analyze-results", *args])
+    """Run `lar-report` with the given extra CLI arguments."""
+    monkeypatch.setattr("sys.argv", ["lar-report", *args])
     from listen_and_rate.cli.analyze_results import main
 
     main()

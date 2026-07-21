@@ -23,22 +23,22 @@ setup-dev:
 	uv sync --all-extras
 
 export:
-	uv run --no-sync lar-export-php-deploy --config $(CONFIG) --outdir $(DEPLOY)
+	uv run --no-sync lar-export --config $(CONFIG) --outdir $(DEPLOY)
 
 export-force:
-	uv run --no-sync lar-export-php-deploy --config $(CONFIG) --outdir $(DEPLOY) --overwrite
+	uv run --no-sync lar-export --config $(CONFIG) --outdir $(DEPLOY) --overwrite
 
 export-copy:
-	uv run --no-sync lar-export-php-deploy --config $(CONFIG) --outdir $(DEPLOY) --copy-audio
+	uv run --no-sync lar-export --config $(CONFIG) --outdir $(DEPLOY) --copy-audio
 
 export-copy-force:
-	uv run --no-sync lar-export-php-deploy --config $(CONFIG) --outdir $(DEPLOY) --overwrite --copy-audio
+	uv run --no-sync lar-export --config $(CONFIG) --outdir $(DEPLOY) --overwrite --copy-audio
 
 serve:
 	LISTEN_AND_RATE_CONFIG=$(CONFIG) uv run --no-sync uvicorn $(PROJECT).main:app --host $(HOST) --port $(PORT)
 
 report:
-	uv run --no-sync lar-analyze-results --config $(CONFIG) $(if $(REPORT_CONFIG),--report-config $(REPORT_CONFIG)) $(if $(DEPLOY),--root $(DEPLOY))
+	uv run --no-sync lar-report --config $(CONFIG) $(if $(REPORT_CONFIG),--report-config $(REPORT_CONFIG)) $(if $(DEPLOY),--root $(DEPLOY))
 
 lint: tool
 	uv run --no-sync ruff check $(PROJECT) tests

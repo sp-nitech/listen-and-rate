@@ -178,7 +178,7 @@ function validate_metadata(array $fields, array $submitted): array
             throw new SaveRequestError(400, "Metadata field {$key} must be a string");
         }
         $type = $field['type'] ?? 'text';
-        if ($type === 'text' && !preg_match('/^[a-zA-Z0-9-]+$/', $value)) {
+        if ($type === 'text' && !preg_match('/^[a-zA-Z0-9.-]+$/', $value)) {
             throw new SaveRequestError(400, "Metadata field {$key} contains invalid characters");
         }
         if ($type === 'select' && !empty($field['options']) && !in_array($value, $field['options'], true)) {

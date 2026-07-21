@@ -224,6 +224,16 @@ final class SaveTest extends TestCase
         );
     }
 
+    public function testValidateMetadataAllowsDotsInTextValue(): void
+    {
+        // The text allowlist includes '.' (e.g. names, version strings).
+        $result = validate_metadata(
+            [['key' => 'listener', 'type' => 'text', 'required' => true]],
+            ['listener' => 'v1.2-beta']
+        );
+        $this->assertSame(['listener' => 'v1.2-beta'], $result);
+    }
+
     public function testValidateMetadataRejectsSelectValueNotInOptions(): void
     {
         $this->expectException(SaveRequestError::class);

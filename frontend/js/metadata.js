@@ -8,13 +8,13 @@
  * resolves with {key: value, ...} when the listener clicks the submit button.
  *
  * Supported field types:
- *   text   - free-text input; only [a-zA-Z0-9\-] allowed
+ *   text   - free-text input; only [a-zA-Z0-9.\-] allowed
  *   select - radio button group from options[]
  */
 
 import { escapeHtml } from './dom.js';
 
-const _TEXT_PATTERN = /^[a-zA-Z0-9-]+$/;
+const _TEXT_PATTERN = /^[a-zA-Z0-9.-]+$/;
 
 export class MetadataPage {
   /**
@@ -73,7 +73,7 @@ export class MetadataPage {
           <label class="metadata-label" for="meta-${escapeHtml(f.key)}">${labelHtml}</label>
           <input class="metadata-input" type="text" id="meta-${escapeHtml(f.key)}"
                  data-key="${escapeHtml(f.key)}" autocomplete="off" spellcheck="false"
-                 placeholder="Letters, digits, hyphens only">
+                 placeholder="Letters, digits, hyphens, dots only">
         </div>`;
     }
 
@@ -103,7 +103,7 @@ export class MetadataPage {
   _bindEvents(page, resolve) {
     for (const input of page.querySelectorAll('input[type="text"]')) {
       input.addEventListener('input', () => {
-        const clean = input.value.replace(/[^a-zA-Z0-9-]/g, '');
+        const clean = input.value.replace(/[^a-zA-Z0-9.-]/g, '');
         if (clean !== input.value) input.value = clean;
         this._values[input.dataset.key] = clean;
         this._updateStart(page);

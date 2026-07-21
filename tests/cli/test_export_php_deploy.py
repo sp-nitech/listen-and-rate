@@ -1,4 +1,4 @@
-"""Tests for the lar-export-php-deploy CLI."""
+"""Tests for the lar-export CLI."""
 
 from __future__ import annotations
 
@@ -19,9 +19,9 @@ def _run_export(
     overwrite: bool = False,
     copy_audio: bool = False,
 ) -> None:
-    """Run `lar-export-php-deploy --config config_yaml --outdir outdir`."""
+    """Run `lar-export --config config_yaml --outdir outdir`."""
     argv = [
-        "lar-export-php-deploy",
+        "lar-export",
         "--config",
         str(config_yaml),
         "--outdir",
@@ -584,7 +584,7 @@ def test_export_php_deploy_writes_stimulus_map_php(
 
 def test_export_php_deploy_requires_outdir_arg(config_yaml, monkeypatch):
     monkeypatch.setattr(
-        "sys.argv", ["lar-export-php-deploy", "--config", str(config_yaml)]
+        "sys.argv", ["lar-export", "--config", str(config_yaml)]
     )
     from listen_and_rate.cli.export_php_deploy import main
 

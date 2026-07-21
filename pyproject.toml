@@ -13,8 +13,8 @@ dependencies = [
 ]
 
 [project.scripts]
-lar-export-php-deploy = "listen_and_rate.cli.export_php_deploy:main"
-lar-analyze-results = "listen_and_rate.cli.analyze_results:main"
+lar-export = "listen_and_rate.cli.export_php_deploy:main"
+lar-report = "listen_and_rate.cli.analyze_results:main"
 
 [project.optional-dependencies]
 analyze = ["plotly>=5.0.0", "scipy>=1.7.0", "pandas>=1.3.0"]

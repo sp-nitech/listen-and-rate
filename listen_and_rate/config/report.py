@@ -1,4 +1,4 @@
-"""Report (figure) config: presentation options for lar-analyze-results.
+"""Report (figure) config: presentation options for lar-report.
 
 Separate from the experiment config (which locates results and defines the
 default system order): this file only controls the generated report - scale,

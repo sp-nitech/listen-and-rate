@@ -12,7 +12,12 @@ from html import escape as _escape_html
 from pathlib import Path
 
 from ..storage import METADATA_COLUMN_PREFIX, SURVEY_COLUMN_PREFIX
-from ._render import _render_table_html, _table_heading_html, _wrap_report_html
+from ._render import (
+    _TEXT_SIZE,
+    _render_table_html,
+    _table_heading_html,
+    _wrap_report_html,
+)
 from .ab import _generate_ab_report
 from .abx import _generate_abx_report
 from .cmos import _generate_cmos_report
@@ -52,14 +57,15 @@ _FILTER_KINDS = (
 )
 
 
-def _section_heading_html(label: str, font_size: int) -> str:
+def _section_heading_html(label: str) -> str:
     """Render a centered section title whose underline hugs the label text.
 
     Shared by the groups sections and the Participants section (see the
-    groups heading rationale in generate_report_html).
+    groups heading rationale in generate_report_html). Uses the fixed HTML
+    font, not the chart font.
     """
     style = (
-        f"display:inline-block;font-size:{font_size + 6}px;"
+        f"display:inline-block;font-size:{_TEXT_SIZE + 6}px;"
         "margin:0;padding:0 24px 8px;border-bottom:1px solid #bbb"
     )
     return (
@@ -68,9 +74,7 @@ def _section_heading_html(label: str, font_size: int) -> str:
     )
 
 
-def _participants_section_html(
-    df, font_family: str, font_size: int, form_labels: dict[str, str] | None = None
-) -> str:
+def _participants_section_html(df, form_labels: dict[str, str] | None = None) -> str:
     """Build the trailing "Participants" section: form-answer distributions.
 
     One table per form (Metadata / Survey) listing, for every prefixed
@@ -102,14 +106,12 @@ def _participants_section_html(
             for response, n in counts.sort_index().items():
                 rows.append([field, str(response), str(int(n))])
         subsections.append(
-            _table_heading_html(form_label, font_size)
-            + _render_table_html(
-                ["Field", "Response", "Sessions"], rows, font_family, font_size
-            )
+            _table_heading_html(form_label)
+            + _render_table_html(["Field", "Response", "Sessions"], rows)
         )
     if not subsections:
         return ""
-    return _section_heading_html("Participants", font_size) + "".join(subsections)
+    return _section_heading_html("Participants") + "".join(subsections)
 
 
 def _filter_group_rows(df, group: dict):
@@ -156,6 +158,8 @@ def generate_report_html(
     require_full_order: bool = False,
     groups: list[dict] | None = None,
     form_labels: dict[str, str] | None = None,
+    mean_bar_color: str = "#72b7b2",
+    count_bar_color: str = "#cd5c5c",
 ) -> str:
     """Read result file(s) (CSV or JSON), compute statistics, return standalone HTML.
 
@@ -262,6 +266,7 @@ def generate_report_html(
         system_order=system_order,
         system_labels=system_labels,
         height_scale=height_scale,
+        mean_bar_color=mean_bar_color,
     )
     if "mos" in known_types or not known_types:
         # MOS is also the fallback for legacy files without a recognizable
@@ -277,18 +282,23 @@ def generate_report_html(
         render = partial(_generate_mos_report, **common, metric_label="DMOS")
     elif "cmos" in known_types:
         typed_df = df[df["test_type"] == "cmos"]
-        render = partial(_generate_cmos_report, **common)
+        render = partial(
+            _generate_cmos_report, **common, count_bar_color=count_bar_color
+        )
     elif "ab" in known_types:
         typed_df = df[df["test_type"] == "ab"]
-        render = partial(_generate_ab_report, **common)
+        render = partial(_generate_ab_report, **common, count_bar_color=count_bar_color)
     elif "abx" in known_types:
         typed_df = df[df["test_type"] == "abx"]
-        render = partial(_generate_abx_report, **common)
+        render = partial(
+            _generate_abx_report, **common, count_bar_color=count_bar_color
+        )
     elif "xab" in known_types:
         typed_df = df[df["test_type"] == "xab"]
         render = partial(
             _generate_ab_report,
             **common,
+            count_bar_color=count_bar_color,
             outcome_column="closer",
             rate_axis_title="Closer-to-reference rate",
             include_tie=False,
@@ -298,10 +308,12 @@ def generate_report_html(
         render = partial(
             _generate_mos_report,
             **common,
-            metric_label="MUSHRA",
-            axis_dtick=10,
+            metric_label="MUSHRA score",
+            axis_step=10,
+            axis_tickformat=None,  # integer 0-100 scale: "60", not "60.0"
+            value_precision=1,  # 0-100 scale: "62.3±5.1", not "62.34±5.12"
             boxplot_range=(0, 100),
-            boxplot_dtick=10,
+            boxplot_dtick=20,  # 0/20/.../100, matching the MUSHRA slider labels
         )
 
     if groups is None:
@@ -311,12 +323,12 @@ def generate_report_html(
         # (inline-block h2 + border-bottom, so its width follows the label),
         # with sections separated by whitespace alone - no full-width rules.
         body = "".join(
-            _section_heading_html(group["label"], font_size)
+            _section_heading_html(group["label"])
             + render(_filter_group_rows(typed_df, group))
             for group in groups
         )
     # Trailing form-answer distributions, always computed on the FULL data
     # (never per group) and rendered at most once; '' without form columns.
-    body += _participants_section_html(typed_df, font_family, font_size, form_labels)
-    html = _wrap_report_html(title, body, font_family, font_size, width)
+    body += _participants_section_html(typed_df, form_labels)
+    html = _wrap_report_html(title, body, width)
     return _set_html_title(html, title)

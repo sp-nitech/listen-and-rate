@@ -26,6 +26,7 @@ def _render_cmos_category_chart(
     font_family: str,
     font_size: int,
     height_scale: float = 1.0,
+    bar_color: str = "#cd5c5c",
 ) -> str:
     """Render the 7-category (much worse..much better) response-count bar chart.
 
@@ -42,9 +43,7 @@ def _render_cmos_category_chart(
     ]
     fig = go.Figure()
     for label, counts in zip(pair_labels, counts_per_pair, strict=True):
-        fig.add_trace(
-            go.Bar(x=x_labels, y=counts, name=label, marker_color="indianred")
-        )
+        fig.add_trace(go.Bar(x=x_labels, y=counts, name=label, marker_color=bar_color))
     fig.update_yaxes(title_text="Count")
     fig.update_layout(
         barmode="group",
@@ -64,6 +63,8 @@ def _generate_cmos_report(
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
+    mean_bar_color: str = "#72b7b2",
+    count_bar_color: str = "#cd5c5c",
 ) -> str:
     """Build the CMOS report: mean-CI bar, 7-category counts, one-sample t-test.
 
@@ -112,7 +113,6 @@ def _generate_cmos_report(
         table_rows.append(
             [
                 pair,
-                f"{mean:.2f}",
                 "N/A" if math.isnan(p_value) else f"{p_value:.4f}",
                 "" if math.isnan(p_value) else ("*" if p_value < alpha else ""),
             ]
@@ -130,20 +130,23 @@ def _generate_cmos_report(
         font_family=font_family,
         font_size=font_size,
         height_scale=height_scale,
+        bar_color=mean_bar_color,
     )
     category_html = _render_cmos_category_chart(
-        pair_labels, counts_per_pair, font_family, font_size, height_scale
+        pair_labels,
+        counts_per_pair,
+        font_family,
+        font_size,
+        height_scale,
+        count_bar_color,
     )
     trailing_tables = _render_trailing_tables_html(
         [
             "Pair",
-            "Mean rating",
             "p-value (t-test vs. 0)",
             f"Significant (α={alpha:.2f})",
         ],
         table_rows,
         df,
-        font_family,
-        font_size,
     )
     return f"{ci_html}{category_html}{trailing_tables}"

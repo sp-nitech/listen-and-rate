@@ -168,6 +168,8 @@ def main() -> None:
         height_scale=report.scale.height,
         require_full_order=require_full_order,
         form_labels=form_labels,
+        mean_bar_color=report.mean_bar_color,
+        count_bar_color=report.count_bar_color,
         groups=(
             [g.model_dump() for g in report.groups]
             if report.groups is not None

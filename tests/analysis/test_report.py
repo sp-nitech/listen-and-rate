@@ -38,6 +38,63 @@ def test_mos_report_labels_main_tables(tmp_path):
     assert ">Data summary</h3>" in html
 
 
+def test_report_mean_bar_color_applies_to_mean_bars(tmp_path):
+    # mean_bar_color colors the mean/rate bar (MOS mean here, AB/CMOS CI bar).
+    for rows in (CSV_ROWS, CMOS_CSV_ROWS):
+        html = generate_report_html(
+            [_write_csv(tmp_path / "s.csv", rows)], mean_bar_color="#123456"
+        )
+        traces, _ = _plotly_call_args(html)
+        assert traces[0]["marker"]["color"] == "#123456"
+
+
+def test_report_bar_colors_default(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
+    mean_traces, _ = _plotly_call_args(html)  # first figure: the rate/CI bar
+    count_traces, _ = _plotly_call_args(html, occurrence=1)  # counts figure
+    assert mean_traces[0]["marker"]["color"] == "#72b7b2"
+    assert count_traces[0]["marker"]["color"] == "#cd5c5c"
+
+
+def test_report_count_bar_color_applies_to_count_bars(tmp_path):
+    # count_bar_color colors the raw-count bars (AB/ABX counts, CMOS categories).
+    for rows in (AB_CSV_ROWS, CMOS_CSV_ROWS):
+        html = generate_report_html(
+            [_write_csv(tmp_path / "s.csv", rows)], count_bar_color="#654321"
+        )
+        count_traces, _ = _plotly_call_args(html, occurrence=1)
+        assert count_traces[0]["marker"]["color"] == "#654321"
+
+
+def test_report_config_font_styles_charts_only_not_html(tmp_path):
+    # The report-config font (family + size) styles the Plotly charts only; the
+    # HTML page chrome (title, headings, tables) keeps a fixed font.
+    path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
+    big = generate_report_html([path], font_family="Georgia", font_size=20)
+    small = generate_report_html([path], font_family="Courier", font_size=8)
+
+    def html_chrome(html):
+        # The HTML CSS font-* declarations (chart fonts live in the plotly JSON).
+        return sorted(re.findall(r"font-(?:family|size):[^;\"]+", html))
+
+    assert html_chrome(big) == html_chrome(small)  # HTML unaffected by config font
+    assert "font-family:sans-serif" in big
+    assert "font-family:Georgia" not in big
+    assert "font-size:24px" in big  # fixed title size, not 20-derived
+
+
+def test_report_table_width_is_decoupled_from_config_width(tmp_path):
+    # Tables keep their natural content width (width:max-content) and break out
+    # of the width-capped page container (full-bleed translateX centering), so
+    # the report-config `width` - which scales the charts - neither stretches
+    # nor squeezes them.
+    path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
+    for width in (500, 1200):
+        html = generate_report_html([path], width=width)
+        assert "width:max-content" in html
+        assert "translateX(-50%)" in html
+
+
 def test_ab_report_labels_main_tables(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)])
     assert ">Significance tests</h3>" in html
@@ -137,7 +194,9 @@ def test_generate_report_dispatches_mos_vs_ab(tmp_path):
     mos_html = generate_report_html([_write_csv(tmp_path / "mos.csv", CSV_ROWS)])
     ab_html = generate_report_html([_write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)])
     assert "p-value (t-test)" in mos_html
-    assert "p-value (binomial)" in ab_html
+    # Both p-value columns follow the "p-value (X)"/"... (X)" form.
+    assert "Adjusted p-value (Bonferroni)" in mos_html
+    assert "p-value (binomial test)" in ab_html
 
 
 def test_generate_report_mixed_test_types_raises_error(tmp_path):
@@ -152,8 +211,8 @@ def test_generate_report_dispatches_mos_ab_abx(tmp_path):
     ab_html = generate_report_html([_write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)])
     abx_html = generate_report_html([_write_csv(tmp_path / "abx.csv", ABX_CSV_ROWS)])
     assert "p-value (t-test)" in mos_html
-    assert "p-value (binomial)" in ab_html
-    assert "p-value (binomial)" in abx_html
+    assert "p-value (binomial test)" in ab_html
+    assert "p-value (binomial test)" in abx_html
 
 
 def test_generate_report_mixed_ab_and_abx_raises_error(tmp_path):

@@ -5,14 +5,22 @@ scale:
   width: 1.0
   height: 1.0
 
-# Font settings for figure text.
+# Font used for figure text. `family` accepts any CSS font-family.
+# Generic families (`sans-serif`, `serif`, `monospace`) always work.
+# For specific fonts such as `Georgia`, include fallbacks for example
+# "Helvetica, Arial, sans-serif" because the font must be installed on the
+# machine viewing the report.
 font:
-  family: sans-serif # Must be a font installed on your system
+  family: sans-serif
   size: 13
 
 # Confidence level for the error bars. The significance tables use
 # alpha = 1 - confidence (0.95 -> 0.05, 0.99 -> 0.01).
 confidence: 0.95
+
+# Bar fill colours (any CSS colour).
+# mean_bar_color: "#72b7b2"
+# count_bar_color: "#cd5c5c"
 
 # Display order of systems/pairs, by their raw name as stored in the results.
 # When given, it must list EVERY system present in the results. Omit to fall
@@ -26,20 +34,16 @@ confidence: 0.95
 #   B: Baseline
 
 # Stacked report sections (optional). Each group renders its own full set of
-# figures and tables under an <h2> heading, one section after another. A group
-# without filters covers every session; metadata_filter keys name pre-test
-# metadata fields and survey_filter keys name post-test survey fields (a
-# non-matching session drops entirely), stimuli_filter keys name stimulus-side
-# columns (utterance = the results' utterance column, i.e. the file stem in
-# stimuli_dirs mode; or system) and drop individual trials. Values are glob
-# patterns (* and ?; a plain value is an exact match), a list of patterns is
-# OR, and multiple keys/filters combine with AND. Omit groups entirely for
-# the usual single-section report.
+# figures and tables under an <h2> heading, one section after another. Omit
+# groups entirely for the usual single-section report.
 # groups:
 #   - label: All listeners
-#   - label: Headphones only
-#     metadata_filter:
-#       device: Headphones
 #   - label: Speaker m001
 #     stimuli_filter:
 #       utterance: "*_m001_*"
+#   - label: Headphones only
+#     metadata_filter:
+#       device: Headphones
+#   - label: Expert only
+#     survey_filter:
+#       expertise: Expert

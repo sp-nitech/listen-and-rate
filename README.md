@@ -53,7 +53,7 @@ make setup
 ### 1. Writing a configuration file
 
 An experiment is defined by a single YAML configuration file.
-The easiest way to get started is to copy one of the example configurations in `examples/` and edit it.
+The easiest way to get started is to copy one of the example configurations in [examples/](examples) and edit it.
 Each example is fully commented, including optional settings that are not covered in this README.
 
 Here's what a typical MOS configuration looks like:

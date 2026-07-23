@@ -16,18 +16,25 @@ def _generate_mos_report(
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
+    mean_bar_color: str = "#72b7b2",
     metric_label: str = "MOS",
-    axis_dtick: float = 0.5,
+    axis_step: float = 0.5,
+    axis_tickformat: str | None = ".1f",
+    value_precision: int = 2,
     boxplot_range: tuple[float, float] = (0.5, 5.5),
     boxplot_dtick: float = 1,
 ) -> str:
     """Build the MOS/DMOS/MUSHRA report: mean+CI and distribution charts, t-tests.
 
     Shared by all three test types - a DMOS/MUSHRA submission's stored row
-    shape (utterance/system/rating) is identical to MOS's, so only the
-    y-axis label (`metric_label`) and the scale-dependent axis parameters
-    (`axis_dtick`, `boxplot_range`, `boxplot_dtick` - 1-5 for MOS/DMOS,
-    0-100 for MUSHRA) differ.
+    shape (utterance/system/rating) is identical to MOS's, so only the y-axis
+    label (`metric_label`) and the scale-dependent parameters differ:
+    `axis_step` (the scale's natural increment the zoomed range is snapped to;
+    ticks within it are auto), `axis_tickformat` (mean-axis tick label format -
+    ".1f" for the 1-5 MOS/DMOS scale, None for MUSHRA's integer 0-100 scale),
+    `value_precision` (decimals in each bar's "mean±CI" annotation - 2 for the
+    fine 1-5 scale, 1 for MUSHRA's coarser 0-100 one), `boxplot_range`,
+    `boxplot_dtick`.
     """
     import itertools
     import math
@@ -89,7 +96,10 @@ def _generate_mos_report(
                 width=6,
                 color="black",
             ),
-            marker_color="steelblue",
+            # Configurable via report-config mean_bar_color; the default is
+            # light enough that the black CI whiskers stay high-contrast where
+            # they overlap the bar, without washing out against the background.
+            marker_color=mean_bar_color,
             showlegend=False,
             hovertemplate=(
                 "<b>%{x}</b><br>"
@@ -108,7 +118,7 @@ def _generate_mos_report(
             x=_disp(sys_name),
             y=mean + err,
             yshift=14,
-            text=f"{mean:.2f}±{err:.2f}",
+            text=f"{mean:.{value_precision}f}±{err:.{value_precision}f}",
             showarrow=False,
             font=dict(size=font_size),
             bgcolor="rgba(255,255,255,0.85)",
@@ -127,12 +137,13 @@ def _generate_mos_report(
             name=f"{int(confidence * 100)}% confidence intervals",
         )
     )
-    # Zoom the y-axis to the actual value±CI spread (snapped to 0.5 ticks,
-    # with a minimum span) instead of always showing the fixed 0.5-5.5 scale
-    # - systems clustered close together would otherwise be hard to tell
-    # apart. A minimum span keeps trivial differences from being visually
-    # exaggerated when every system scores nearly the same.
-    MIN_SPAN = axis_dtick * 2
+    # Zoom the y-axis to the actual value±CI spread (snapped to axis_step
+    # increments, with a minimum span) instead of always showing the full
+    # rating scale - systems clustered close together would otherwise be hard
+    # to tell apart. A minimum span keeps trivial differences from being
+    # visually exaggerated when every system scores nearly the same. Tick
+    # placement within the range is left to Plotly (no fixed dtick).
+    MIN_SPAN = axis_step * 2
     PADDING_FRACTION = 0.2
     data_lo = min(m - e for m, e in zip(means, errors, strict=True))
     data_hi = max(m + e for m, e in zip(means, errors, strict=True))
@@ -144,13 +155,12 @@ def _generate_mos_report(
     # A wide CI (e.g. from a small, high-variance sample) can otherwise pull
     # padded_lo below 0 - never a valid rating on any of this function's
     # scales (1-5 for MOS/DMOS, 0-100 for MUSHRA).
-    axis_lo = max(math.floor(padded_lo / axis_dtick) * axis_dtick, 0.0)
-    axis_hi = math.ceil(padded_hi / axis_dtick) * axis_dtick
+    axis_lo = max(math.floor(padded_lo / axis_step) * axis_step, 0.0)
+    axis_hi = math.ceil(padded_hi / axis_step) * axis_step
 
     mos_fig.update_yaxes(
         range=[axis_lo, axis_hi],
-        dtick=axis_dtick,
-        tickformat=".1f",
+        tickformat=axis_tickformat,
         title_text=metric_label,
     )
     mos_fig.update_layout(
@@ -179,7 +189,7 @@ def _generate_mos_report(
     dist_fig.update_yaxes(
         range=list(boxplot_range),
         dtick=boxplot_dtick,
-        tickformat=".1f",
+        tickformat=axis_tickformat,
         title_text="Rating",
     )
     dist_fig.update_layout(
@@ -227,12 +237,10 @@ def _generate_mos_report(
         [
             "Pair",
             "p-value (t-test)",
-            "Bonferroni-adjusted p-value",
+            "Adjusted p-value (Bonferroni)",
             f"Significant (α={alpha:.2f})",
         ],
         table_rows,
         df,
-        font_family,
-        font_size,
     )
     return f"{mos_html}{dist_html}{trailing_tables}"

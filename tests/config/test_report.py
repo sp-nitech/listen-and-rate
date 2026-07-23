@@ -24,6 +24,8 @@ def test_defaults_when_empty():
     assert rc.font.size == 13
     assert rc.order is None
     assert rc.labels is None
+    assert rc.mean_bar_color == "#72b7b2"
+    assert rc.count_bar_color == "#cd5c5c"
 
 
 def test_parses_all_fields():
@@ -33,6 +35,8 @@ def test_parses_all_fields():
         font={"family": "Georgia", "size": 20},
         order=["A", "B"],
         labels={"A": "Proposed", "B": "Baseline"},
+        mean_bar_color="#4c78a8",
+        count_bar_color="#e45756",
     )
     assert rc.scale.width == 1.5
     assert rc.scale.height == 2.0
@@ -41,6 +45,8 @@ def test_parses_all_fields():
     assert rc.font.size == 20
     assert rc.order == ["A", "B"]
     assert rc.labels == {"A": "Proposed", "B": "Baseline"}
+    assert rc.mean_bar_color == "#4c78a8"
+    assert rc.count_bar_color == "#e45756"
 
 
 def test_confidence_must_be_between_zero_and_one():

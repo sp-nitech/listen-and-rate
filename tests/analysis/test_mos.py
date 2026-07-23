@@ -90,7 +90,8 @@ def test_generate_mos_report_zooms_yaxis_for_close_scores(tmp_path):
     """When all systems' MOS values cluster tightly, the y-axis should zoom
     in around that cluster (snapped to 0.5 increments, with a minimum span
     so trivial differences aren't visually exaggerated) instead of always
-    showing the full 0.5-5.5 scale, so differences remain visible."""
+    showing the full 0.5-5.5 scale, so differences remain visible. Tick
+    spacing within that range is left to Plotly (no fixed dtick)."""
     rows = _mos_rows(
         [
             ("s1", "A", "u1", 4),
@@ -105,7 +106,43 @@ def test_generate_mos_report_zooms_yaxis_for_close_scores(tmp_path):
     assert hi - lo < 5.0  # narrower than the old fixed [0.5, 5.5] span
     assert (lo * 2) == int(lo * 2)  # snapped to a 0.5 multiple
     assert (hi * 2) == int(hi * 2)
-    assert layout["yaxis"]["dtick"] == 0.5
+    assert "dtick" not in layout["yaxis"]  # ticks are auto, not fixed
+
+
+def test_generate_mushra_report_labels_yaxis_as_score(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "m.csv", MUSHRA_CSV_ROWS)])
+    _, layout = _plotly_call_args(html)
+    assert layout["yaxis"]["title"]["text"] == "MUSHRA score"
+
+
+def _annotation_decimals(html):
+    """Digits after the decimal point in each bar's "mean±CI" annotation."""
+    _, layout = _plotly_call_args(html)
+    texts = [a["text"] for a in layout.get("annotations", [])]
+    assert texts, "expected per-bar value annotations"
+    return [(len(part.split(".")[1]) for part in t.split("±")) for t in texts]
+
+
+def test_generate_mushra_report_bar_annotation_one_decimal(tmp_path):
+    # 0-100 scale: "62.3±5.1" - 2 decimals would be spurious precision.
+    html = generate_report_html([_write_csv(tmp_path / "m.csv", MUSHRA_CSV_ROWS)])
+    for mean_dec, err_dec in _annotation_decimals(html):
+        assert mean_dec == 1 and err_dec == 1
+
+
+def test_generate_mos_report_bar_annotation_two_decimals(tmp_path):
+    # 1-5 scale keeps 2 decimals (e.g. "3.82±0.14").
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
+    for mean_dec, err_dec in _annotation_decimals(html):
+        assert mean_dec == 2 and err_dec == 2
+
+
+def test_generate_mushra_report_mean_axis_ticks_are_integers(tmp_path):
+    # The 0-100 integer scale uses no forced 1-decimal format, so ticks read
+    # "60" not "60.0" (MOS/DMOS keep ".1f" for their fractional 1-5 scale).
+    html = generate_report_html([_write_csv(tmp_path / "m.csv", MUSHRA_CSV_ROWS)])
+    _, layout = _plotly_call_args(html)
+    assert "tickformat" not in layout["yaxis"]
 
 
 def test_generate_mos_report_yaxis_never_goes_below_zero(tmp_path):
@@ -172,23 +209,13 @@ def test_generate_mushra_report_returns_html(tmp_path):
     assert "<html>" in html
 
 
-def test_generate_mushra_report_yaxis_says_mushra(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", MUSHRA_CSV_ROWS)])
-    _, layout = _plotly_call_args(html)
-    assert layout["yaxis"]["title"]["text"] == "MUSHRA"
-
-
-def test_generate_mushra_report_bar_axis_dtick_is_10(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", MUSHRA_CSV_ROWS)])
-    _, layout = _plotly_call_args(html)
-    assert layout["yaxis"]["dtick"] == 10
-
-
 def test_generate_mushra_report_boxplot_range_is_0_100(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", MUSHRA_CSV_ROWS)])
     _, layout = _plotly_call_args(html, occurrence=1)
     assert layout["yaxis"]["range"] == [0, 100]
-    assert layout["yaxis"]["dtick"] == 10
+    assert layout["yaxis"]["dtick"] == 20  # matches the slider's 20-step labels
+    # 0-100 integer scale: the Rating axis reads "10" not "10.0" too.
+    assert "tickformat" not in layout["yaxis"]
 
 
 # -- significance -----------------------------------------------------------

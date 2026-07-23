@@ -89,9 +89,12 @@ def test_generate_ab_report_custom_font(tmp_path):
         font_size=20,
     )
     _, layout = _plotly_call_args(html)
+    # The report-config font styles the CHART only...
     assert layout["font"]["family"] == "Georgia"
     assert layout["font"]["size"] == 20
-    assert "font-family:Georgia" in html
+    # ...not the HTML page chrome, which keeps its fixed font.
+    assert "font-family:Georgia" not in html
+    assert "font-family:sans-serif" in html
 
 
 def test_generate_ab_report_custom_width(tmp_path):
@@ -185,7 +188,7 @@ def test_generate_xab_report_has_no_tie_category(tmp_path):
 def test_generate_xab_report_includes_binomial_pvalue(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", XAB_CSV_ROWS)])
     assert "A vs B" in html
-    assert "p-value (binomial)" in html
+    assert "p-value (binomial test)" in html
 
 
 def test_generate_xab_report_json_input(tmp_path):

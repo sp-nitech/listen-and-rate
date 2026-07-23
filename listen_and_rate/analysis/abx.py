@@ -18,6 +18,8 @@ def _generate_abx_report(
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
+    mean_bar_color: str = "#72b7b2",
+    count_bar_color: str = "#cd5c5c",
 ) -> str:
     """Build the ABX report: accuracy and count charts plus a binomial table.
 
@@ -74,12 +76,12 @@ def _generate_abx_report(
         font_family,
         font_size,
         height_scale,
+        mean_bar_color=mean_bar_color,
+        count_bar_color=count_bar_color,
     )
     trailing_tables = _render_trailing_tables_html(
-        ["Pair", "p-value (binomial)", f"Significant (α={alpha:.2f})"],
+        ["Pair", "p-value (binomial test)", f"Significant (α={alpha:.2f})"],
         table_rows,
         df,
-        font_family,
-        font_size,
     )
     return f"{accuracy_html}{counts_html}{trailing_tables}"

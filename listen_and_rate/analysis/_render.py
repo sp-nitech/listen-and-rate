@@ -12,6 +12,12 @@ from html import escape as _escape_html
 
 _TH_STYLE = "border:1px solid #999;padding:6px 12px;background:#f0f0f0;text-align:left"
 _TD_STYLE = "border:1px solid #999;padding:6px 12px"
+# Fixed font (family + size) for the HTML page chrome (page title, section and
+# table headings, table cells). Deliberately NOT the report-config font.family/
+# font.size, which style the Plotly charts only - the page stays a constant,
+# readable font regardless of the chart font.
+_TEXT_FAMILY = "sans-serif"
+_TEXT_SIZE = 13
 
 
 def _system_sort_key(name: str, system_order: list[str] | None) -> tuple[int, int, str]:
@@ -32,29 +38,29 @@ def _reorder_pair(a: str, b: str, system_order: list[str] | None) -> tuple[str, 
     return a, b
 
 
-def _table_heading_html(label: str, font_size: int) -> str:
+def _table_heading_html(label: str) -> str:
     """Render a centered h3 heading sitting just above a report table.
 
     Shared by the per-test-type main tables (significance, data summary) and
     the Participants section's per-form (Metadata/Survey) subsections, so
-    every table heading looks the same.
+    every table heading looks the same. Uses the fixed HTML font, not the
+    chart font.
     """
     return (
-        f'<h3 style="text-align:center;font-size:{font_size + 2}px;'
+        f'<h3 style="text-align:center;font-size:{_TEXT_SIZE + 2}px;'
         f'margin:24px 0 0">{_escape_html(label)}</h3>'
     )
 
 
-def _render_table_html(
-    headers: list[str], rows: list[list[str]], font_family: str, font_size: int
-) -> str:
+def _render_table_html(headers: list[str], rows: list[list[str]]) -> str:
     """Render a headers+rows grid as a standalone, bordered HTML <table>.
 
     The generic table painter shared by every report table (significance,
-    data summary, participant distributions). Headers/cells are HTML-escaped:
-    they carry system names (and rename labels) straight from the admin's
-    config, so a stray '<' shouldn't be able to break the page - matching the
-    browser-tab title's own escaping.
+    data summary, participant distributions). Uses the fixed HTML font (not
+    the chart font). Headers/cells are HTML-escaped: they carry system names
+    (and rename labels) straight from the admin's config, so a stray '<'
+    shouldn't be able to break the page - matching the browser-tab title's own
+    escaping.
     """
     thead = "".join(f'<th style="{_TH_STYLE}">{_escape_html(h)}</th>' for h in headers)
     tbody = "".join(
@@ -63,22 +69,28 @@ def _render_table_html(
         + "</tr>"
         for row in rows
     )
+    # Decouple the table from the report-config `width` (which caps the whole
+    # page container to size the charts): width:max-content gives the table its
+    # natural content width, and the left:50%/translateX(-50%) "full-bleed"
+    # centering breaks it out of that container so a wide viewport shows it in
+    # full (no scrollbar) rather than being squeezed to the chart width.
+    # max-width:96vw keeps it from ever reaching the viewport edge.
     return (
-        f'<table style="margin:16px auto;border-collapse:collapse;'
-        f'font-family:{font_family};font-size:{font_size}px">'
+        f'<table style="width:max-content;max-width:96vw;margin:16px 0;'
+        f"position:relative;left:50%;transform:translateX(-50%);"
+        f"border-collapse:collapse;"
+        f'font-family:{_TEXT_FAMILY};font-size:{_TEXT_SIZE}px">'
         f"<thead><tr>{thead}</tr></thead><tbody>{tbody}</tbody></table>"
     )
 
 
-def _render_data_summary_table_html(df, font_family: str, font_size: int) -> str:
+def _render_data_summary_table_html(df) -> str:
     """Render the session/record-count data summary table shared by all reports."""
     n_participants = df["session_id"].nunique() if "session_id" in df.columns else 0
     n_rows = len(df)
     return _render_table_html(
         ["Session count", "Record count"],
         [[str(n_participants), str(n_rows)]],
-        font_family,
-        font_size,
     )
 
 
@@ -86,8 +98,6 @@ def _render_trailing_tables_html(
     significance_test_headers: list[str],
     significance_test_rows: list[list[str]],
     df,
-    font_family: str,
-    font_size: int,
 ) -> str:
     """Render the labeled tables trailing every per-test-type report body.
 
@@ -97,20 +107,17 @@ def _render_trailing_tables_html(
     same way.
     """
     return (
-        _table_heading_html("Significance tests", font_size)
-        + _render_table_html(
-            significance_test_headers, significance_test_rows, font_family, font_size
-        )
-        + _table_heading_html("Data summary", font_size)
-        + _render_data_summary_table_html(df, font_family, font_size)
+        _table_heading_html("Significance tests")
+        + _render_table_html(significance_test_headers, significance_test_rows)
+        + _table_heading_html("Data summary")
+        + _render_data_summary_table_html(df)
     )
 
 
-def _wrap_report_html(
-    title: str, body_html: str, font_family: str, font_size: int, width: int
-) -> str:
+def _wrap_report_html(title: str, body_html: str, width: int) -> str:
     """Wrap chart/table HTML in the report page shell shared by all reports.
 
+    Uses the fixed HTML font (page title/container), not the chart font.
     plotly.js is embedded here, exactly once, rather than by the first chart's
     to_html(include_plotlyjs=True) - the generators return composable body
     fragments (every chart uses include_plotlyjs=False), so a report stacking
@@ -119,8 +126,9 @@ def _wrap_report_html(
     from plotly.offline import get_plotlyjs
 
     body = (
-        f'<div style="max-width:{width}px;margin:0 auto;font-family:{font_family}">'
-        f'<h1 style="text-align:center;font-size:{font_size + 11}px">'
+        f'<div style="max-width:{width}px;margin:0 auto;padding-top:24px;'
+        f'font-family:{_TEXT_FAMILY}">'
+        f'<h1 style="text-align:center;font-size:{_TEXT_SIZE + 11}px;margin-top:0">'
         f"{_escape_html(title)}</h1>"
         f"{body_html}"
         "</div>"
@@ -176,6 +184,7 @@ def _render_ci_bar_chart(
     font_family: str,
     font_size: int,
     height_scale: float = 1.0,
+    bar_color: str = "#72b7b2",
 ) -> str:
     """Render a horizontal bar chart with CI error whiskers, one bar per system pair.
 
@@ -201,7 +210,9 @@ def _render_ci_bar_chart(
                 width=6,
                 color="black",
             ),
-            marker_color="steelblue",
+            # The mean/rate bar color (report-config mean_bar_color), passed by
+            # the callers; matches _generate_mos_report's bar.
+            marker_color=bar_color,
             showlegend=False,
             hovertext=hover_text,
             hovertemplate="%{hovertext}<extra></extra>",
@@ -263,6 +274,7 @@ def _render_counts_bar_chart(
     font_family: str,
     font_size: int,
     height_scale: float = 1.0,
+    bar_color: str = "#cd5c5c",
 ) -> str:
     """Render a vertical bar chart of raw outcome counts (AB/ABX/CMOS reports).
 
@@ -273,7 +285,7 @@ def _render_counts_bar_chart(
     import plotly.graph_objects as go
 
     counts_fig = go.Figure(
-        go.Bar(x=count_labels, y=count_values, marker_color="indianred")
+        go.Bar(x=count_labels, y=count_values, marker_color=bar_color)
     )
     counts_fig.update_yaxes(title_text="Count")
     counts_fig.update_layout(
@@ -317,6 +329,8 @@ def _render_binary_outcome_charts(
     font_family: str,
     font_size: int,
     height_scale: float = 1.0,
+    mean_bar_color: str = "#72b7b2",
+    count_bar_color: str = "#cd5c5c",
 ) -> tuple[str, str]:
     """Render the rate-vs-chance + raw-counts chart pair for AB and ABX reports.
 
@@ -335,8 +349,14 @@ def _render_binary_outcome_charts(
         font_family=font_family,
         font_size=font_size,
         height_scale=height_scale,
+        bar_color=mean_bar_color,
     )
     counts_html = _render_counts_bar_chart(
-        count_labels, count_values, font_family, font_size, height_scale
+        count_labels,
+        count_values,
+        font_family,
+        font_size,
+        height_scale,
+        count_bar_color,
     )
     return rate_html, counts_html

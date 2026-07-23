@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ._render import (
+    _display_namer,
     _render_trailing_tables_html,
     _system_sort_key,
 )
@@ -43,11 +44,8 @@ def _generate_mos_report(
     import plotly.graph_objects as go
     from scipy import stats
 
-    labels = system_labels or {}
+    _disp = _display_namer(system_labels)
     alpha = 1 - confidence
-
-    def _disp(name: str) -> str:
-        return labels.get(name, name)
 
     systems: list[str] = []
     means: list[float] = []

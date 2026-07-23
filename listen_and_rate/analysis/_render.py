@@ -8,6 +8,7 @@ inside the functions that need them, so importing this module stays cheap.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from html import escape as _escape_html
 
 _TH_STYLE = "border:1px solid #999;padding:6px 12px;background:#f0f0f0;text-align:left"
@@ -36,6 +37,17 @@ def _reorder_pair(a: str, b: str, system_order: list[str] | None) -> tuple[str, 
     if _system_sort_key(b, system_order) < _system_sort_key(a, system_order):
         return b, a
     return a, b
+
+
+def _display_namer(system_labels: dict[str, str] | None) -> Callable[[str], str]:
+    """Return a function mapping a raw system name to its display name.
+
+    system_labels renames systems for display only (charts/tables); a name it
+    doesn't mention (or when it's None) passes through unchanged. Shared by all
+    report generators.
+    """
+    labels = system_labels or {}
+    return lambda name: labels.get(name, name)
 
 
 def _table_heading_html(label: str) -> str:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ._render import (
     _binomial_pair_stats,
+    _display_namer,
     _ordered_pairs,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
@@ -27,11 +28,8 @@ def _generate_abx_report(
     - the same binomtest mechanism as AB's win-rate test, but answering "can
     listeners tell A and B apart?" instead of "which do they prefer?".
     """
-    labels = system_labels or {}
+    _disp = _display_namer(system_labels)
     alpha = 1 - confidence
-
-    def _disp(name: str) -> str:
-        return labels.get(name, name)
 
     pair_labels: list[str] = []
     accuracy: list[float] = []

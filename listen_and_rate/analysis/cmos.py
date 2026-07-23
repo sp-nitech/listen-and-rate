@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ._render import (
+    _display_namer,
     _ordered_pairs,
     _render_ci_bar_chart,
     _render_trailing_tables_html,
@@ -77,11 +78,8 @@ def _generate_cmos_report(
 
     from scipy import stats
 
-    labels = system_labels or {}
+    _disp = _display_namer(system_labels)
     alpha = 1 - confidence
-
-    def _disp(name: str) -> str:
-        return labels.get(name, name)
 
     pair_labels: list[str] = []
     means: list[float] = []

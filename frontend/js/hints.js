@@ -23,7 +23,7 @@ export function ratingKeysHint(rating) {
     keys.length > 1 &&
     keys.every((k, i) => /^[0-9]$/.test(k) && (i === 0 || Number(k) === Number(keys[i - 1]) + 1));
   if (isDigitRun) {
-    return `<kbd>${escapeHtml(keys[0])}</kbd>–<kbd>${escapeHtml(keys[keys.length - 1])}</kbd>`;
+    return `<kbd>${escapeHtml(keys[0])}</kbd>\u2013<kbd>${escapeHtml(keys[keys.length - 1])}</kbd>`;
   }
   return keys.map((k) => `<kbd>${escapeHtml(k)}</kbd>`).join('');
 }

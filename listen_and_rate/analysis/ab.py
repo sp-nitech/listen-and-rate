@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ._render import (
     _binomial_pair_stats,
+    _display_namer,
     _ordered_pairs,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
@@ -32,11 +33,8 @@ def _generate_ab_report(
     the rate means (closeness to the reference rather than preference) -
     hence the outcome_column/rate_axis_title/include_tie parameters.
     """
-    labels = system_labels or {}
+    _disp = _display_namer(system_labels)
     alpha = 1 - confidence
-
-    def _disp(name: str) -> str:
-        return labels.get(name, name)
 
     pair_labels: list[str] = []
     pref_rate_a: list[float] = []

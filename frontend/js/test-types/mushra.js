@@ -334,7 +334,7 @@ export class MUSHRATest extends PairedTrialTest {
 
   /**
    * Show whether this slider has been rated yet. Unrated sliders hide their
-   * thumb/fill (CSS .is-unrated) and read "–" instead of a number - a thumb
+   * thumb/fill (CSS .is-unrated) and read a dash placeholder instead of a number - a thumb
    * parked at 0 with a "0" readout could be misread as a deliberate
    * lowest-possible score rather than "not rated yet". aria-valuetext keeps
    * the same distinction audible: without it a screen reader would announce
@@ -347,7 +347,7 @@ export class MUSHRATest extends PairedTrialTest {
     } else {
       range.setAttribute('aria-valuetext', 'not rated yet');
       const valueEl = range.closest('.mushra-slider-col')?.querySelector('.mushra-slider-value');
-      if (valueEl) valueEl.textContent = '–';
+      if (valueEl) valueEl.textContent = '\u2013';
     }
   }
 

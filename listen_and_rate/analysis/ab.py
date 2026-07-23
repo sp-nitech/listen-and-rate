@@ -19,6 +19,8 @@ def _generate_ab_report(
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
+    bar_width_scale: float = 1.0,
+    png_scale: float = 2.0,
     mean_bar_color: str = "#72b7b2",
     count_bar_color: str = "#cd5c5c",
     outcome_column: str = "winner",
@@ -86,6 +88,8 @@ def _generate_ab_report(
         font_family,
         font_size,
         height_scale,
+        bar_width_scale,
+        png_scale,
         mean_bar_color=mean_bar_color,
         count_bar_color=count_bar_color,
     )

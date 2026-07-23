@@ -166,6 +166,8 @@ def main() -> None:
         system_order=system_order,
         system_labels=report.labels,
         height_scale=report.scale.height,
+        bar_width_scale=report.scale.bar_width,
+        png_scale=report.scale.png,
         require_full_order=require_full_order,
         form_labels=form_labels,
         tie_label=report.tie_label,

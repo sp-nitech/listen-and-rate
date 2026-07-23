@@ -155,6 +155,8 @@ def generate_report_html(
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
+    bar_width_scale: float = 1.0,
+    png_scale: float = 2.0,
     require_full_order: bool = False,
     groups: list[dict] | None = None,
     form_labels: dict[str, str] | None = None,
@@ -168,24 +170,47 @@ def generate_report_html(
     Requires optional 'analyze' dependencies (plotly, scipy, pandas).
     Install with:  uv sync --extra analyze   (or:  make setup-analyze)
 
-    system_order, if given, controls the order systems/pairs are displayed
-    in (e.g. the order written in the original config's stimuli_dirs) -
-    otherwise systems are shown alphabetically. system_labels renames systems
-    for display only (data keys stay the raw names). height_scale multiplies
-    every chart's height. When require_full_order is set, system_order must
-    list every system present in the results (raises ValueError otherwise);
-    the significance threshold alpha is 1 - confidence.
+    When the results carry metadata/survey form answers, a trailing
+    "Participants" section shows their per-session response distributions
+    (always over the full data, regardless of groups).
 
-    groups, if given, stacks one report section per group vertically - an
-    <h2> heading (the group's label) followed by the full set of charts and
-    tables for the rows selected by its filters (see _filter_group_rows;
-    a group without filters covers everything). Without groups the report
-    is a single unlabeled section, as before. When the results carry
-    metadata/survey form answers, a trailing "Participants" section shows
-    their per-session response distributions (always over the full data,
-    regardless of groups). form_labels maps a prefixed form column
-    (e.g. 'survey_trial_count') to that field's human label from the config,
-    shown in that section's Field column in place of the bare key.
+    Args:
+        paths: Result CSV/JSON file(s); all rows are combined into one report.
+        title: Page title, shown as the heading and the browser-tab title.
+        confidence: CI level for every interval and significance test; the
+            significance threshold alpha is 1 - confidence.
+        font_family: Chart font family (the HTML chrome keeps a fixed font).
+        font_size: Chart font size in px (likewise charts only).
+        width: Page content width in px, which caps the charts' width
+            (tables keep their natural width).
+        system_order: Display order of systems/pairs (e.g. the order written
+            in the original config's stimuli_dirs); alphabetical when None.
+        system_labels: Maps a raw system name to its display name
+            (charts/tables only; the stored data keeps its raw names).
+        height_scale: Multiplier on every chart's height.
+        bar_width_scale: Multiplier on every bar's width within its category
+            slot; the gap between bars floors at zero once they fill the
+            slot (>= 1.25). Boxplots are unaffected.
+        png_scale: Resolution multiplier for the modebar's PNG download
+            (every figure); the on-screen display is unaffected.
+        require_full_order: When set, system_order must list every system
+            present in the results (raises ValueError otherwise).
+        groups: When given, stacks one report section per group vertically -
+            an <h2> heading (the group's label) followed by the full set of
+            charts and tables for the rows selected by its filters (see
+            _filter_group_rows; a group without filters covers everything).
+            Without groups the report is a single unlabeled section.
+        form_labels: Maps a prefixed form column (e.g. 'survey_trial_count')
+            to that field's human label from the config, shown in the
+            Participants section's Field column in place of the bare key.
+        tie_label: Name of the AB count chart's centered tie bar (its
+            position is always centered). Ignored by the other test types.
+        mean_bar_color: Fill color of the mean/rate bars.
+        count_bar_color: Fill color of the raw-count bars.
+
+    Returns:
+        The complete report page as a standalone HTML string.
+
     """
     try:
         import json as _json
@@ -267,6 +292,8 @@ def generate_report_html(
         system_order=system_order,
         system_labels=system_labels,
         height_scale=height_scale,
+        bar_width_scale=bar_width_scale,
+        png_scale=png_scale,
         mean_bar_color=mean_bar_color,
     )
     if "mos" in known_types or not known_types:

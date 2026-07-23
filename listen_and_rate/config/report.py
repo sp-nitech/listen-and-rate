@@ -84,10 +84,17 @@ class ReportGroupConfig(_StrictModel):
 
 
 class ScaleConfig(_StrictModel):
-    """Multipliers on the report's base figure dimensions (not absolute pixels)."""
+    """Dimensionless rendering multipliers (not absolute pixels).
+
+    width/height scale the figures' canvas, bar_width the bars' thickness
+    within their category slot (boxplots unaffected), and png the resolution
+    of the modebar's PNG download (on-screen display unaffected).
+    """
 
     width: float = Field(default=1.0, gt=0)
     height: float = Field(default=1.0, gt=0)
+    bar_width: float = Field(default=1.0, gt=0)
+    png: float = Field(default=2.0, gt=0)
 
 
 class FontConfig(_StrictModel):

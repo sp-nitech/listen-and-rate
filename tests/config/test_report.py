@@ -19,6 +19,8 @@ def test_defaults_when_empty():
     rc = ReportConfig()
     assert rc.scale.width == 1.0
     assert rc.scale.height == 1.0
+    assert rc.scale.bar_width == 1.0
+    assert rc.scale.png == 2.0
     assert rc.confidence == 0.95
     assert rc.font.family == "sans-serif"
     assert rc.font.size == 13
@@ -31,7 +33,7 @@ def test_defaults_when_empty():
 
 def test_parses_all_fields():
     rc = ReportConfig(
-        scale={"width": 1.5, "height": 2.0},
+        scale={"width": 1.5, "height": 2.0, "bar_width": 0.5, "png": 4.0},
         confidence=0.99,
         font={"family": "Georgia", "size": 20},
         order=["A", "B"],
@@ -42,6 +44,8 @@ def test_parses_all_fields():
     )
     assert rc.scale.width == 1.5
     assert rc.scale.height == 2.0
+    assert rc.scale.bar_width == 0.5
+    assert rc.scale.png == 4.0
     assert rc.confidence == 0.99
     assert rc.font.family == "Georgia"
     assert rc.font.size == 20
@@ -64,6 +68,10 @@ def test_scale_must_be_positive():
         ReportConfig(scale={"width": 0})
     with pytest.raises(ValidationError):
         ReportConfig(scale={"height": -1})
+    with pytest.raises(ValidationError):
+        ReportConfig(scale={"bar_width": 0})
+    with pytest.raises(ValidationError):
+        ReportConfig(scale={"png": 0})
 
 
 def test_font_size_must_be_positive():

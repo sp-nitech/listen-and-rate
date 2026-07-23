@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from ._render import (
+    _bar_gap,
     _display_namer,
+    _fig_to_html,
     _render_trailing_tables_html,
     _system_sort_key,
 )
@@ -17,6 +19,8 @@ def _generate_mos_report(
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
+    bar_width_scale: float = 1.0,
+    png_scale: float = 2.0,
     mean_bar_color: str = "#72b7b2",
     metric_label: str = "MOS",
     axis_step: float = 0.5,
@@ -167,6 +171,7 @@ def _generate_mos_report(
         # error whiskers, or annotations regardless of how many systems there are.
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         height=round(320 * height_scale),
+        bargap=_bar_gap(bar_width_scale),
         margin=dict(t=50, b=50),
         font=dict(family=font_family, size=font_size),
     )
@@ -197,8 +202,8 @@ def _generate_mos_report(
         font=dict(family=font_family, size=font_size),
     )
 
-    mos_html = mos_fig.to_html(include_plotlyjs=False, full_html=False)
-    dist_html = dist_fig.to_html(include_plotlyjs=False, full_html=False)
+    mos_html = _fig_to_html(mos_fig, png_scale)
+    dist_html = _fig_to_html(dist_fig, png_scale)
 
     n_pairs = math.comb(len(systems), 2)
     table_rows = []

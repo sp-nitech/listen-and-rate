@@ -184,6 +184,33 @@ def _ordered_pairs(
     return ordered
 
 
+def _bar_gap(bar_width_scale: float) -> float:
+    """Convert the bar-width multiplier into Plotly's layout bargap fraction.
+
+    Plotly's own default is bargap 0.2 (bars fill 80% of their category
+    slot), so scale 1.0 reproduces the default look exactly; the gap floors
+    at 0 once the bars fill the whole slot (scale >= 1.25). Layout-level
+    bargap - rather than a per-trace width - applies uniformly to single,
+    grouped (CMOS categories), and horizontal bar charts.
+    """
+    return max(0.0, 1 - 0.8 * bar_width_scale)
+
+
+def _fig_to_html(fig, png_scale: float) -> str:
+    """Serialize a figure to an embeddable HTML fragment.
+
+    Shared by every chart renderer: the page loads plotly.js once (so each
+    fragment excludes its own copy), and the modebar's PNG download renders
+    at png_scale times the on-screen resolution (report-config scale.png;
+    the on-screen display itself is unaffected).
+    """
+    return fig.to_html(
+        include_plotlyjs=False,
+        full_html=False,
+        config={"toImageButtonOptions": {"scale": png_scale}},
+    )
+
+
 def _render_ci_bar_chart(
     pair_labels: list[str],
     values: list[float],
@@ -196,6 +223,8 @@ def _render_ci_bar_chart(
     font_family: str,
     font_size: int,
     height_scale: float = 1.0,
+    bar_width_scale: float = 1.0,
+    png_scale: float = 2.0,
     bar_color: str = "#72b7b2",
 ) -> str:
     """Render a horizontal bar chart with CI error whiskers, one bar per system pair.
@@ -273,11 +302,12 @@ def _render_ci_bar_chart(
         # error whiskers, or annotations regardless of how many pairs there are.
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         height=round(260 * height_scale),
+        bargap=_bar_gap(bar_width_scale),
         margin=dict(t=50, b=50),
         font=dict(family=font_family, size=font_size),
     )
 
-    return rate_fig.to_html(include_plotlyjs=False, full_html=False)
+    return _fig_to_html(rate_fig, png_scale)
 
 
 def _render_counts_bar_chart(
@@ -286,6 +316,8 @@ def _render_counts_bar_chart(
     font_family: str,
     font_size: int,
     height_scale: float = 1.0,
+    bar_width_scale: float = 1.0,
+    png_scale: float = 2.0,
     bar_color: str = "#cd5c5c",
 ) -> str:
     """Render a vertical bar chart of raw outcome counts (AB/ABX/CMOS reports).
@@ -303,10 +335,11 @@ def _render_counts_bar_chart(
     counts_fig.update_layout(
         showlegend=False,
         height=round(260 * height_scale),
+        bargap=_bar_gap(bar_width_scale),
         margin=dict(t=30, b=50),
         font=dict(family=font_family, size=font_size),
     )
-    return counts_fig.to_html(include_plotlyjs=False, full_html=False)
+    return _fig_to_html(counts_fig, png_scale)
 
 
 def _binomial_pair_stats(
@@ -341,6 +374,8 @@ def _render_binary_outcome_charts(
     font_family: str,
     font_size: int,
     height_scale: float = 1.0,
+    bar_width_scale: float = 1.0,
+    png_scale: float = 2.0,
     mean_bar_color: str = "#72b7b2",
     count_bar_color: str = "#cd5c5c",
 ) -> tuple[str, str]:
@@ -361,6 +396,8 @@ def _render_binary_outcome_charts(
         font_family=font_family,
         font_size=font_size,
         height_scale=height_scale,
+        bar_width_scale=bar_width_scale,
+        png_scale=png_scale,
         bar_color=mean_bar_color,
     )
     counts_html = _render_counts_bar_chart(
@@ -369,6 +406,8 @@ def _render_binary_outcome_charts(
         font_family,
         font_size,
         height_scale,
+        bar_width_scale,
+        png_scale,
         count_bar_color,
     )
     return rate_html, counts_html

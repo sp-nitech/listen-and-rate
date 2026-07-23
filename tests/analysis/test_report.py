@@ -17,6 +17,7 @@ from ._helpers import (
     THREE_SYSTEM_CSV_ROWS,
     XAB_CSV_ROWS,
     _plotly_call_args,
+    _plotly_config,
     _with_session_meta,
     _write_csv,
     _write_json,
@@ -306,6 +307,75 @@ def test_height_scale_scales_chart_height(tmp_path):
     _, base = _plotly_call_args(generate_report_html([path]))
     _, scaled = _plotly_call_args(generate_report_html([path], height_scale=2.0))
     assert scaled["height"] == base["height"] * 2
+
+
+# -- bar_width_scale --------------------------------------------------------
+
+
+def test_bar_width_scale_default_matches_plotly_look(tmp_path):
+    # Scale 1.0 sets bargap to Plotly's own 0.2 default (bars fill 80% of
+    # their category slot), so the default report look is unchanged.
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
+    _, mean_layout = _plotly_call_args(html)
+    _, count_layout = _plotly_call_args(html, occurrence=1)
+    assert mean_layout["bargap"] == pytest.approx(0.2)
+    assert count_layout["bargap"] == pytest.approx(0.2)
+
+
+def test_bar_width_scale_thins_bars_in_all_bar_charts(tmp_path):
+    # Scale 0.5 halves the bars' slot fraction (0.8 -> 0.4, i.e. bargap 0.6)
+    # in the mean/rate chart and the count chart of every bar-based report.
+    for rows in (AB_CSV_ROWS, CMOS_CSV_ROWS):
+        html = generate_report_html(
+            [_write_csv(tmp_path / "s.csv", rows)], bar_width_scale=0.5
+        )
+        _, mean_layout = _plotly_call_args(html)
+        _, count_layout = _plotly_call_args(html, occurrence=1)
+        assert mean_layout["bargap"] == pytest.approx(0.6)
+        assert count_layout["bargap"] == pytest.approx(0.6)
+
+
+def test_bar_width_scale_applies_to_mos_mean_chart_not_boxplot(tmp_path):
+    # MOS's second figure is a boxplot, not a bar chart - the scale must
+    # not leak a bargap into it.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)], bar_width_scale=0.5
+    )
+    _, mean_layout = _plotly_call_args(html)
+    _, box_layout = _plotly_call_args(html, occurrence=1)
+    assert mean_layout["bargap"] == pytest.approx(0.6)
+    assert "bargap" not in box_layout
+
+
+def test_bar_width_scale_gap_floors_at_zero(tmp_path):
+    # Bars cannot exceed their category slot: scales >= 1.25 clamp to
+    # touching bars (bargap 0) instead of a negative gap Plotly rejects.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)], bar_width_scale=2.0
+    )
+    _, mean_layout = _plotly_call_args(html)
+    assert mean_layout["bargap"] == 0
+
+
+# -- png_scale --------------------------------------------------------------
+
+
+def test_png_download_defaults_to_double_resolution(tmp_path):
+    # The modebar's PNG download renders at 2x resolution out of the box -
+    # every figure gets it, the boxplot (occurrence 1 here) included.
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
+    for occurrence in (0, 1):
+        config = _plotly_config(html, occurrence=occurrence)
+        assert config["toImageButtonOptions"]["scale"] == 2.0
+
+
+def test_png_scale_is_configurable(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)], png_scale=4.0
+    )
+    for occurrence in (0, 1):
+        config = _plotly_config(html, occurrence=occurrence)
+        assert config["toImageButtonOptions"]["scale"] == 4.0
 
 
 # -- alpha derived from confidence ------------------------------------------

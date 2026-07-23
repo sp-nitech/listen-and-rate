@@ -24,6 +24,7 @@ __all__ = [
     "_write_csv",
     "_write_json",
     "_plotly_call_args",
+    "_plotly_config",
     "_with_session_meta",
     "_mos_rows",
     "RATINGS_A_B",
@@ -69,6 +70,27 @@ def _plotly_call_args(html: str, occurrence: int = 0) -> tuple[list, dict]:
     assert comma, "could not find layout argument after traces"
     layout, _ = decoder.raw_decode(html, idx + comma.end())
     return traces, layout
+
+
+def _plotly_config(html: str, occurrence: int = 0) -> dict:
+    """Extract the config arg (4th) of the Nth Plotly.newPlot(...) call.
+
+    Companion to _plotly_call_args: the config object carries modebar and
+    export options (e.g. toImageButtonOptions) rather than data or layout.
+    """
+    matches = list(re.finditer(r'Plotly\.newPlot\(\s*"[^"]+",\s*', html, re.DOTALL))
+    assert len(matches) > occurrence, (
+        f"could not find Plotly.newPlot(...) call #{occurrence} in HTML"
+    )
+    decoder = json.JSONDecoder()
+    idx = matches[occurrence].end()
+    value: dict = {}
+    for arg in ("traces", "layout", "config"):
+        value, idx = decoder.raw_decode(html, idx)
+        comma = re.match(r"\s*,\s*", html[idx:])
+        assert comma or arg == "config", f"could not find argument after {arg}"
+        idx += comma.end() if comma else 0
+    return value
 
 
 def _write_json(

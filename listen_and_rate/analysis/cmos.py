@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from ._render import (
+    _bar_gap,
     _display_namer,
+    _fig_to_html,
     _ordered_pairs,
     _render_ci_bar_chart,
     _render_trailing_tables_html,
@@ -27,6 +29,8 @@ def _render_cmos_category_chart(
     font_family: str,
     font_size: int,
     height_scale: float = 1.0,
+    bar_width_scale: float = 1.0,
+    png_scale: float = 2.0,
     bar_color: str = "#cd5c5c",
 ) -> str:
     """Render the 7-category (much worse..much better) response-count bar chart.
@@ -50,10 +54,11 @@ def _render_cmos_category_chart(
         barmode="group",
         showlegend=len(pair_labels) > 1,
         height=round(320 * height_scale),
+        bargap=_bar_gap(bar_width_scale),
         margin=dict(t=30, b=80),
         font=dict(family=font_family, size=font_size),
     )
-    return fig.to_html(include_plotlyjs=False, full_html=False)
+    return _fig_to_html(fig, png_scale)
 
 
 def _generate_cmos_report(
@@ -64,6 +69,8 @@ def _generate_cmos_report(
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
     height_scale: float = 1.0,
+    bar_width_scale: float = 1.0,
+    png_scale: float = 2.0,
     mean_bar_color: str = "#72b7b2",
     count_bar_color: str = "#cd5c5c",
 ) -> str:
@@ -128,6 +135,8 @@ def _generate_cmos_report(
         font_family=font_family,
         font_size=font_size,
         height_scale=height_scale,
+        bar_width_scale=bar_width_scale,
+        png_scale=png_scale,
         bar_color=mean_bar_color,
     )
     category_html = _render_cmos_category_chart(
@@ -136,6 +145,8 @@ def _generate_cmos_report(
         font_family,
         font_size,
         height_scale,
+        bar_width_scale,
+        png_scale,
         count_bar_color,
     )
     trailing_tables = _render_trailing_tables_html(

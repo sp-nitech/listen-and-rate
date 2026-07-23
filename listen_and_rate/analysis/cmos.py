@@ -113,7 +113,7 @@ def _generate_cmos_report(
         pair_labels.append(pair)
         means.append(mean)
         mean_errors.append(err)
-        hover_text.append(f"{pair}: {mean:.2f}±{err:.2f}")
+        hover_text.append(f"{pair}: {mean:.2f}\u2009±\u2009{err:.2f}")
         counts_per_pair.append([int((ratings == v).sum()) for v in _CMOS_CATEGORIES])
         table_rows.append(
             [

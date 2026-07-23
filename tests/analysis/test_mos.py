@@ -116,11 +116,24 @@ def test_generate_mushra_report_labels_yaxis_as_score(tmp_path):
 
 
 def _annotation_decimals(html):
-    """Digits after the decimal point in each bar's "mean±CI" annotation."""
+    """Digits after the decimal point in each bar's "mean ± CI" annotation."""
     _, layout = _plotly_call_args(html)
     texts = [a["text"] for a in layout.get("annotations", [])]
     assert texts, "expected per-bar value annotations"
-    return [(len(part.split(".")[1]) for part in t.split("±")) for t in texts]
+    return [
+        (len(part.split(".")[1]) for part in t.split("\u2009±\u2009")) for t in texts
+    ]
+
+
+def test_generate_mos_report_annotation_thin_spaces_around_plus_minus(tmp_path):
+    # Binary "±" is typeset with surrounding spaces; thin spaces (U+2009)
+    # keep the chart annotation compact while separating the operands.
+    import re
+
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
+    _, layout = _plotly_call_args(html)
+    for annotation in layout["annotations"]:
+        assert re.fullmatch(r"\d+\.\d+\u2009±\u2009\d+\.\d+", annotation["text"])
 
 
 def test_generate_mushra_report_bar_annotation_one_decimal(tmp_path):

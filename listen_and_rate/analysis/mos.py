@@ -111,7 +111,7 @@ def _generate_mos_report(
             ),
         )
     )
-    # Value ± CI text above each bar's error whisker, e.g. "3.22±0.55" - an
+    # Value ± CI text above each bar's error whisker, e.g. "3.22 ± 0.55" - an
     # opaque backing box keeps it readable regardless of what's behind it
     # (bar fill for a tall bar, plain background for a short one), matching
     # _render_binary_outcome_charts' annotation treatment.
@@ -120,7 +120,7 @@ def _generate_mos_report(
             x=_disp(sys_name),
             y=mean + err,
             yshift=14,
-            text=f"{mean:.{value_precision}f}±{err:.{value_precision}f}",
+            text=f"{mean:.{value_precision}f}\u2009±\u2009{err:.{value_precision}f}",
             showarrow=False,
             font=dict(size=font_size),
             bgcolor="rgba(255,255,255,0.85)",

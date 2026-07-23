@@ -17,6 +17,14 @@ def test_generate_cmos_report_returns_html(tmp_path):
     assert "<html>" in html
 
 
+def test_generate_cmos_report_hover_thin_spaces_around_plus_minus(tmp_path):
+    # The "mean±CI" hover reads "0.75 ± 1.16" with thin spaces (U+2009),
+    # matching the MOS annotations' binary-operator spacing.
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", CMOS_CSV_ROWS)])
+    traces, _ = _plotly_call_args(html)
+    assert "\u2009±\u2009" in traces[0]["hovertext"][0]
+
+
 def test_generate_cmos_report_shows_ci_and_pair_label(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CMOS_CSV_ROWS)])
     assert "95% confidence intervals" in html

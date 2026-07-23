@@ -158,6 +158,7 @@ def generate_report_html(
     require_full_order: bool = False,
     groups: list[dict] | None = None,
     form_labels: dict[str, str] | None = None,
+    tie_label: str = "No preference",
     mean_bar_color: str = "#72b7b2",
     count_bar_color: str = "#cd5c5c",
 ) -> str:
@@ -287,7 +288,12 @@ def generate_report_html(
         )
     elif "ab" in known_types:
         typed_df = df[df["test_type"] == "ab"]
-        render = partial(_generate_ab_report, **common, count_bar_color=count_bar_color)
+        render = partial(
+            _generate_ab_report,
+            **common,
+            count_bar_color=count_bar_color,
+            tie_label=tie_label,
+        )
     elif "abx" in known_types:
         typed_df = df[df["test_type"] == "abx"]
         render = partial(

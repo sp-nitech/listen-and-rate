@@ -28,7 +28,7 @@ def test_generate_ab_report_shows_preference_rate_and_ci(tmp_path):
 
 def test_generate_ab_report_counts_ties_separately(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
-    assert "Tie" in html or "tie" in html
+    assert "No preference" in html  # the default tie label
 
 
 def test_generate_ab_report_includes_binomial_pvalue(tmp_path):
@@ -69,7 +69,17 @@ def test_generate_ab_report_counts_chart_is_vertical_with_tie_centered(tmp_path)
     html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
     traces, _ = _plotly_call_args(html, occurrence=1)
     assert traces[0].get("orientation") != "h"
-    assert traces[0]["x"] == ["A", "Tie", "B"]
+    assert traces[0]["x"] == ["A", "No preference", "B"]
+
+
+def test_generate_ab_report_custom_tie_label(tmp_path):
+    # The centered tie bar's name is configurable (report-config tie_label);
+    # position stays centered between the two systems.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)], tie_label="Equal"
+    )
+    traces, _ = _plotly_call_args(html, occurrence=1)
+    assert traces[0]["x"] == ["A", "Equal", "B"]
 
 
 def test_generate_ab_report_title_is_centered_heading(tmp_path):

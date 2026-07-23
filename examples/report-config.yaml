@@ -33,6 +33,10 @@ confidence: 0.95
 #   A: Proposed
 #   B: Baseline
 
+# Name of the centered "no preference" bar in the AB count chart (its position
+# is always centered between the two systems). Ignored by the other test types.
+# tie_label: "No preference"
+
 # Stacked report sections (optional). Each group renders its own full set of
 # figures and tables under an <h2> heading, one section after another. Omit
 # groups entirely for the usual single-section report.

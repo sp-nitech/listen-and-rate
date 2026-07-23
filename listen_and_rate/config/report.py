@@ -114,6 +114,7 @@ class ReportConfig(_StrictModel):
     font: FontConfig = Field(default_factory=FontConfig)
     order: list[str] | None = None
     labels: dict[str, str] | None = None
+    tie_label: str = "No preference"
     mean_bar_color: str = "#72b7b2"
     count_bar_color: str = "#cd5c5c"
     groups: list[ReportGroupConfig] | None = None

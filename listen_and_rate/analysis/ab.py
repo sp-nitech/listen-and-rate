@@ -22,6 +22,7 @@ def _generate_ab_report(
     count_bar_color: str = "#cd5c5c",
     outcome_column: str = "winner",
     rate_axis_title: str = "Preference rate",
+    tie_label: str = "No preference",
     include_tie: bool = True,
 ) -> str:
     """Build the AB report: rate and count charts plus a binomial-test table.
@@ -58,9 +59,11 @@ def _generate_ab_report(
         hover_text.append(f"{da}: {rate_a:.0%}  /  {db}: {1 - rate_a:.0%}")
         if include_tie:
             # Tie centered between the two systems' counts, matching CMOS's
-            # vertical category chart's visual style.
+            # vertical category chart's visual style. The bar's name is
+            # configurable (report-config tie_label); its centered position is
+            # not, since it encodes "neither of the flanking systems".
             n_tie = int((sub[outcome_column] == "tie").sum())
-            count_labels.extend([da, "Tie", db])
+            count_labels.extend([da, tie_label, db])
             count_values.extend([n_a, n_tie, n_b])
         else:
             count_labels.extend([da, db])

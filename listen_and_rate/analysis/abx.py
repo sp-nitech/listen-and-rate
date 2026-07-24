@@ -51,7 +51,9 @@ def _generate_abx_report(
         pair_labels.append(f"{_disp(system_a)} vs {_disp(system_b)}")
         accuracy.append(rate)
         accuracy_errors.append(err)
-        hover_text.append(f"Correct: {n_correct}/{n_total} ({rate:.0%})")
+        hover_text.append(
+            f"Correct: {n_correct}/{n_total} ({rate:.0%}\u2009±\u2009{err:.0%})"
+        )
         # ABXConfig requires exactly 2 systems, so there is only ever one
         # pair and generic "Correct"/"Incorrect" labels stay unambiguous.
         count_labels.extend(["Correct", "Incorrect"])

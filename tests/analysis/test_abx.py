@@ -22,6 +22,19 @@ def test_generate_abx_report_shows_accuracy_and_ci(tmp_path):
     assert "95% confidence intervals" in html
 
 
+def test_generate_abx_report_annotation_shows_ci_value(tmp_path):
+    # The accuracy annotation prints the CI half-width next to the rate,
+    # matching the "value +/- CI" convention used across the report types.
+    import re
+
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", ABX_CSV_ROWS)])
+    _, layout = _plotly_call_args(html)
+    texts = [a["text"] for a in layout["annotations"]]
+    # Thin spaces (U+2009) flank the binary "+/-", as in MOS/CMOS/AB.
+    pattern = r"\d+%" + "\u2009±\u2009" + r"\d+%\)"
+    assert any(re.search(pattern, t) for t in texts)
+
+
 def test_generate_abx_report_includes_binomial_pvalue(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", ABX_CSV_ROWS)])
     assert "A vs B" in html

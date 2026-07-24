@@ -817,7 +817,7 @@ final class SaveTest extends TestCase
         $this->assertSame('A', $row['winner']);
     }
 
-    public function testBuildAbJsonResultTieProducesWinnerTie(): void
+    public function testBuildAbJsonResultTieProducesTieToken(): void
     {
         $data = [
             'session_id' => 's1',
@@ -825,7 +825,31 @@ final class SaveTest extends TestCase
             'choices'    => [['stimulus_ids' => ['a1', 'b1'], 'selected_stimulus_id' => null]],
         ];
         $result = build_ab_json_result($data, [], $this->abStimulusMap(), '2026-01-01T00:00:00+00:00');
-        $this->assertSame('tie', $result['ratings'][0]['winner']);
+        $this->assertSame('=', $result['ratings'][0]['winner']); // OUTCOME_TIE
+    }
+
+    public function testBuildAbJsonResultWinnerIsPositionalNotSystemName(): void
+    {
+        // winner records the pair SIDE (A/B/=), never a system name, so systems
+        // named "tie"/"=" - which used to collide with the old "tie" sentinel -
+        // are recorded unambiguously.
+        $stimulusMap = [
+            'a1' => ['system' => '=', 'utterance' => 'u1'],   // sorts before "tie"
+            'b1' => ['system' => 'tie', 'utterance' => 'u1'],
+        ];
+        $data = [
+            'session_id' => 's1',
+            'test_type'  => 'ab',
+            'choices'    => [
+                ['stimulus_ids' => ['a1', 'b1'], 'selected_stimulus_id' => 'b1'], // "tie" wins
+                ['stimulus_ids' => ['a1', 'b1'], 'selected_stimulus_id' => null], // real tie
+            ],
+        ];
+        $result = build_ab_json_result($data, [], $stimulusMap, '2026-01-01T00:00:00+00:00');
+        $this->assertSame('=', $result['ratings'][0]['system_a']);
+        $this->assertSame('tie', $result['ratings'][0]['system_b']);
+        $this->assertSame('B', $result['ratings'][0]['winner']); // system_b ("tie") won
+        $this->assertSame('=', $result['ratings'][1]['winner']); // an actual tie
     }
 
     public function testBuildAbJsonResultSortsNumericSystemNamesLexicographically(): void

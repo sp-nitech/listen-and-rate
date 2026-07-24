@@ -41,6 +41,14 @@
 
 require_once __DIR__ . '/x_token.php';
 
+// AB/XAB outcome tokens: the winner/closer column records which SIDE of the
+// stored pair was chosen (system_a / system_b), or a tie, as a positional
+// token rather than a system name - so any system name ("tie", "A", "="
+// included) is collision-free. Mirrors Python storage.OUTCOME_* exactly.
+const OUTCOME_A   = 'A';
+const OUTCOME_B   = 'B';
+const OUTCOME_TIE = '=';
+
 // -- Shared helpers ------------------------------------------------------
 
 /** Thrown by the helpers below to signal a request-level error with an HTTP status. */
@@ -522,6 +530,19 @@ function validate_ab_choices(array $choices, array $stimulusMap, bool $allowTie)
     }
 }
 
+/**
+ * Positional outcome token for an AB choice: OUTCOME_TIE when nothing was
+ * selected, else OUTCOME_A/OUTCOME_B for the chosen side of the sorted pair.
+ * Mirrors listen_and_rate/routers/api/ab.py so any system name is safe.
+ */
+function ab_winner_token(?string $selected, array $stimulusMap, array $pair): string
+{
+    if ($selected === null) {
+        return OUTCOME_TIE;
+    }
+    return $stimulusMap[$selected]['system'] === $pair[0] ? OUTCOME_A : OUTCOME_B;
+}
+
 /** Build the assoc array to json_encode for JSON-format AB output. */
 function build_ab_json_result(array $data, array $meta, array $stimulusMap, string $ts): array
 {
@@ -535,7 +556,7 @@ function build_ab_json_result(array $data, array $meta, array $stimulusMap, stri
             'system_a'  => $pair[0],
             'system_b'  => $pair[1],
             'utterance' => $meta1['utterance'],
-            'winner'    => $selected === null ? 'tie' : $stimulusMap[$selected]['system'],
+            'winner'    => ab_winner_token($selected, $stimulusMap, $pair),
         ];
     }
     return [
@@ -568,7 +589,7 @@ function build_ab_csv_rows(array $data, array $meta, array $metaKeys, array $sti
         $row[]  = $pair[0];
         $row[]  = $pair[1];
         $row[]  = $meta1['utterance'];
-        $row[]  = $selected === null ? 'tie' : $stimulusMap[$selected]['system'];
+        $row[]  = ab_winner_token($selected, $stimulusMap, $pair);
         $rows[] = $row;
     }
     return [$fields, $rows];
@@ -683,6 +704,16 @@ function validate_xab_choice(array $stimulusMap, array $c, string $referenceSyst
     return [$meta1, $meta2];
 }
 
+/**
+ * Positional outcome token for an XAB choice: OUTCOME_A/OUTCOME_B for the
+ * side of the sorted pair judged closer to the reference (XAB has no tie).
+ * Mirrors listen_and_rate/routers/api/xab.py.
+ */
+function xab_closer_token(string $selected, array $stimulusMap, array $pair): string
+{
+    return $stimulusMap[$selected]['system'] === $pair[0] ? OUTCOME_A : OUTCOME_B;
+}
+
 /** Build the assoc array to json_encode for JSON-format XAB output. */
 function build_xab_json_result(array $data, array $meta, array $stimulusMap, string $ts, string $referenceSystem): array
 {
@@ -695,7 +726,7 @@ function build_xab_json_result(array $data, array $meta, array $stimulusMap, str
             'system_a'  => $pair[0],
             'system_b'  => $pair[1],
             'utterance' => $meta1['utterance'],
-            'closer'    => $stimulusMap[$c['selected_stimulus_id']]['system'],
+            'closer'    => xab_closer_token($c['selected_stimulus_id'], $stimulusMap, $pair),
         ];
     }
     return [
@@ -727,7 +758,7 @@ function build_xab_csv_rows(array $data, array $meta, array $metaKeys, array $st
         $row[]  = $pair[0];
         $row[]  = $pair[1];
         $row[]  = $meta1['utterance'];
-        $row[]  = $stimulusMap[$c['selected_stimulus_id']]['system'];
+        $row[]  = xab_closer_token($c['selected_stimulus_id'], $stimulusMap, $pair);
         $rows[] = $row;
     }
     return [$fields, $rows];

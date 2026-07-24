@@ -116,7 +116,7 @@ def test_ab_submit_tie_recorded_as_tie(tmp_path, test_audio_file, monkeypatch):
         )
         assert res.status_code == 200
         rows = list(csv.DictReader((tmp_path / "results" / "config" / "s1.csv").open()))
-        assert rows[0]["winner"] == "tie"
+        assert rows[0]["winner"] == "="  # OUTCOME_TIE positional token
 
 
 def test_ab_submit_tie_rejected_when_allow_tie_false(

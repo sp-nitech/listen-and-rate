@@ -172,11 +172,15 @@ CMOS_ROWS = [
 
 CMOS_CSV_ROWS = _with_session_meta("cmos", CMOS_ROWS)
 
+# winner/closer are positional tokens (A = system_a, B = system_b, = tie),
+# not system names - see storage.OUTCOME_*. Here system_a is literally named
+# "A", so the tokens happen to coincide with the names, but they encode the
+# pair SIDE regardless of what the systems are called.
 AB_ROWS = [
     {"system_a": "A", "system_b": "B", "utterance": "u1", "winner": "A"},
     {"system_a": "A", "system_b": "B", "utterance": "u2", "winner": "A"},
     {"system_a": "A", "system_b": "B", "utterance": "u3", "winner": "B"},
-    {"system_a": "A", "system_b": "B", "utterance": "u4", "winner": "tie"},
+    {"system_a": "A", "system_b": "B", "utterance": "u4", "winner": "="},
 ]
 
 AB_CSV_ROWS = _with_session_meta("ab", AB_ROWS)

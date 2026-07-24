@@ -261,7 +261,7 @@ def test_generate_report_escapes_system_name_in_pvalue_table(tmp_path):
     rows = _with_session_meta(
         "ab",
         [
-            {"system_a": "A<b>", "system_b": "B", "utterance": "u1", "winner": "A<b>"},
+            {"system_a": "A<b>", "system_b": "B", "utterance": "u1", "winner": "A"},
             {"system_a": "A<b>", "system_b": "B", "utterance": "u2", "winner": "B"},
         ],
     )

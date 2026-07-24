@@ -20,6 +20,16 @@ from pathlib import Path
 METADATA_COLUMN_PREFIX = "metadata_"
 SURVEY_COLUMN_PREFIX = "survey_"
 
+# AB/XAB outcome tokens: the winner/closer column records which SIDE of the
+# stored pair was chosen (system_a / system_b), or a tie, as a fixed
+# positional token rather than a system name. Keeping names out of the
+# outcome column means any system name - "tie", "A", "=" included - is
+# collision-free, since the identities live only in the system_a/system_b
+# columns. Mirrored by frontend/save.php for the PHP deployment.
+OUTCOME_A = "A"
+OUTCOME_B = "B"
+OUTCOME_TIE = "="
+
 
 class ResultExistsError(Exception):
     """Raised when a result file for the session already exists.

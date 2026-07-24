@@ -8,6 +8,7 @@ from ._helpers import (
     XAB_CSV_ROWS,
     XAB_ROWS,
     _plotly_call_args,
+    _with_session_meta,
     _write_csv,
     _write_json,
     generate_report_html,
@@ -24,6 +25,20 @@ def test_generate_ab_report_returns_html(tmp_path):
 def test_generate_ab_report_shows_preference_rate_and_ci(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
     assert "95% confidence intervals" in html
+
+
+def test_generate_ab_report_annotation_shows_ci_value_on_a_side(tmp_path):
+    # The rate annotation carries the CI half-width (as a percentage) on the
+    # A side, matching MOS/CMOS's "value +/- CI" convention; the B side (the
+    # mirror rate) omits the identical +/- to avoid redundancy.
+    import re
+
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
+    _, layout = _plotly_call_args(html)
+    texts = [a["text"] for a in layout["annotations"]]
+    # Thin spaces (U+2009) flank the binary "+/-", as in MOS/CMOS.
+    pattern = r"A: \d+%" + "\u2009±\u2009" + r"\d+%"
+    assert any(re.search(pattern, t) for t in texts)
 
 
 def test_generate_ab_report_counts_ties_separately(tmp_path):
@@ -82,6 +97,46 @@ def test_generate_ab_report_custom_tie_label(tmp_path):
     assert traces[0]["x"] == ["A", "Equal", "B"]
 
 
+def test_generate_ab_report_positional_tokens_are_name_agnostic(tmp_path):
+    # winner is a positional token (A/B/=), never a system name, so systems
+    # named "tie"/"=" - which used to collide with the old "tie" sentinel -
+    # are counted correctly from the token alone.
+    rows = _with_session_meta(
+        "ab",
+        [
+            {"system_a": "=", "system_b": "tie", "utterance": "u1", "winner": "A"},
+            {"system_a": "=", "system_b": "tie", "utterance": "u2", "winner": "A"},
+            {"system_a": "=", "system_b": "tie", "utterance": "u3", "winner": "B"},
+            {"system_a": "=", "system_b": "tie", "utterance": "u4", "winner": "="},
+        ],
+    )
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
+    traces, _ = _plotly_call_args(html, occurrence=1)
+    # counts chart: [system_a, tie_label, system_b] with the token-derived
+    # counts (system_a "=" won 2, tie 1, system_b "tie" won 1).
+    assert traces[0]["x"] == ["=", "No preference", "tie"]
+    assert traces[0]["y"] == [2, 1, 1]
+
+
+def test_generate_ab_report_rate_follows_positional_token_under_swap(tmp_path):
+    # system_order swaps the display sides (stored Mid,Zebra shown as
+    # Zebra,Mid); the rate must still follow the positional token - Mid (the
+    # stored system_a, winner="A") won both, so displayed Zebra's rate is 0.
+    rows = _with_session_meta(
+        "ab",
+        [
+            {"system_a": "Mid", "system_b": "Zebra", "utterance": "u1", "winner": "A"},
+            {"system_a": "Mid", "system_b": "Zebra", "utterance": "u2", "winner": "A"},
+        ],
+    )
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", rows)], system_order=["Zebra", "Mid"]
+    )
+    traces, _ = _plotly_call_args(html)
+    assert traces[0]["y"] == ["Zebra vs Mid"]
+    assert traces[0]["x"][0] == 0.0  # Zebra won 0 of 2
+
+
 def test_generate_ab_report_title_is_centered_heading(tmp_path):
     # AB report has no per-chart title (removed to avoid clutter); the overall
     # experiment title is a centered <h1> above the charts instead.
@@ -123,7 +178,7 @@ def test_generate_ab_report_orders_pairs_by_system_order(tmp_path):
             "utterance": "u1",
             "system_a": "Alpha",
             "system_b": "Zebra",
-            "winner": "Alpha",
+            "winner": "A",  # Alpha (system_a) won
         },
     ]
     html = generate_report_html(
@@ -144,7 +199,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "utterance": "u1",
             "system_a": "Mid",
             "system_b": "Zebra",
-            "winner": "Mid",
+            "winner": "A",  # Mid (system_a) won
         },
         {
             "session_id": "s1",
@@ -153,7 +208,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "utterance": "u2",
             "system_a": "Alpha",
             "system_b": "Zebra",
-            "winner": "Alpha",
+            "winner": "A",  # Alpha (system_a) won
         },
         {
             "session_id": "s1",
@@ -162,7 +217,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "utterance": "u3",
             "system_a": "Alpha",
             "system_b": "Mid",
-            "winner": "Alpha",
+            "winner": "A",  # Alpha (system_a) won
         },
     ]
     html = generate_report_html(

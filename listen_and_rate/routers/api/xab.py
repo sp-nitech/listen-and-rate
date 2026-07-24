@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from ...config import StimulusConfig, XABConfig, XABTrial, build_xab_trials
 from ...models import SubmitRequest
-from ...storage import ResultSaver
+from ...storage import OUTCOME_A, OUTCOME_B, ResultSaver
 from ._shared import (
     _all_items,
     _id_to_meta,
@@ -100,12 +100,16 @@ def _submit_xab(body: SubmitRequest, config: XABConfig, saver: ResultSaver) -> d
             )
 
         system_a, system_b = sorted([meta1["system"], meta2["system"]])
+        # Positional token (which side is closer to the reference), not the
+        # system name - matches AB's winner encoding; XAB has no tie.
+        chosen = id_to_meta[choice.selected_stimulus_id]["system"]
+        closer = OUTCOME_A if chosen == system_a else OUTCOME_B
         rows.append(
             {
                 "system_a": system_a,
                 "system_b": system_b,
                 "utterance": meta1["utterance"],
-                "closer": id_to_meta[choice.selected_stimulus_id]["system"],
+                "closer": closer,
             }
         )
 

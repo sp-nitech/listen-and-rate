@@ -124,7 +124,7 @@ def test_csv_saver_creates_output_directory(tmp_path):
 def test_csv_saver_infers_columns_from_ab_row_shape(tmp_path):
     ab_rows = [
         {"system_a": "A", "system_b": "B", "utterance": "u1", "winner": "A"},
-        {"system_a": "A", "system_b": "B", "utterance": "u2", "winner": "tie"},
+        {"system_a": "A", "system_b": "B", "utterance": "u2", "winner": "="},
     ]
     CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, "ab", ab_rows)
     rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
@@ -138,7 +138,7 @@ def test_csv_saver_infers_columns_from_ab_row_shape(tmp_path):
         "winner",
     ]
     assert rows[0]["winner"] == "A"
-    assert rows[1]["winner"] == "tie"
+    assert rows[1]["winner"] == "="
 
 
 def test_csv_saver_infers_columns_from_abx_row_shape(tmp_path):

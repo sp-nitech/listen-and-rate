@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 from ...config import ABConfig
 from ...models import SubmitRequest
-from ...storage import ResultSaver
+from ...storage import OUTCOME_A, OUTCOME_B, OUTCOME_TIE, ResultSaver
 from ._shared import (
     _all_items,
     _id_to_meta,
@@ -46,11 +46,13 @@ def _submit_ab(body: SubmitRequest, config: ABConfig, saver: ResultSaver) -> dic
             )
 
         system_a, system_b = sorted([meta1["system"], meta2["system"]])
-        winner = (
-            "tie"
-            if choice.selected_stimulus_id is None
-            else id_to_meta[choice.selected_stimulus_id]["system"]
-        )
+        # Record which SIDE of the pair won as a positional token, not the
+        # system name, so any name (including "tie") is collision-free.
+        if choice.selected_stimulus_id is None:
+            winner = OUTCOME_TIE
+        else:
+            chosen = id_to_meta[choice.selected_stimulus_id]["system"]
+            winner = OUTCOME_A if chosen == system_a else OUTCOME_B
         rows.append(
             {
                 "system_a": system_a,

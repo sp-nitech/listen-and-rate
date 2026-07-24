@@ -7,8 +7,10 @@ from ._render import (
     _binomial_pair_stats,
     _display_namer,
     _ordered_pairs,
+    _pvalue_header,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
+    _significant_header,
 )
 
 
@@ -105,7 +107,7 @@ def _generate_ab_report(
         count_bar_color=count_bar_color,
     )
     trailing_tables = _render_trailing_tables_html(
-        ["Pair", "p-value (binomial test)", f"Significant (α={alpha:.2f})"],
+        ["Pair", _pvalue_header("binomial test"), _significant_header(alpha)],
         table_rows,
         df,
     )

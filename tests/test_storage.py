@@ -123,7 +123,7 @@ def test_csv_saver_creates_output_directory(tmp_path):
 
 def test_csv_saver_infers_columns_from_ab_row_shape(tmp_path):
     ab_rows = [
-        {"system_a": "A", "system_b": "B", "utterance": "u1", "winner": "A"},
+        {"system_a": "A", "system_b": "B", "utterance": "u1", "winner": "a"},
         {"system_a": "A", "system_b": "B", "utterance": "u2", "winner": "="},
     ]
     CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, "ab", ab_rows)
@@ -137,7 +137,7 @@ def test_csv_saver_infers_columns_from_ab_row_shape(tmp_path):
         "utterance",
         "winner",
     ]
-    assert rows[0]["winner"] == "A"
+    assert rows[0]["winner"] == "a"
     assert rows[1]["winner"] == "="
 
 
@@ -157,8 +157,10 @@ def test_csv_saver_infers_columns_from_abx_row_shape(tmp_path):
         "utterance",
         "correct",
     ]
-    assert rows[0]["correct"] == "True"
-    assert rows[1]["correct"] == "False"
+    # Booleans are written as JSON-style lowercase tokens (matching the JSON
+    # saver's native true/false), not Python's str(bool) "True"/"False".
+    assert rows[0]["correct"] == "true"
+    assert rows[1]["correct"] == "false"
 
 
 def test_csv_saver_refuses_to_overwrite_existing_session(tmp_path):

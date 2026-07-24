@@ -172,14 +172,14 @@ CMOS_ROWS = [
 
 CMOS_CSV_ROWS = _with_session_meta("cmos", CMOS_ROWS)
 
-# winner/closer are positional tokens (A = system_a, B = system_b, = tie),
-# not system names - see storage.OUTCOME_*. Here system_a is literally named
-# "A", so the tokens happen to coincide with the names, but they encode the
-# pair SIDE regardless of what the systems are called.
+# winner/closer are positional tokens (a = system_a, b = system_b, = tie),
+# not system names - see storage.OUTCOME_*. The lowercase a/b mirror the
+# system_a/system_b column names and encode the pair SIDE regardless of what
+# the systems are actually called.
 AB_ROWS = [
-    {"system_a": "A", "system_b": "B", "utterance": "u1", "winner": "A"},
-    {"system_a": "A", "system_b": "B", "utterance": "u2", "winner": "A"},
-    {"system_a": "A", "system_b": "B", "utterance": "u3", "winner": "B"},
+    {"system_a": "A", "system_b": "B", "utterance": "u1", "winner": "a"},
+    {"system_a": "A", "system_b": "B", "utterance": "u2", "winner": "a"},
+    {"system_a": "A", "system_b": "B", "utterance": "u3", "winner": "b"},
     {"system_a": "A", "system_b": "B", "utterance": "u4", "winner": "="},
 ]
 
@@ -195,10 +195,10 @@ ABX_ROWS = [
 ABX_CSV_ROWS = _with_session_meta("abx", ABX_ROWS)
 
 XAB_ROWS = [
-    {"system_a": "A", "system_b": "B", "utterance": "u1", "closer": "A"},
-    {"system_a": "A", "system_b": "B", "utterance": "u2", "closer": "A"},
-    {"system_a": "A", "system_b": "B", "utterance": "u3", "closer": "A"},
-    {"system_a": "A", "system_b": "B", "utterance": "u4", "closer": "B"},
+    {"system_a": "A", "system_b": "B", "utterance": "u1", "closer": "a"},
+    {"system_a": "A", "system_b": "B", "utterance": "u2", "closer": "a"},
+    {"system_a": "A", "system_b": "B", "utterance": "u3", "closer": "a"},
+    {"system_a": "A", "system_b": "B", "utterance": "u4", "closer": "b"},
 ]
 
 XAB_CSV_ROWS = _with_session_meta("xab", XAB_ROWS)

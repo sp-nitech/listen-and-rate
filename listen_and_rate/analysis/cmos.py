@@ -7,8 +7,10 @@ from ._render import (
     _display_namer,
     _fig_to_html,
     _ordered_pairs,
+    _pvalue_header,
     _render_ci_bar_chart,
     _render_trailing_tables_html,
+    _significant_header,
 )
 
 _CMOS_CATEGORIES = [-3, -2, -1, 0, 1, 2, 3]
@@ -152,8 +154,8 @@ def _generate_cmos_report(
     trailing_tables = _render_trailing_tables_html(
         [
             "Pair",
-            "p-value (t-test vs. 0)",
-            f"Significant (α={alpha:.2f})",
+            _pvalue_header("t-test vs. 0"),
+            _significant_header(alpha),
         ],
         table_rows,
         df,

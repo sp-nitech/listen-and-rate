@@ -12,9 +12,9 @@ from ._helpers import (
 )
 
 
-def _closer_system(stimulus_id: str) -> str:
-    """Map an id like sys_a__utt0 back to its configured system name (A/B)."""
-    return "A" if stimulus_id.startswith("sys_a__") else "B"
+def _closer_token(stimulus_id: str) -> str:
+    """Map an id like sys_a__utt0 to its positional closer token (a/b)."""
+    return "a" if stimulus_id.startswith("sys_a__") else "b"
 
 
 def test_xab_config_returns_trials_with_reference_and_pair(
@@ -90,7 +90,7 @@ def test_xab_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
         for row, trial in zip(rows, trials, strict=True):
             assert row["system_a"] == "A"
             assert row["system_b"] == "B"
-            assert row["closer"] == _closer_system(trial["stimuli"][0]["id"])
+            assert row["closer"] == _closer_token(trial["stimuli"][0]["id"])
             assert "winner" not in row
         # Column order matches MOS's system-first convention.
         assert list(rows[0].keys()) == [

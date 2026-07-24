@@ -6,7 +6,9 @@ from ._render import (
     _bar_gap,
     _display_namer,
     _fig_to_html,
+    _pvalue_header,
     _render_trailing_tables_html,
+    _significant_header,
     _system_sort_key,
 )
 
@@ -239,9 +241,9 @@ def _generate_mos_report(
     trailing_tables = _render_trailing_tables_html(
         [
             "Pair",
-            "p-value (t-test)",
-            "Adjusted p-value (Bonferroni)",
-            f"Significant (α={alpha:.2f})",
+            _pvalue_header("t-test"),
+            f"Adjusted {_pvalue_header('Bonferroni')}",
+            _significant_header(alpha),
         ],
         table_rows,
         df,

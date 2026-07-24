@@ -104,9 +104,9 @@ def test_generate_ab_report_positional_tokens_are_name_agnostic(tmp_path):
     rows = _with_session_meta(
         "ab",
         [
-            {"system_a": "=", "system_b": "tie", "utterance": "u1", "winner": "A"},
-            {"system_a": "=", "system_b": "tie", "utterance": "u2", "winner": "A"},
-            {"system_a": "=", "system_b": "tie", "utterance": "u3", "winner": "B"},
+            {"system_a": "=", "system_b": "tie", "utterance": "u1", "winner": "a"},
+            {"system_a": "=", "system_b": "tie", "utterance": "u2", "winner": "a"},
+            {"system_a": "=", "system_b": "tie", "utterance": "u3", "winner": "b"},
             {"system_a": "=", "system_b": "tie", "utterance": "u4", "winner": "="},
         ],
     )
@@ -125,8 +125,8 @@ def test_generate_ab_report_rate_follows_positional_token_under_swap(tmp_path):
     rows = _with_session_meta(
         "ab",
         [
-            {"system_a": "Mid", "system_b": "Zebra", "utterance": "u1", "winner": "A"},
-            {"system_a": "Mid", "system_b": "Zebra", "utterance": "u2", "winner": "A"},
+            {"system_a": "Mid", "system_b": "Zebra", "utterance": "u1", "winner": "a"},
+            {"system_a": "Mid", "system_b": "Zebra", "utterance": "u2", "winner": "a"},
         ],
     )
     html = generate_report_html(
@@ -178,7 +178,7 @@ def test_generate_ab_report_orders_pairs_by_system_order(tmp_path):
             "utterance": "u1",
             "system_a": "Alpha",
             "system_b": "Zebra",
-            "winner": "A",  # Alpha (system_a) won
+            "winner": "a",  # Alpha (system_a) won
         },
     ]
     html = generate_report_html(
@@ -199,7 +199,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "utterance": "u1",
             "system_a": "Mid",
             "system_b": "Zebra",
-            "winner": "A",  # Mid (system_a) won
+            "winner": "a",  # Mid (system_a) won
         },
         {
             "session_id": "s1",
@@ -208,7 +208,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "utterance": "u2",
             "system_a": "Alpha",
             "system_b": "Zebra",
-            "winner": "A",  # Alpha (system_a) won
+            "winner": "a",  # Alpha (system_a) won
         },
         {
             "session_id": "s1",
@@ -217,7 +217,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "utterance": "u3",
             "system_a": "Alpha",
             "system_b": "Mid",
-            "winner": "A",  # Alpha (system_a) won
+            "winner": "a",  # Alpha (system_a) won
         },
     ]
     html = generate_report_html(

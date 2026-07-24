@@ -350,7 +350,7 @@ def test_report_config_applies_labels_order_and_confidence(tmp_path, monkeypatch
     )
     html = out_path.read_text()
     assert '"x":["Baseline","Proposed"]' in html.replace(" ", "")
-    assert "α=0.01" in html  # alpha follows confidence (1 - 0.99)
+    assert "\u03b1=0.01" in html  # alpha follows confidence (1 - 0.99)
 
 
 def test_report_config_scale_applies(tmp_path, monkeypatch):
@@ -392,7 +392,7 @@ def test_report_config_is_optional(tmp_path, monkeypatch):
     _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
     html = out_path.read_text()
     assert "max-width:900px" in html  # default scale = 1.0
-    assert "α=0.05" in html  # default confidence 0.95
+    assert "\u03b1=0.05" in html  # default confidence 0.95
 
 
 def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):

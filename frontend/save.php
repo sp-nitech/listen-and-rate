@@ -45,8 +45,8 @@ require_once __DIR__ . '/x_token.php';
 // stored pair was chosen (system_a / system_b), or a tie, as a positional
 // token rather than a system name - so any system name ("tie", "A", "="
 // included) is collision-free. Mirrors Python storage.OUTCOME_* exactly.
-const OUTCOME_A   = 'A';
-const OUTCOME_B   = 'B';
+const OUTCOME_A   = 'a';
+const OUTCOME_B   = 'b';
 const OUTCOME_TIE = '=';
 
 // -- Shared helpers ------------------------------------------------------
@@ -669,7 +669,9 @@ function build_abx_csv_rows(array $data, array $meta, array $metaKeys, array $st
         $row[]  = $meta1['utterance'];
         // Matches Python's str(True)/str(False), since storage.py's CSV
         // writer does the same for the equivalent MOS/AB row shape's values.
-        $row[]  = ($c['selected_stimulus_id'] === $groundTruth) ? 'True' : 'False';
+        // JSON-style lowercase tokens, matching the JSON output's native
+        // boolean and Python's CSVResultSaver (see storage._csv_cell).
+        $row[]  = ($c['selected_stimulus_id'] === $groundTruth) ? 'true' : 'false';
         $rows[] = $row;
     }
     return [$fields, $rows];

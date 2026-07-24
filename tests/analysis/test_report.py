@@ -261,8 +261,8 @@ def test_generate_report_escapes_system_name_in_pvalue_table(tmp_path):
     rows = _with_session_meta(
         "ab",
         [
-            {"system_a": "A<b>", "system_b": "B", "utterance": "u1", "winner": "A"},
-            {"system_a": "A<b>", "system_b": "B", "utterance": "u2", "winner": "B"},
+            {"system_a": "A<b>", "system_b": "B", "utterance": "u1", "winner": "a"},
+            {"system_a": "A<b>", "system_b": "B", "utterance": "u2", "winner": "b"},
         ],
     )
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
@@ -383,15 +383,15 @@ def test_png_scale_is_configurable(tmp_path):
 
 def test_significance_alpha_defaults_to_005(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", THREE_SYSTEM_CSV_ROWS)])
-    assert "α=0.05" in html
+    assert "\u03b1=0.05" in html
 
 
 def test_significance_alpha_follows_confidence(tmp_path):
     html = generate_report_html(
         [_write_csv(tmp_path / "s.csv", THREE_SYSTEM_CSV_ROWS)], confidence=0.99
     )
-    assert "α=0.01" in html
-    assert "α=0.05" not in html
+    assert "\u03b1=0.01" in html
+    assert "\u03b1=0.05" not in html
 
 
 # -- groups (stacked filtered sections) ---------------------------------------

@@ -22,13 +22,30 @@ SURVEY_COLUMN_PREFIX = "survey_"
 
 # AB/XAB outcome tokens: the winner/closer column records which SIDE of the
 # stored pair was chosen (system_a / system_b), or a tie, as a fixed
-# positional token rather than a system name. Keeping names out of the
-# outcome column means any system name - "tie", "A", "=" included - is
-# collision-free, since the identities live only in the system_a/system_b
-# columns. Mirrored by frontend/save.php for the PHP deployment.
-OUTCOME_A = "A"
-OUTCOME_B = "B"
+# positional token rather than a system name. The lowercase a/b mirror the
+# system_a/system_b column names. Keeping names out of the outcome column
+# means any system name - "tie", "A", "=" included - is collision-free, since
+# the identities live only in the system_a/system_b columns. Mirrored by
+# frontend/save.php for the PHP deployment.
+OUTCOME_A = "a"
+OUTCOME_B = "b"
 OUTCOME_TIE = "="
+
+
+def _csv_cell(value: object) -> object:
+    """Render one CSV cell value, JSON-normalizing booleans.
+
+    csv.DictWriter would otherwise stringify Python bools as "True"/"False";
+    emit the JSON-style lowercase "true"/"false" instead, so the CSV and JSON
+    savers agree (and the format stays language-neutral rather than leaking
+    Python's str(bool)). Mirrored by frontend/save.php. Non-bools pass through
+    for DictWriter's default stringification.
+    """
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return value
 
 
 class ResultExistsError(Exception):
@@ -111,22 +128,21 @@ class CSVResultSaver(ResultSaver):
             writer = csv.DictWriter(f, fieldnames=fields)
             writer.writeheader()
             for r in ratings:
-                writer.writerow(
-                    {
-                        "session_id": session_id,
-                        "timestamp": ts,
-                        "test_type": test_type,
-                        **{
-                            METADATA_COLUMN_PREFIX + k: meta.get(k, "")
-                            for k in self._metadata_keys
-                        },
-                        **{
-                            SURVEY_COLUMN_PREFIX + k: answers.get(k, "")
-                            for k in self._survey_keys
-                        },
-                        **r,
-                    }
-                )
+                row = {
+                    "session_id": session_id,
+                    "timestamp": ts,
+                    "test_type": test_type,
+                    **{
+                        METADATA_COLUMN_PREFIX + k: meta.get(k, "")
+                        for k in self._metadata_keys
+                    },
+                    **{
+                        SURVEY_COLUMN_PREFIX + k: answers.get(k, "")
+                        for k in self._survey_keys
+                    },
+                    **r,
+                }
+                writer.writerow({k: _csv_cell(v) for k, v in row.items()})
 
 
 class JSONResultSaver(ResultSaver):

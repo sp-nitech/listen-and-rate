@@ -814,7 +814,7 @@ final class SaveTest extends TestCase
         $this->assertSame('u1', $row['utterance']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
-        $this->assertSame('A', $row['winner']);
+        $this->assertSame('a', $row['winner']);
     }
 
     public function testBuildAbJsonResultTieProducesTieToken(): void
@@ -848,7 +848,7 @@ final class SaveTest extends TestCase
         $result = build_ab_json_result($data, [], $stimulusMap, '2026-01-01T00:00:00+00:00');
         $this->assertSame('=', $result['ratings'][0]['system_a']);
         $this->assertSame('tie', $result['ratings'][0]['system_b']);
-        $this->assertSame('B', $result['ratings'][0]['winner']); // system_b ("tie") won
+        $this->assertSame('b', $result['ratings'][0]['winner']); // system_b ("tie") won
         $this->assertSame('=', $result['ratings'][1]['winner']); // an actual tie
     }
 
@@ -891,7 +891,7 @@ final class SaveTest extends TestCase
             ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'utterance', 'winner'],
             $fields
         );
-        $this->assertSame(['s1', '2026-01-01', 'ab', 'Alice', 'A', 'B', 'u1', 'B'], $rows[0]);
+        $this->assertSame(['s1', '2026-01-01', 'ab', 'Alice', 'A', 'B', 'u1', 'b'], $rows[0]);
     }
 
     // -- validate_abx_choice ------------------------------------------------
@@ -1026,7 +1026,7 @@ final class SaveTest extends TestCase
             ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'utterance', 'correct'],
             $fields
         );
-        $this->assertSame(['s1', '2026-01-01', 'abx', 'Alice', 'A', 'B', 'u1', 'True'], $rows[0]);
+        $this->assertSame(['s1', '2026-01-01', 'abx', 'Alice', 'A', 'B', 'u1', 'true'], $rows[0]);
     }
 
     // -- validate_xab_choice ------------------------------------------------
@@ -1108,7 +1108,7 @@ final class SaveTest extends TestCase
         $this->assertSame('u1', $row['utterance']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
-        $this->assertSame('B', $row['closer']);
+        $this->assertSame('b', $row['closer']);
     }
 
     public function testBuildXabCsvRowsOrdersMetadataBeforeXabColumns(): void
@@ -1130,7 +1130,7 @@ final class SaveTest extends TestCase
             ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'utterance', 'closer'],
             $fields
         );
-        $this->assertSame(['s1', '2026-01-01', 'xab', 'Alice', 'A', 'B', 'u1', 'A'], $rows[0]);
+        $this->assertSame(['s1', '2026-01-01', 'xab', 'Alice', 'A', 'B', 'u1', 'a'], $rows[0]);
     }
 
     // -- write_json_file / write_csv_file ---------------------------------

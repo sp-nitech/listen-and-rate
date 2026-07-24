@@ -87,7 +87,7 @@ def test_ab_submit_happy_path_preference(tmp_path, test_audio_file, monkeypatch)
         )
         assert res.status_code == 200
         rows = list(csv.DictReader((tmp_path / "results" / "config" / "s1.csv").open()))
-        assert rows[0]["winner"] in ("A", "B")
+        assert rows[0]["winner"] in ("a", "b")
         assert {rows[0]["system_a"], rows[0]["system_b"]} == {"A", "B"}
         assert rows[0]["utterance"] == "utt0"
         # Column order matches MOS's system-first convention.

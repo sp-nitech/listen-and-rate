@@ -96,6 +96,24 @@ def _render_table_html(headers: list[str], rows: list[list[str]]) -> str:
     )
 
 
+def _pvalue_header(description: str) -> str:
+    """Return a p-value column header naming the test in parentheses.
+
+    e.g. _pvalue_header("t-test") -> "p-value (t-test)". Centralizes the
+    header text shared by the significance tables.
+    """
+    return f"p-value ({description})"
+
+
+def _significant_header(alpha: float) -> str:
+    """Return the significance column header for the given alpha threshold.
+
+    e.g. _significant_header(0.05) -> "Significant (alpha=0.05)". Shared by
+    every per-test-type significance table.
+    """
+    return f"Significant (\u03b1={alpha:.2f})"
+
+
 def _render_data_summary_table_html(df) -> str:
     """Render the session/record-count data summary table shared by all reports."""
     n_participants = df["session_id"].nunique() if "session_id" in df.columns else 0

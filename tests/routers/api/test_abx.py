@@ -156,8 +156,8 @@ def test_abx_submit_scores_exactly_one_of_two_opposite_guesses_correct(
         rows2 = list(
             csv.DictReader((tmp_path / "results" / "config" / "s2.csv").open())
         )
-        correct1 = rows1[0]["correct"] == "True"
-        correct2 = rows2[0]["correct"] == "True"
+        correct1 = rows1[0]["correct"] == "true"
+        correct2 = rows2[0]["correct"] == "true"
         assert correct1 != correct2
         # Column order matches MOS's system-first convention.
         assert list(rows1[0].keys()) == [

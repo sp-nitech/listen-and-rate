@@ -5,10 +5,11 @@
 
 A lightweight, self-hostable tool for conducting subjective listening tests in a browser.
 Simply prepare your audio files and a YAML configuration file, and you're ready to run your experiment.
-A screenshot of the interface is shown below.
+Screenshots of the interface are shown below.
 
 <p align="center">
-  <img src="assets/mos-interface.png" alt="Screenshot" width="800">
+  <img src="assets/ab-interface.png" alt="AB preference test interface" width="800">
+  <img src="assets/mos-interface.png" alt="MOS rating test interface" width="800">
 </p>
 
 ## Key Features

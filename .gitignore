@@ -1,7 +1,7 @@
 .venv/
 
 results/
-stimuli/**/
+stimuli/*
 !stimuli/examples/
 
 tools/**/

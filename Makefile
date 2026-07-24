@@ -16,34 +16,48 @@ YAMLFMT      := tools/yamlfmt/yamlfmt
 
 .DEFAULT_GOAL := setup-dev
 
+.PHONY: setup
 setup:
 	uv sync --no-dev --extra analyze
 
+.PHONY: setup-dev
 setup-dev:
 	uv sync --all-extras
 
+.PHONY: export
 export:
 	uv run --no-sync lar-export --config $(CONFIG) --outdir $(DEPLOY)
 
+.PHONY: export-force
 export-force:
 	uv run --no-sync lar-export --config $(CONFIG) --outdir $(DEPLOY) --overwrite
 
+.PHONY: export-copy
 export-copy:
 	uv run --no-sync lar-export --config $(CONFIG) --outdir $(DEPLOY) --copy-audio
 
+.PHONY: export-copy-force
 export-copy-force:
 	uv run --no-sync lar-export --config $(CONFIG) --outdir $(DEPLOY) --overwrite --copy-audio
 
+.PHONY: serve
 serve:
 	LISTEN_AND_RATE_CONFIG=$(CONFIG) uv run --no-sync uvicorn $(PROJECT).main:app --host $(HOST) --port $(PORT)
 
+.PHONY: report
 report:
 	uv run --no-sync lar-report --config $(CONFIG) $(if $(REPORT_CONFIG),--report-config $(REPORT_CONFIG)) $(if $(DEPLOY),--root $(DEPLOY))
 
+.PHONY: screenshots
+screenshots:
+	uv run --no-sync playwright install chromium
+	uv run --no-sync python scripts/capture_screenshots.py
+
+.PHONY: lint
 lint: tool
-	uv run --no-sync ruff check $(PROJECT) tests
-	uv run --no-sync ruff format --check $(PROJECT) tests
-	uv run --no-sync pyright $(PROJECT)
+	uv run --no-sync ruff check $(PROJECT) scripts tests
+	uv run --no-sync ruff format --check $(PROJECT) scripts tests
+	uv run --no-sync pyright $(PROJECT) scripts
 	uv run --no-sync djlint --check frontend/*.html
 	uv run --no-sync mdformat --check *.md
 	(cd frontend && ../$(BIOME) check .)
@@ -52,9 +66,10 @@ lint: tool
 	$(YAMLFMT) --lint examples .yamlfmt.yaml .github/workflows/*.yaml
 	php $(PHP_CS_FIXER) check --config frontend/.php-cs-fixer.php --no-ansi
 
+.PHONY: format
 format: tool
-	uv run --no-sync ruff check --fix $(PROJECT) tests
-	uv run --no-sync ruff format $(PROJECT) tests
+	uv run --no-sync ruff check --fix $(PROJECT) scripts tests
+	uv run --no-sync ruff format $(PROJECT) scripts tests
 	uv run --no-sync djlint --reformat frontend/*.html
 	uv run --no-sync mdformat *.md
 	(cd frontend && ../$(BIOME) format --write .)
@@ -63,17 +78,19 @@ format: tool
 	$(YAMLFMT) examples .yamlfmt.yaml .github/workflows/*.yaml
 	php $(PHP_CS_FIXER) fix --config frontend/.php-cs-fixer.php --no-ansi
 
+.PHONY: test
 test: tool
 	uv run --no-sync pytest -s -x
 	php $(PHPUNIT) --configuration frontend/phpunit.xml
 
+.PHONY: tool
 tool:
 	$(MAKE) -C tools
 
+.PHONY: tool-clean
 tool-clean:
 	$(MAKE) -C tools clean
 
+.PHONY: clean
 clean: tool-clean
 	rm -rf .venv
-
-.PHONY: setup setup-dev export export-force export-copy export-copy-force serve report lint format test tool tool-clean clean

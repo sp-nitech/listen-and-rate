@@ -68,6 +68,7 @@ dev = [
   "httpx2",
   "mdformat",
   "mdformat-gfm",
+  "playwright",
   "pyright[nodejs]",
   "pytest",
   "pytest-asyncio",

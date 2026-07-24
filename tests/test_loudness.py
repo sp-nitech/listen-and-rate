@@ -4,6 +4,7 @@ optional audio libraries, real measurement + the config-driven runner."""
 from __future__ import annotations
 
 import math
+import sys
 
 import pytest
 
@@ -236,6 +237,10 @@ def test_apply_gain_and_write_warns_on_clipping(tmp_path):
     assert apply_gain_and_write(src, tmp_path / "soft.wav", gain_db=-6.0) is None
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="creating symlinks needs privileges a Windows runner may lack",
+)
 def test_apply_gain_and_write_replaces_symlink_dst_without_touching_target(tmp_path):
     """A stale symlink at dst (e.g. left by a previous symlink-mode export)
     must be replaced by a real file - writing through it would destroy the

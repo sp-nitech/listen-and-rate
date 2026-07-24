@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
 
 from .._helpers import write_sine
 from ._helpers import _write_config_yaml
+
+_skip_without_symlinks = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="creating symlinks needs privileges a Windows runner may lack",
+)
 
 
 def _run_export(
@@ -119,8 +126,6 @@ def test_export_deploy_hint_is_logged_not_printed(
 ):
     """The 'copy to public_html' hint goes through logging.info, so it stays
     out of stdout and off-screen in tests (which don't emit INFO logs)."""
-    import logging
-
     outdir = tmp_path / "deploy"
     with caplog.at_level(logging.INFO, logger="listen_and_rate"):
         _run_export(config_yaml, outdir, monkeypatch)
@@ -621,6 +626,7 @@ def test_export_php_deploy_absolute_output_path_seeds_no_bundle_results_dir(
     assert not (outdir / "results").exists()
 
 
+@_skip_without_symlinks
 def test_export_php_deploy_creates_audio_symlinks(
     config_yaml, tmp_path, test_audio_file, monkeypatch
 ):
@@ -653,6 +659,29 @@ def test_export_php_deploy_copies_audio_files_when_copy_audio(
         assert f.is_file()
         assert not f.is_symlink()
         assert f.read_bytes() == test_audio_file.read_bytes()
+
+
+def test_export_php_deploy_falls_back_to_copy_when_symlinks_unsupported(
+    config_yaml, tmp_path, test_audio_file, monkeypatch, caplog
+):
+    """Where symlink creation fails (e.g. Windows without Developer Mode), the
+    default symlink export copies the audio into the bundle and warns, rather
+    than crashing - so the bundle is still usable."""
+    monkeypatch.setattr(
+        "listen_and_rate.cli.export_php_deploy._symlinks_supported",
+        lambda outdir: False,
+    )
+    outdir = tmp_path / "deploy"
+    with caplog.at_level(logging.WARNING):
+        _run_export(config_yaml, outdir, monkeypatch)
+    text = (outdir / "config_data.php").read_text()
+    urls = re.findall(r"'audio_url' => '([^']*)'", text)
+    assert urls
+    for u in urls:
+        f = outdir / u
+        assert f.is_file() and not f.is_symlink()  # real copy, not a link
+        assert f.read_bytes() == test_audio_file.read_bytes()
+    assert any("symlink" in r.message.lower() for r in caplog.records)
 
 
 def test_export_php_deploy_overwrite_regenerates_copied_audio(

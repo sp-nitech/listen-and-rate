@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 import re
 import shutil
 from pathlib import Path
@@ -62,8 +63,6 @@ def test_analyze_report_saved_hint_is_logged_not_printed(
 ):
     """The 'Report saved' hint goes through logging.info, so it stays out of
     stdout/stderr and off-screen in tests (which don't emit INFO logs)."""
-    import logging
-
     pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"

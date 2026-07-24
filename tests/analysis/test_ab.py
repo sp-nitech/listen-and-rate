@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from ._helpers import (
     AB_CSV_ROWS,
     AB_ROWS,
@@ -31,8 +33,6 @@ def test_generate_ab_report_annotation_shows_ci_value_on_a_side(tmp_path):
     # The rate annotation carries the CI half-width (as a percentage) on the
     # A side, matching MOS/CMOS's "value +/- CI" convention; the B side (the
     # mirror rate) omits the identical +/- to avoid redundancy.
-    import re
-
     html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
     _, layout = _plotly_call_args(html)
     texts = [a["text"] for a in layout["annotations"]]

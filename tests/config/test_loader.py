@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -379,6 +380,10 @@ def test_stimuli_dir_with_only_unsupported_format_is_rejected(tmp_path):
         load_config(write_config(tmp_path, data))
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="creating symlinks needs privileges a Windows runner may lack",
+)
 def test_symlink_within_project_is_allowed(tmp_path, test_audio_file, tmp_path_factory):
     external_dir = tmp_path_factory.mktemp("external")
     shutil.copy(test_audio_file, external_dir / "001.wav")

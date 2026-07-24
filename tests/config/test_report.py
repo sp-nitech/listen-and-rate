@@ -3,16 +3,11 @@
 from __future__ import annotations
 
 import pytest
-import yaml
 from pydantic import ValidationError
 
 from listen_and_rate.config import ReportConfig, load_report_config_or_exit
 
-
-def _write(tmp_path, data: dict):
-    p = tmp_path / "report.yaml"
-    p.write_text(yaml.dump(data, allow_unicode=True))
-    return p
+from .._helpers import write_config
 
 
 def test_defaults_when_empty():
@@ -157,7 +152,9 @@ def test_groups_label_required():
 
 
 def test_load_report_config_or_exit_reads_yaml(tmp_path):
-    path = _write(tmp_path, {"confidence": 0.9, "labels": {"A": "Proposed"}})
+    path = write_config(
+        tmp_path, {"confidence": 0.9, "labels": {"A": "Proposed"}}, name="report.yaml"
+    )
     rc = load_report_config_or_exit(path)
     assert rc.confidence == 0.9
     assert rc.labels == {"A": "Proposed"}
@@ -165,13 +162,13 @@ def test_load_report_config_or_exit_reads_yaml(tmp_path):
 
 def test_load_report_config_or_exit_empty_file_uses_defaults(tmp_path):
     path = tmp_path / "report.yaml"
-    path.write_text("")
+    path.write_text("", encoding="utf-8")
     rc = load_report_config_or_exit(path)
     assert rc == ReportConfig()
 
 
 def test_load_report_config_or_exit_exits_cleanly_on_bad_value(tmp_path):
-    path = _write(tmp_path, {"confidence": 2})
+    path = write_config(tmp_path, {"confidence": 2}, name="report.yaml")
     with pytest.raises(SystemExit) as excinfo:
         load_report_config_or_exit(path)
     # Clean, URL-free message (see format_config_error).
@@ -179,6 +176,6 @@ def test_load_report_config_or_exit_exits_cleanly_on_bad_value(tmp_path):
 
 
 def test_load_report_config_or_exit_exits_on_unknown_field(tmp_path):
-    path = _write(tmp_path, {"nonsense": True})
+    path = write_config(tmp_path, {"nonsense": True}, name="report.yaml")
     with pytest.raises(SystemExit):
         load_report_config_or_exit(path)

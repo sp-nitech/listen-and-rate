@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 
 import pytest
-import yaml
 from pydantic import ValidationError
 
 from listen_and_rate.config import load_config
@@ -23,14 +22,14 @@ from ._helpers import (
 
 def test_empty_config_file_raises_clean_error(tmp_path):
     path = tmp_path / "config.yaml"
-    path.write_text("")
+    path.write_text("", encoding="utf-8")
     with pytest.raises(ValueError, match="YAML mapping"):
         load_config(path)
 
 
 def test_non_mapping_config_file_raises_clean_error(tmp_path):
     path = tmp_path / "config.yaml"
-    path.write_text("- just\n- a\n- list\n")
+    path.write_text("- just\n- a\n- list\n", encoding="utf-8")
     with pytest.raises(ValueError, match="YAML mapping"):
         load_config(path)
 
@@ -64,8 +63,9 @@ def test_relative_audio_path_resolved_to_absolute(tmp_path, test_audio_file):
 
 
 def test_experiment_id_is_derived_from_config_filename(tmp_path, test_audio_file):
-    p = tmp_path / "myexperiment.yaml"
-    p.write_text(yaml.dump(minimal_config(str(test_audio_file))))
+    p = write_config(
+        tmp_path, minimal_config(str(test_audio_file)), name="myexperiment.yaml"
+    )
     assert load_config(p).experiment_id == "myexperiment"
 
 

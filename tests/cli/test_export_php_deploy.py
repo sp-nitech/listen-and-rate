@@ -10,8 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from .._helpers import write_sine
-from ._helpers import _write_config_yaml
+from .._helpers import write_config, write_sine
 
 _skip_without_symlinks = pytest.mark.skipif(
     sys.platform == "win32",
@@ -45,7 +44,7 @@ def _run_export(
 
 
 def _config_with_systems(tmp_path, test_audio_file) -> Path:
-    return _write_config_yaml(
+    return write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -101,7 +100,7 @@ def test_export_invalid_config_exits_without_pydantic_url(
         "stimuli": {"items": [{"id": "s001", "path": "/tmp/nonexistent.wav"}]},
         **mutation,
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     with pytest.raises(SystemExit) as excinfo:
         _run_export(config_yaml, tmp_path / "deploy", monkeypatch)
     message = str(excinfo.value)
@@ -177,7 +176,7 @@ def test_export_php_deploy_config_data_includes_session_sampling_params(
     shutil.copy(test_audio_file, d / "utt1.wav")
     shutil.copy(test_audio_file, d / "utt2.wav")
     config["stimuli_dirs"]["systems"] = [{"path": str(d)}]
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -208,7 +207,7 @@ def test_export_php_deploy_config_data_includes_survey_fields(
         },
         "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -235,7 +234,7 @@ def test_export_php_deploy_config_data_includes_practice_params(
             ]
         },
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -268,7 +267,7 @@ def test_export_php_deploy_config_data_includes_practice_for_trial_types(
         "practice": {"count": 1, "instructions": "Warm-up."},
         "stimuli_dirs": {"systems": [{"path": str(da)}, {"path": str(db)}]},
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -296,7 +295,7 @@ def test_export_php_deploy_config_data_includes_reference_system_for_dmos(
             ],
         },
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -342,7 +341,7 @@ def test_export_php_deploy_config_data_for_mushra_with_reference_and_anchor(
             ],
         },
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -372,7 +371,7 @@ def test_export_php_deploy_config_data_for_mushra_without_reference_or_anchor(
         "instructions": "I",
         "stimuli_dirs": {"systems": [{"path": str(da)}, {"path": str(db)}]},
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -397,7 +396,7 @@ def test_export_php_deploy_config_data_for_cmos(tmp_path, test_audio_file, monke
             "systems": [{"path": str(da)}, {"path": str(db)}],
         },
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -427,7 +426,7 @@ def test_export_php_deploy_config_data_includes_allow_tie_for_ab(
             "systems": [{"path": str(da)}, {"path": str(db)}],
         },
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -452,7 +451,7 @@ def test_export_php_deploy_config_data_includes_x_secret_for_abx(
             "systems": [{"path": str(da)}, {"path": str(db)}],
         },
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -483,7 +482,7 @@ def test_export_php_deploy_config_data_includes_reference_system_for_xab(
             ],
         },
     }
-    config_yaml = _write_config_yaml(tmp_path, config)
+    config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
@@ -525,7 +524,7 @@ def _config_with_output_path(tmp_path, test_audio_file, output_path=None) -> Pat
     }
     if output_path is not None:
         config["output"] = {"format": "csv", "path": output_path}
-    return _write_config_yaml(tmp_path, config)
+    return write_config(tmp_path, config)
 
 
 def test_export_php_deploy_config_data_includes_default_output_path(
@@ -570,7 +569,7 @@ def test_export_php_deploy_overwrite_preserves_custom_results_dir(
     _run_export(config_yaml, outdir, monkeypatch)
     keep = outdir / "collected" / "exp" / "s1.csv"
     keep.parent.mkdir(parents=True)
-    keep.write_text("precious data")
+    keep.write_text("precious data", encoding="utf-8")
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
     assert keep.read_text(encoding="utf-8") == "precious data"
 
@@ -714,7 +713,7 @@ def test_export_normalizes_audio_into_bundle_as_real_wav(tmp_path, monkeypatch):
         "stimuli": {"items": [{"id": "s001", "path": str(sine)}]},
     }
     outdir = tmp_path / "deploy"
-    _run_export(_write_config_yaml(tmp_path, config), outdir, monkeypatch)
+    _run_export(write_config(tmp_path, config), outdir, monkeypatch)
 
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
     urls = re.findall(r"'audio_url' => '([^']*)'", text)
@@ -743,7 +742,7 @@ def test_export_normalize_converts_non_wav_input_to_wav(tmp_path, monkeypatch):
         "stimuli": {"items": [{"id": "s001", "path": str(tmp_path / "clip.mp3")}]},
     }
     outdir = tmp_path / "deploy"
-    _run_export(_write_config_yaml(tmp_path, config), outdir, monkeypatch)
+    _run_export(write_config(tmp_path, config), outdir, monkeypatch)
 
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
     (url,) = re.findall(r"'audio_url' => '([^']*)'", text)
@@ -766,7 +765,7 @@ def test_export_php_deploy_does_not_overwrite_existing_outdir_by_default(
 ):
     outdir = tmp_path / "deploy"
     outdir.mkdir()
-    (outdir / "stale.txt").write_text("leftover from a previous run")
+    (outdir / "stale.txt").write_text("leftover from a previous run", encoding="utf-8")
     with pytest.raises(FileExistsError):
         _run_export(config_yaml, outdir, monkeypatch)
     assert (outdir / "stale.txt").exists()
@@ -777,7 +776,7 @@ def test_export_php_deploy_overwrite_flag_regenerates_existing_outdir(
 ):
     outdir = tmp_path / "deploy"
     outdir.mkdir()
-    (outdir / "stale.txt").write_text("leftover from a previous run")
+    (outdir / "stale.txt").write_text("leftover from a previous run", encoding="utf-8")
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
     assert not (outdir / "stale.txt").exists()
     assert (outdir / "config_data.php").is_file()
@@ -793,7 +792,9 @@ def test_export_php_deploy_overwrite_preserves_existing_results_directory(
     results_dir = outdir / "results" / "some-experiment"
     results_dir.mkdir(parents=True)
     collected = results_dir / "real-listener-session.csv"
-    collected.write_text("session_id,timestamp,test_type,system,utterance,rating\n")
+    collected.write_text(
+        "session_id,timestamp,test_type,system,utterance,rating\n", encoding="utf-8"
+    )
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
     assert collected.is_file()
     assert (
@@ -812,7 +813,7 @@ def test_export_php_deploy_overwrite_clears_results_dir_when_output_path_absolut
     outdir = tmp_path / "deploy"
     stale = outdir / "results" / "old-layout" / "stale.csv"
     stale.parent.mkdir(parents=True)
-    stale.write_text("stale")
+    stale.write_text("stale", encoding="utf-8")
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
     assert not (outdir / "results").exists()
 

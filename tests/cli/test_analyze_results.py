@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from ._helpers import _write_config_yaml
+from .._helpers import write_config
 
 
 def _run_analyze(monkeypatch, *args: str) -> None:
@@ -116,7 +116,7 @@ def test_analyze_results_derives_results_dir_from_config(
     default report location) come from --config's output.path - the FastAPI
     deployment's layout, where `make report CONFIG=...` should just work."""
     pytest.importorskip("plotly")
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -140,7 +140,7 @@ def test_analyze_results_derives_results_dir_from_config(
 def test_analyze_results_derived_dir_without_files_raises(
     tmp_path, test_audio_file, monkeypatch
 ):
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -171,7 +171,7 @@ def test_analyze_results_root_resolves_output_path_under_root(
     name> - the layout both deployments share now that save.php honors
     output.path too."""
     pytest.importorskip("plotly")
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -200,7 +200,7 @@ def test_analyze_results_root_with_absolute_output_path_exits_with_usage_error(
 ):
     """An absolute output.path cannot be re-rooted - combining it with --root
     would silently ignore one of the two, so it is rejected instead."""
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -226,7 +226,7 @@ def test_analyze_results_root_requires_config(tmp_path, monkeypatch, capsys):
 def test_analyze_results_root_with_positional_results_exits_with_usage_error(
     tmp_path, test_audio_file, monkeypatch, capsys
 ):
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -266,7 +266,7 @@ def test_analyze_results_config_flag_orders_systems(
     d_alpha.mkdir()
     shutil.copy(test_audio_file, d_zebra / "utt1.wav")
     shutil.copy(test_audio_file, d_alpha / "utt1.wav")
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -320,11 +320,7 @@ def test_analyze_results_config_flag_orders_systems(
 
 
 def _write_report_config(tmp_path, data: dict) -> Path:
-    import yaml
-
-    p = tmp_path / "report-config.yaml"
-    p.write_text(yaml.dump(data, allow_unicode=True))
-    return p
+    return write_config(tmp_path, data, name="report-config.yaml")
 
 
 def test_report_config_applies_labels_order_and_confidence(tmp_path, monkeypatch):

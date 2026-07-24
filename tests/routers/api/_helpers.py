@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import shutil
 
-import yaml
 from fastapi.testclient import TestClient
+
+from ..._helpers import write_config
 
 
 def _create_app_client(tmp_path, config: dict, monkeypatch) -> TestClient:
     """Write `config` to config.yaml, point the app at it, and build a TestClient."""
-    p = tmp_path / "config.yaml"
-    p.write_text(yaml.dump(config))
+    p = write_config(tmp_path, config)
     monkeypatch.setenv("LISTEN_AND_RATE_CONFIG", str(p))
     from listen_and_rate.main import create_app
 

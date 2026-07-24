@@ -14,7 +14,7 @@ from listen_and_rate.loudness import (
     system_mean_range,
 )
 
-from ._helpers import write_sine
+from ._helpers import write_config, write_sine
 
 # -- pure aggregation (no soundfile/pyloudnorm needed) ------------------------
 
@@ -81,7 +81,6 @@ def _config_with_two_systems(
     tmp_path, monkeypatch, loudness_check, quiet_amp, loud_amp
 ):
     """Build a 2-system MOS config (system A quiet, B loud) and load it."""
-    import yaml
 
     from listen_and_rate.config import load_config
 
@@ -102,8 +101,7 @@ def _config_with_two_systems(
             ]
         },
     }
-    p = tmp_path / "config.yaml"
-    p.write_text(yaml.dump(cfg))
+    p = write_config(tmp_path, cfg)
     return load_config(p)
 
 
@@ -150,7 +148,6 @@ def test_runner_silent_within_threshold_without_verbose(tmp_path, capsys):
 
 def test_per_system_output_follows_config_order_not_alphabetical(tmp_path, capsys):
     """Systems declared B then A must print in that (config) order, not sorted."""
-    import yaml
 
     from listen_and_rate.config import load_config
     from listen_and_rate.loudness import run_configured_loudness_check
@@ -172,15 +169,13 @@ def test_per_system_output_follows_config_order_not_alphabetical(tmp_path, capsy
             ]
         },
     }
-    p = tmp_path / "config.yaml"
-    p.write_text(yaml.dump(cfg))
+    p = write_config(tmp_path, cfg)
     run_configured_loudness_check(load_config(p))
     out = capsys.readouterr().out
     assert out.index("  B:") < out.index("  A:")
 
 
 def test_runner_noop_when_not_configured(tmp_path, capsys):
-    import yaml
 
     from listen_and_rate.config import load_config
     from listen_and_rate.loudness import run_configured_loudness_check
@@ -194,8 +189,7 @@ def test_runner_noop_when_not_configured(tmp_path, capsys):
         "instructions": "I",
         "stimuli_dirs": {"systems": [{"path": str(da), "system": "A"}]},
     }
-    p = tmp_path / "config.yaml"
-    p.write_text(yaml.dump(cfg))
+    p = write_config(tmp_path, cfg)
     run_configured_loudness_check(load_config(p))
     assert capsys.readouterr().out == ""
 
@@ -205,7 +199,6 @@ def test_runner_noop_when_not_configured(tmp_path, capsys):
 
 def _config_with_normalize(tmp_path, normalize, amps):
     """Build/load a 2-system MOS config; `amps` = {system: [(utt, amp), ...]}."""
-    import yaml
 
     from listen_and_rate.config import load_config
 
@@ -223,8 +216,7 @@ def _config_with_normalize(tmp_path, normalize, amps):
         "loudness_normalization": normalize,
         "stimuli_dirs": {"systems": systems},
     }
-    p = tmp_path / "config.yaml"
-    p.write_text(yaml.dump(cfg))
+    p = write_config(tmp_path, cfg)
     return load_config(p)
 
 
@@ -375,7 +367,6 @@ def test_normalize_scope_system_matches_means_and_preserves_within_system(tmp_pa
 
 
 def test_normalize_noop_returns_empty_when_not_configured(tmp_path):
-    import yaml
 
     from listen_and_rate.config import load_config
     from listen_and_rate.loudness import run_configured_loudness_normalization
@@ -389,8 +380,7 @@ def test_normalize_noop_returns_empty_when_not_configured(tmp_path):
         "instructions": "I",
         "stimuli_dirs": {"systems": [{"path": str(da), "system": "A"}]},
     }
-    p = tmp_path / "config.yaml"
-    p.write_text(yaml.dump(cfg))
+    p = write_config(tmp_path, cfg)
     assert (
         run_configured_loudness_normalization(load_config(p), lambda item: tmp_path)
         == {}

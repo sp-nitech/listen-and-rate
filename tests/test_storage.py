@@ -107,12 +107,12 @@ def test_csv_saver_each_session_has_own_header(tmp_path):
     saver = CSVResultSaver(tmp_path, EXPERIMENT_ID)
     saver.save("session-1", TEST_TYPE, RATINGS)
     saver.save("session-2", TEST_TYPE, RATINGS)
-    assert (tmp_path / EXPERIMENT_ID / "session-1.csv").read_text().count(
-        "session_id"
-    ) == 1
-    assert (tmp_path / EXPERIMENT_ID / "session-2.csv").read_text().count(
-        "session_id"
-    ) == 1
+    assert (tmp_path / EXPERIMENT_ID / "session-1.csv").read_text(
+        encoding="utf-8"
+    ).count("session_id") == 1
+    assert (tmp_path / EXPERIMENT_ID / "session-2.csv").read_text(
+        encoding="utf-8"
+    ).count("session_id") == 1
 
 
 def test_csv_saver_creates_output_directory(tmp_path):
@@ -166,13 +166,17 @@ def test_csv_saver_infers_columns_from_abx_row_shape(tmp_path):
 def test_csv_saver_refuses_to_overwrite_existing_session(tmp_path):
     saver = CSVResultSaver(tmp_path, EXPERIMENT_ID)
     saver.save(SESSION_ID, TEST_TYPE, RATINGS)
-    original = (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").read_text()
+    original = (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").read_text(
+        encoding="utf-8"
+    )
     with pytest.raises(ResultExistsError):
         saver.save(
             SESSION_ID, TEST_TYPE, [{"system": "x", "utterance": "y", "rating": 1}]
         )
     # The collected data must be left untouched.
-    assert (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").read_text() == original
+    assert (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").read_text(
+        encoding="utf-8"
+    ) == original
 
 
 # -- JSONResultSaver --------------------------------------------------------
@@ -180,7 +184,9 @@ def test_csv_saver_refuses_to_overwrite_existing_session(tmp_path):
 
 def test_json_saver_correct_values(tmp_path):
     JSONResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
-    data = json.loads((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text())
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
     assert data["session_id"] == SESSION_ID
     assert data["test_type"] == TEST_TYPE
     assert {
@@ -198,7 +204,9 @@ def test_json_saver_includes_metadata(tmp_path):
     JSONResultSaver(tmp_path, EXPERIMENT_ID).save(
         SESSION_ID, TEST_TYPE, RATINGS, metadata=METADATA
     )
-    data = json.loads((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text())
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
     assert data["metadata"] == METADATA
 
 
@@ -210,14 +218,18 @@ def test_json_saver_includes_survey_as_separate_object(tmp_path):
         metadata=METADATA,
         survey={"trial_count": "adequate"},
     )
-    data = json.loads((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text())
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
     assert data["survey"] == {"trial_count": "adequate"}
     assert data["metadata"] == METADATA
 
 
 def test_json_saver_survey_defaults_to_empty_object(tmp_path):
     JSONResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
-    data = json.loads((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text())
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
     assert data["survey"] == {}
 
 
@@ -232,12 +244,16 @@ def test_json_saver_each_session_is_separate_file(tmp_path):
 def test_json_saver_refuses_to_overwrite_existing_session(tmp_path):
     saver = JSONResultSaver(tmp_path, EXPERIMENT_ID)
     saver.save(SESSION_ID, TEST_TYPE, RATINGS)
-    original = (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text()
+    original = (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(
+        encoding="utf-8"
+    )
     with pytest.raises(ResultExistsError):
         saver.save(
             SESSION_ID, TEST_TYPE, [{"system": "x", "utterance": "y", "rating": 1}]
         )
-    assert (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text() == original
+    assert (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(
+        encoding="utf-8"
+    ) == original
 
 
 # -- make_result_saver ------------------------------------------------------

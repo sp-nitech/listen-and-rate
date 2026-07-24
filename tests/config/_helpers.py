@@ -3,15 +3,8 @@
 from __future__ import annotations
 
 import shutil
-from pathlib import Path
 
-import yaml
-
-
-def write_config(tmp_path: Path, data: dict) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(yaml.dump(data, allow_unicode=True))
-    return p
+from .._helpers import write_config as write_config  # re-exported for config tests
 
 
 def minimal_config(audio_path: str) -> dict:

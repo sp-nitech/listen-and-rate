@@ -180,7 +180,7 @@ def load_config(config_path: str | Path) -> Config:
     """Load and validate a YAML config file; resolve paths relative to CWD."""
     path = Path(config_path).resolve()
 
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     # An empty file parses to None and a top-level list to a list - both

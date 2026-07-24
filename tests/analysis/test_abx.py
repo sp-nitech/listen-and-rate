@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from ._helpers import (
     ABX_CSV_ROWS,
     ABX_ROWS,
@@ -25,8 +27,6 @@ def test_generate_abx_report_shows_accuracy_and_ci(tmp_path):
 def test_generate_abx_report_annotation_shows_ci_value(tmp_path):
     # The accuracy annotation prints the CI half-width next to the rate,
     # matching the "value +/- CI" convention used across the report types.
-    import re
-
     html = generate_report_html([_write_csv(tmp_path / "s.csv", ABX_CSV_ROWS)])
     _, layout = _plotly_call_args(html)
     texts = [a["text"] for a in layout["annotations"]]

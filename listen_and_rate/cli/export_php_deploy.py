@@ -147,6 +147,24 @@ def _audio_url(audio_path: Path) -> str:
         ) from None
 
 
+def _symlinks_supported(outdir: Path) -> bool:
+    """Return whether symlinks can be created inside outdir.
+
+    Windows without Developer Mode (and some filesystems) raise OSError from
+    symlink creation; probe it once so the export can fall back to copying
+    rather than crashing halfway through.
+    """
+    outdir.mkdir(parents=True, exist_ok=True)
+    probe = outdir / ".lar-symlink-probe"
+    probe.unlink(missing_ok=True)
+    try:
+        probe.symlink_to(outdir)
+    except OSError:
+        return False
+    probe.unlink()
+    return True
+
+
 def _symlink_audio_files(
     outdir: Path, all_items: list[StimulusConfig], audio_urls: dict[str, str]
 ) -> None:
@@ -158,7 +176,19 @@ def _symlink_audio_files(
     must stay put). Uploading the bundle to a remote host still requires
     transferring the audio files there too (e.g. `scp -r`/`rsync -L` to
     follow the links).
+
+    Where symlinks are unavailable (e.g. Windows without Developer Mode), falls
+    back to copying the audio in (like --copy-audio) with a warning, since a
+    half-symlinked bundle would be worse than a fully self-contained one.
     """
+    if not _symlinks_supported(outdir):
+        logger.warning(
+            "Symlinks are not supported here (e.g. Windows without Developer "
+            "Mode); copying audio into the bundle instead. Pass --copy-audio "
+            "to make this the explicit, intended behavior."
+        )
+        _copy_audio_files(outdir, all_items, audio_urls)
+        return
     for s in all_items:
         dst = outdir / audio_urls[s.id]
         dst.parent.mkdir(parents=True, exist_ok=True)

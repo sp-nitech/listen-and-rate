@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
-import yaml
 from pydantic import ValidationError
 
 from listen_and_rate.config import load_config
@@ -22,14 +22,14 @@ from ._helpers import (
 
 def test_empty_config_file_raises_clean_error(tmp_path):
     path = tmp_path / "config.yaml"
-    path.write_text("")
+    path.write_text("", encoding="utf-8")
     with pytest.raises(ValueError, match="YAML mapping"):
         load_config(path)
 
 
 def test_non_mapping_config_file_raises_clean_error(tmp_path):
     path = tmp_path / "config.yaml"
-    path.write_text("- just\n- a\n- list\n")
+    path.write_text("- just\n- a\n- list\n", encoding="utf-8")
     with pytest.raises(ValueError, match="YAML mapping"):
         load_config(path)
 
@@ -63,8 +63,9 @@ def test_relative_audio_path_resolved_to_absolute(tmp_path, test_audio_file):
 
 
 def test_experiment_id_is_derived_from_config_filename(tmp_path, test_audio_file):
-    p = tmp_path / "myexperiment.yaml"
-    p.write_text(yaml.dump(minimal_config(str(test_audio_file))))
+    p = write_config(
+        tmp_path, minimal_config(str(test_audio_file)), name="myexperiment.yaml"
+    )
     assert load_config(p).experiment_id == "myexperiment"
 
 
@@ -379,6 +380,10 @@ def test_stimuli_dir_with_only_unsupported_format_is_rejected(tmp_path):
         load_config(write_config(tmp_path, data))
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="creating symlinks needs privileges a Windows runner may lack",
+)
 def test_symlink_within_project_is_allowed(tmp_path, test_audio_file, tmp_path_factory):
     external_dir = tmp_path_factory.mktemp("external")
     shutil.copy(test_audio_file, external_dir / "001.wav")

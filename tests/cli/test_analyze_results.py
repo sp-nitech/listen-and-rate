@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import csv
+import logging
 import re
 import shutil
 from pathlib import Path
 
 import pytest
 
-from ._helpers import _write_config_yaml
+from .._helpers import write_config
 
 
 def _run_analyze(monkeypatch, *args: str) -> None:
@@ -54,7 +55,7 @@ def test_analyze_results_writes_html(tmp_path, monkeypatch):
     out_path = tmp_path / "report.html"
     _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
     assert out_path.exists()
-    assert "<html>" in out_path.read_text()
+    assert "<html>" in out_path.read_text(encoding="utf-8")
 
 
 def test_analyze_report_saved_hint_is_logged_not_printed(
@@ -62,8 +63,6 @@ def test_analyze_report_saved_hint_is_logged_not_printed(
 ):
     """The 'Report saved' hint goes through logging.info, so it stays out of
     stdout/stderr and off-screen in tests (which don't emit INFO logs)."""
-    import logging
-
     pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
@@ -117,7 +116,7 @@ def test_analyze_results_derives_results_dir_from_config(
     default report location) come from --config's output.path - the FastAPI
     deployment's layout, where `make report CONFIG=...` should just work."""
     pytest.importorskip("plotly")
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -135,13 +134,13 @@ def test_analyze_results_derives_results_dir_from_config(
 
     report = results_dir / "report.html"
     assert report.exists()
-    assert "<html>" in report.read_text()
+    assert "<html>" in report.read_text(encoding="utf-8")
 
 
 def test_analyze_results_derived_dir_without_files_raises(
     tmp_path, test_audio_file, monkeypatch
 ):
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -172,7 +171,7 @@ def test_analyze_results_root_resolves_output_path_under_root(
     name> - the layout both deployments share now that save.php honors
     output.path too."""
     pytest.importorskip("plotly")
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -193,7 +192,7 @@ def test_analyze_results_root_resolves_output_path_under_root(
 
     report = results_dir / "report.html"
     assert report.exists()
-    assert "<html>" in report.read_text()
+    assert "<html>" in report.read_text(encoding="utf-8")
 
 
 def test_analyze_results_root_with_absolute_output_path_exits_with_usage_error(
@@ -201,7 +200,7 @@ def test_analyze_results_root_with_absolute_output_path_exits_with_usage_error(
 ):
     """An absolute output.path cannot be re-rooted - combining it with --root
     would silently ignore one of the two, so it is rejected instead."""
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -227,7 +226,7 @@ def test_analyze_results_root_requires_config(tmp_path, monkeypatch, capsys):
 def test_analyze_results_root_with_positional_results_exits_with_usage_error(
     tmp_path, test_audio_file, monkeypatch, capsys
 ):
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -267,7 +266,7 @@ def test_analyze_results_config_flag_orders_systems(
     d_alpha.mkdir()
     shutil.copy(test_audio_file, d_zebra / "utt1.wav")
     shutil.copy(test_audio_file, d_alpha / "utt1.wav")
-    config_yaml = _write_config_yaml(
+    config_yaml = write_config(
         tmp_path,
         {
             "test_type": "mos",
@@ -311,7 +310,7 @@ def test_analyze_results_config_flag_orders_systems(
         "--output",
         str(out_path),
     )
-    html = out_path.read_text()
+    html = out_path.read_text(encoding="utf-8")
     m = re.search(r'"x":\s*\[("Zebra",\s*"Alpha"|"Alpha",\s*"Zebra")\]', html)
     assert m, "could not find the MOS chart's system x-array in the report"
     assert m.group(1).startswith('"Zebra"')
@@ -321,11 +320,7 @@ def test_analyze_results_config_flag_orders_systems(
 
 
 def _write_report_config(tmp_path, data: dict) -> Path:
-    import yaml
-
-    p = tmp_path / "report-config.yaml"
-    p.write_text(yaml.dump(data, allow_unicode=True))
-    return p
+    return write_config(tmp_path, data, name="report-config.yaml")
 
 
 def test_report_config_applies_labels_order_and_confidence(tmp_path, monkeypatch):
@@ -348,7 +343,7 @@ def test_report_config_applies_labels_order_and_confidence(tmp_path, monkeypatch
         "--output",
         str(out_path),
     )
-    html = out_path.read_text()
+    html = out_path.read_text(encoding="utf-8")
     assert '"x":["Baseline","Proposed"]' in html.replace(" ", "")
     assert "\u03b1=0.01" in html  # alpha follows confidence (1 - 0.99)
 
@@ -366,7 +361,7 @@ def test_report_config_scale_applies(tmp_path, monkeypatch):
         "--output",
         str(out_path),
     )
-    assert "max-width:450px" in out_path.read_text()  # 900 * 0.5
+    assert "max-width:450px" in out_path.read_text(encoding="utf-8")  # 900 * 0.5
 
 
 def test_report_config_order_missing_system_raises(tmp_path, monkeypatch):
@@ -390,7 +385,7 @@ def test_report_config_is_optional(tmp_path, monkeypatch):
     csv_path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
     _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
-    html = out_path.read_text()
+    html = out_path.read_text(encoding="utf-8")
     assert "max-width:900px" in html  # default scale = 1.0
     assert "\u03b1=0.05" in html  # default confidence 0.95
 
@@ -432,7 +427,7 @@ def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):
         "--output",
         str(out_path),
     )
-    html = out_path.read_text()
+    html = out_path.read_text(encoding="utf-8")
     assert html.count("<h2") == 3  # 2 group sections + trailing Participants
     assert "All listeners" in html
     assert "Headphones" in html

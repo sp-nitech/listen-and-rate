@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from ._helpers import (
     CSV_ROWS,
     DMOS_CSV_ROWS,
@@ -128,8 +130,6 @@ def _annotation_decimals(html):
 def test_generate_mos_report_annotation_thin_spaces_around_plus_minus(tmp_path):
     # Binary "±" is typeset with surrounding spaces; thin spaces (U+2009)
     # keep the chart annotation compact while separating the operands.
-    import re
-
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
     _, layout = _plotly_call_args(html)
     for annotation in layout["annotations"]:

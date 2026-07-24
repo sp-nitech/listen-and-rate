@@ -5,8 +5,9 @@ import wave
 from pathlib import Path
 
 import pytest
-import yaml
 from fastapi.testclient import TestClient
+
+from ._helpers import write_config
 
 
 @pytest.fixture(autouse=True)
@@ -40,9 +41,7 @@ def config_yaml(tmp_path, test_audio_file) -> Path:
             ]
         },
     }
-    p = tmp_path / "config.yaml"
-    p.write_text(yaml.dump(config))
-    return p
+    return write_config(tmp_path, config)
 
 
 @pytest.fixture

@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from .._helpers import write_sine
+from .._helpers import write_config, write_sine
 
 
 def test_audio_served_is_loudness_normalized_when_configured(tmp_path, monkeypatch):
     pytest.importorskip("soundfile")
-    import yaml
 
     from listen_and_rate.loudness import measure_loudness
     from listen_and_rate.main import create_app
@@ -22,8 +21,7 @@ def test_audio_served_is_loudness_normalized_when_configured(tmp_path, monkeypat
         "loudness_normalization": {"target": -20.0, "scope": "stimulus"},
         "stimuli": {"items": [{"id": "s001", "path": str(sine)}]},
     }
-    cfg_path = tmp_path / "config.yaml"
-    cfg_path.write_text(yaml.dump(config))
+    cfg_path = write_config(tmp_path, config)
     monkeypatch.setenv("LISTEN_AND_RATE_CONFIG", str(cfg_path))
 
     from fastapi.testclient import TestClient
@@ -43,8 +41,6 @@ def test_normalization_cache_is_cleaned_up_when_startup_fails(tmp_path, monkeypa
     pytest.importorskip("soundfile")
     import tempfile
 
-    import yaml
-
     from listen_and_rate import main as main_module
 
     sine = write_sine(tmp_path / "clip.wav")
@@ -55,8 +51,7 @@ def test_normalization_cache_is_cleaned_up_when_startup_fails(tmp_path, monkeypa
         "loudness_normalization": {"target": -20.0},
         "stimuli": {"items": [{"id": "s001", "path": str(sine)}]},
     }
-    cfg_path = tmp_path / "config.yaml"
-    cfg_path.write_text(yaml.dump(config))
+    cfg_path = write_config(tmp_path, config)
     monkeypatch.setenv("LISTEN_AND_RATE_CONFIG", str(cfg_path))
 
     # Keep the cache under tmp_path so leftovers are visible to this test.

@@ -1,7 +1,8 @@
 # Listen and Rate
 
 [![License](https://img.shields.io/github/license/sp-nitech/listen-and-rate.svg)](https://github.com/sp-nitech/listen-and-rate/blob/master/LICENSE)
-[![GitHub Actions](https://github.com/sp-nitech/listen-and-rate/workflows/package/badge.svg)](https://github.com/sp-nitech/listen-and-rate/actions)
+[![Linux](https://github.com/sp-nitech/listen-and-rate/actions/workflows/linux.yaml/badge.svg)](https://github.com/sp-nitech/listen-and-rate/actions/workflows/linux.yaml)
+[![Windows](https://github.com/sp-nitech/listen-and-rate/actions/workflows/windows.yaml/badge.svg)](https://github.com/sp-nitech/listen-and-rate/actions/workflows/windows.yaml)
 
 A lightweight, self-hostable tool for conducting subjective listening tests in a browser.
 Simply prepare your audio files and a YAML configuration file, and you're ready to run your experiment.

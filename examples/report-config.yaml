@@ -19,13 +19,15 @@ font:
   family: sans-serif
   size: 13
 
+# Bar fill colours (any CSS colour). `mean_bar` fills the mean/rate bars,
+# `count_bar` the raw-count bars.
+color:
+  mean_bar: "#72b7b2"
+  count_bar: "#cd5c5c"
+
 # Confidence level for the error bars. The significance tables use
 # alpha = 1 - confidence (0.95 -> 0.05, 0.99 -> 0.01).
 confidence: 0.95
-
-# Bar fill colours (any CSS colour).
-# mean_bar_color: "#72b7b2"
-# count_bar_color: "#cd5c5c"
 
 # Display order of systems/pairs, by their raw name as stored in the results.
 # When given, it must list EVERY system present in the results. Omit to fall

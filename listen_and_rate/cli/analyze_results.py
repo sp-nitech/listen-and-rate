@@ -171,8 +171,8 @@ def main() -> None:
         require_full_order=require_full_order,
         form_labels=form_labels,
         tie_label=report.tie_label,
-        mean_bar_color=report.mean_bar_color,
-        count_bar_color=report.count_bar_color,
+        mean_bar_color=report.color.mean_bar,
+        count_bar_color=report.color.count_bar,
         groups=(
             [g.model_dump() for g in report.groups]
             if report.groups is not None

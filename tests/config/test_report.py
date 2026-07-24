@@ -27,8 +27,8 @@ def test_defaults_when_empty():
     assert rc.order is None
     assert rc.labels is None
     assert rc.tie_label == "No preference"
-    assert rc.mean_bar_color == "#72b7b2"
-    assert rc.count_bar_color == "#cd5c5c"
+    assert rc.color.mean_bar == "#72b7b2"
+    assert rc.color.count_bar == "#cd5c5c"
 
 
 def test_parses_all_fields():
@@ -39,8 +39,7 @@ def test_parses_all_fields():
         order=["A", "B"],
         labels={"A": "Proposed", "B": "Baseline"},
         tie_label="Equal",
-        mean_bar_color="#4c78a8",
-        count_bar_color="#e45756",
+        color={"mean_bar": "#4c78a8", "count_bar": "#e45756"},
     )
     assert rc.scale.width == 1.5
     assert rc.scale.height == 2.0
@@ -52,8 +51,8 @@ def test_parses_all_fields():
     assert rc.order == ["A", "B"]
     assert rc.labels == {"A": "Proposed", "B": "Baseline"}
     assert rc.tie_label == "Equal"
-    assert rc.mean_bar_color == "#4c78a8"
-    assert rc.count_bar_color == "#e45756"
+    assert rc.color.mean_bar == "#4c78a8"
+    assert rc.color.count_bar == "#e45756"
 
 
 def test_confidence_must_be_between_zero_and_one():
@@ -87,6 +86,11 @@ def test_unknown_top_level_field_rejected():
 def test_unknown_scale_field_rejected():
     with pytest.raises(ValidationError):
         ReportConfig(scale={"depth": 1.0})
+
+
+def test_unknown_color_field_rejected():
+    with pytest.raises(ValidationError):
+        ReportConfig(color={"tie_bar": "#000000"})
 
 
 def test_groups_default_to_none():

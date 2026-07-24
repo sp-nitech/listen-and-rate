@@ -104,6 +104,17 @@ class FontConfig(_StrictModel):
     size: int = Field(default=13, gt=0)
 
 
+class ColorConfig(_StrictModel):
+    """Bar fill colors (any CSS color).
+
+    mean_bar fills the mean/rate bars (MOS means, AB/CMOS CI bars); count_bar
+    fills the raw-count bars (AB/ABX counts, CMOS categories).
+    """
+
+    mean_bar: str = "#72b7b2"
+    count_bar: str = "#cd5c5c"
+
+
 class ReportConfig(_StrictModel):
     """Presentation options for the generated report.
 
@@ -122,8 +133,7 @@ class ReportConfig(_StrictModel):
     order: list[str] | None = None
     labels: dict[str, str] | None = None
     tie_label: str = "No preference"
-    mean_bar_color: str = "#72b7b2"
-    count_bar_color: str = "#cd5c5c"
+    color: ColorConfig = Field(default_factory=ColorConfig)
     groups: list[ReportGroupConfig] | None = None
 
     @field_validator("groups")

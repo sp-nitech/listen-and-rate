@@ -2,12 +2,9 @@
 
 For each (config, theme) pair below, launch the FastAPI dev server, drive a
 headless Chromium (Playwright) to the rendered test interface with the colour
-theme forced via localStorage, and write a PNG to assets/. AB is shot in light
-and MOS in dark so the README advertises both the test-type variety and the
+theme forced via localStorage, and write a PNG to assets/. AB is shot in dark
+and MOS in light so the README advertises both the test-type variety and the
 theme toggle (its sun/moon icon sits in the top-right of every shot).
-
-Run with `make screenshots` (needs the dev dependency group and a one-off
-`playwright install chromium`).
 """
 
 from __future__ import annotations
@@ -29,8 +26,8 @@ PORT = 8000
 # (config, theme, output filename). config.mos.yaml / config.ab.yaml already
 # point at the bundled stimuli/examples audio, so they render as-is.
 SHOTS = [
-    ("examples/config.ab.yaml", "light", "ab-interface.png"),
-    ("examples/config.mos.yaml", "dark", "mos-interface.png"),
+    ("examples/config.ab.yaml", "dark", "ab-interface.png"),
+    ("examples/config.mos.yaml", "light", "mos-interface.png"),
 ]
 
 

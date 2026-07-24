@@ -8,8 +8,8 @@ Simply prepare your audio files and a YAML configuration file, and you're ready 
 Screenshots of the interface are shown below.
 
 <p align="center">
-  <img src="assets/ab-interface.png" alt="AB preference test interface" width="800">
   <img src="assets/mos-interface.png" alt="MOS rating test interface" width="800">
+  <img src="assets/ab-interface.png" alt="AB preference test interface" width="800">
 </p>
 
 ## Key Features

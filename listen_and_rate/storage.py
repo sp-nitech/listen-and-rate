@@ -7,6 +7,7 @@ import json
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
+from typing import ClassVar
 
 # Column-name prefixes namespacing per-session form answers in CSV results.
 # The prefix makes a form key structurally unable to collide with the
@@ -89,7 +90,7 @@ class CSVResultSaver(ResultSaver):
     namespaced with METADATA_COLUMN_PREFIX/SURVEY_COLUMN_PREFIX.
     """
 
-    _BASE_FIELDS = ["session_id", "timestamp", "test_type"]
+    _BASE_FIELDS: ClassVar[list[str]] = ["session_id", "timestamp", "test_type"]
 
     def __init__(
         self,

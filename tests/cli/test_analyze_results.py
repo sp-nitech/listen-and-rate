@@ -55,7 +55,7 @@ def test_analyze_results_writes_html(tmp_path, monkeypatch):
     out_path = tmp_path / "report.html"
     _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
     assert out_path.exists()
-    assert "<html>" in out_path.read_text()
+    assert "<html>" in out_path.read_text(encoding="utf-8")
 
 
 def test_analyze_report_saved_hint_is_logged_not_printed(
@@ -134,7 +134,7 @@ def test_analyze_results_derives_results_dir_from_config(
 
     report = results_dir / "report.html"
     assert report.exists()
-    assert "<html>" in report.read_text()
+    assert "<html>" in report.read_text(encoding="utf-8")
 
 
 def test_analyze_results_derived_dir_without_files_raises(
@@ -192,7 +192,7 @@ def test_analyze_results_root_resolves_output_path_under_root(
 
     report = results_dir / "report.html"
     assert report.exists()
-    assert "<html>" in report.read_text()
+    assert "<html>" in report.read_text(encoding="utf-8")
 
 
 def test_analyze_results_root_with_absolute_output_path_exits_with_usage_error(
@@ -310,7 +310,7 @@ def test_analyze_results_config_flag_orders_systems(
         "--output",
         str(out_path),
     )
-    html = out_path.read_text()
+    html = out_path.read_text(encoding="utf-8")
     m = re.search(r'"x":\s*\[("Zebra",\s*"Alpha"|"Alpha",\s*"Zebra")\]', html)
     assert m, "could not find the MOS chart's system x-array in the report"
     assert m.group(1).startswith('"Zebra"')
@@ -347,7 +347,7 @@ def test_report_config_applies_labels_order_and_confidence(tmp_path, monkeypatch
         "--output",
         str(out_path),
     )
-    html = out_path.read_text()
+    html = out_path.read_text(encoding="utf-8")
     assert '"x":["Baseline","Proposed"]' in html.replace(" ", "")
     assert "\u03b1=0.01" in html  # alpha follows confidence (1 - 0.99)
 
@@ -365,7 +365,7 @@ def test_report_config_scale_applies(tmp_path, monkeypatch):
         "--output",
         str(out_path),
     )
-    assert "max-width:450px" in out_path.read_text()  # 900 * 0.5
+    assert "max-width:450px" in out_path.read_text(encoding="utf-8")  # 900 * 0.5
 
 
 def test_report_config_order_missing_system_raises(tmp_path, monkeypatch):
@@ -389,7 +389,7 @@ def test_report_config_is_optional(tmp_path, monkeypatch):
     csv_path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
     _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
-    html = out_path.read_text()
+    html = out_path.read_text(encoding="utf-8")
     assert "max-width:900px" in html  # default scale = 1.0
     assert "\u03b1=0.05" in html  # default confidence 0.95
 
@@ -431,7 +431,7 @@ def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):
         "--output",
         str(out_path),
     )
-    html = out_path.read_text()
+    html = out_path.read_text(encoding="utf-8")
     assert html.count("<h2") == 3  # 2 group sections + trailing Participants
     assert "All listeners" in html
     assert "Headphones" in html

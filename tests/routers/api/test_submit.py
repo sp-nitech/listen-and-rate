@@ -76,7 +76,7 @@ def test_submit_writes_json_when_format_is_json(tmp_path, test_audio_file, monke
     assert res.status_code == 200
     json_path = tmp_path / "results" / "config" / "sess-json.json"
     assert json_path.exists()
-    data = json.loads(json_path.read_text())
+    data = json.loads(json_path.read_text(encoding="utf-8"))
     assert data["session_id"] == "sess-json"
     assert data["test_type"] == "mos"
     assert len(data["ratings"]) == 2
@@ -304,7 +304,9 @@ def test_submit_survey_saved_as_json_object(tmp_path, test_audio_file, monkeypat
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         res = _submit(tc, {}, survey={"trial_count": "TooMany", "bogus": "x"})
         assert res.status_code == 200
-        data = json.loads((tmp_path / "results" / "config" / "s.json").read_text())
+        data = json.loads(
+            (tmp_path / "results" / "config" / "s.json").read_text(encoding="utf-8")
+        )
         # Undeclared keys are stripped, declared ones stored under 'survey'.
         assert data["survey"] == {"trial_count": "TooMany"}
 
@@ -325,5 +327,7 @@ def test_submit_strips_unknown_metadata_keys(tmp_path, test_audio_file, monkeypa
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         res = _submit(tc, {"unexpected": "=cmd|'/C calc'!A1"})
         assert res.status_code == 200
-        data = json.loads((tmp_path / "results" / "config" / "s.json").read_text())
+        data = json.loads(
+            (tmp_path / "results" / "config" / "s.json").read_text(encoding="utf-8")
+        )
         assert data["metadata"] == {}

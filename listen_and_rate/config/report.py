@@ -162,7 +162,7 @@ def load_report_config_or_exit(config_path: str | Path) -> ReportConfig:
     prints a short, URL-free message (see format_config_error) and exits rather
     than a stack trace. An empty file yields the defaults.
     """
-    with open(Path(config_path)) as f:
+    with open(Path(config_path), encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     try:
         return ReportConfig.model_validate(data)

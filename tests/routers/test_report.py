@@ -35,7 +35,7 @@ def test_report_with_results_returns_html(client, config_yaml):
             "rating": 3,
         },
     ]
-    with open(results_dir / "s1.csv", "w", newline="") as f:
+    with open(results_dir / "s1.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=rows[0].keys())
         writer.writeheader()
         writer.writerows(rows)

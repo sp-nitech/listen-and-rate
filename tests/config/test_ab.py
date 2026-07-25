@@ -35,7 +35,7 @@ def test_ab_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_file
         "test_type": "ab",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
@@ -62,7 +62,7 @@ def test_ab_requires_exactly_two_systems_not_three(tmp_path, test_audio_file):
         load_config(write_config(tmp_path, data))
 
 
-def test_ab_unpaired_utterance_is_dropped_with_warning(tmp_path, test_audio_file):
+def test_ab_unpaired_item_is_dropped_with_warning(tmp_path, test_audio_file):
     da = tmp_path / "sys_a"
     db = tmp_path / "sys_b"
     da.mkdir()
@@ -73,23 +73,23 @@ def test_ab_unpaired_utterance_is_dropped_with_warning(tmp_path, test_audio_file
     data = stimuli_dirs_data([{"path": str(da)}, {"path": str(db)}], test_type="ab")
     with pytest.warns(UserWarning, match="not present in all systems"):
         result = load_config(write_config(tmp_path, data))
-    trials = build_ab_trials(result.stimuli.items)
+    trials = build_ab_trials(result.stimuli.entries)
     assert len(trials) == 1
-    assert trials[0].utterance == "utt1"
+    assert trials[0].item == "utt1"
 
 
-def test_build_ab_trials_pairs_by_utterance_with_deterministic_system_order(
+def test_build_ab_trials_pairs_by_item_with_deterministic_system_order(
     tmp_path, test_audio_file
 ):
-    da, db = two_system_dirs(tmp_path, test_audio_file, utterances=("utt1", "utt2"))
+    da, db = two_system_dirs(tmp_path, test_audio_file, items=("utt1", "utt2"))
     data = stimuli_dirs_data(
         [{"path": str(db), "system": "B"}, {"path": str(da), "system": "A"}],
         test_type="ab",
     )
     result = load_config(write_config(tmp_path, data))
-    trials = build_ab_trials(result.stimuli.items)
+    trials = build_ab_trials(result.stimuli.entries)
     assert len(trials) == 2
-    assert [t.utterance for t in trials] == ["utt1", "utt2"]
+    assert [t.item for t in trials] == ["utt1", "utt2"]
     for t in trials:
         assert t.systems == ("A", "B")
 

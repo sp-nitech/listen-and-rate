@@ -8,7 +8,7 @@ from ...config import CMOSConfig
 from ...models import SubmitRequest
 from ...storage import ResultSaver
 from ._shared import (
-    _all_items,
+    _all_stimuli,
     _id_to_meta,
     _pair_config_response,
     _require_non_empty,
@@ -28,7 +28,7 @@ def _submit_cmos(body: SubmitRequest, config: CMOSConfig, saver: ResultSaver) ->
     outside -3..3.
     """
     _require_non_empty(body.choices, "choices")
-    id_to_meta = _id_to_meta(_all_items(config))
+    id_to_meta = _id_to_meta(_all_stimuli(config))
 
     rows = []
     for choice in body.choices:
@@ -45,13 +45,14 @@ def _submit_cmos(body: SubmitRequest, config: CMOSConfig, saver: ResultSaver) ->
 
         system_a, system_b = sorted([meta1["system"], meta2["system"]])
         # choice.rating means "stimulus_ids[1] relative to stimulus_ids[0]";
-        # flip its sign when stimulus_ids[0] isn't the canonical (system_a) side.
+        # flip its sign when stimulus_ids[0] isn't the canonical (system_a)
+        # side.
         rating = choice.rating if meta1["system"] == system_a else -choice.rating
         rows.append(
             {
                 "system_a": system_a,
                 "system_b": system_b,
-                "utterance": meta1["utterance"],
+                "item": meta1["item"],
                 "rating": rating,
             }
         )

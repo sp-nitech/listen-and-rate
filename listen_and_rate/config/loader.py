@@ -35,9 +35,9 @@ Config = Annotated[
 def _expand_stimuli_dirs(dirs_config: StimuliDirsConfig) -> list[StimulusConfig]:
     """Scan each system directory for audio files and return a flat stimulus list.
 
-    Validates that all systems share a common set of utterances (filenames).
-    Emits a UserWarning for utterances missing from any system; raises ValueError
-    if no common utterances exist at all.
+    Validates that all systems share a common set of items (filenames).
+    Emits a UserWarning for items missing from any system; raises ValueError
+    if no common items exist at all.
     """
     dir_entries: list[tuple[str, str, list[Path]]] = []
     for entry in dirs_config.systems:
@@ -87,7 +87,7 @@ def _expand_stimuli_dirs(dirs_config: StimuliDirsConfig) -> list[StimulusConfig]
 
             details = ", ".join(_missing_in(s) for s in sorted(system_specific))
             warnings.warn(
-                f"Some utterances are not present in all systems: {details}",
+                f"Some items are not present in all systems: {details}",
                 UserWarning,
                 stacklevel=4,
             )
@@ -101,16 +101,16 @@ def _expand_stimuli_dirs(dirs_config: StimuliDirsConfig) -> list[StimulusConfig]
                     id=sid,
                     path=str(audio_file),
                     system=system,
-                    utterance=audio_file.stem,
+                    item=audio_file.stem,
                 )
             )
     return stimuli
 
 
-def _check_no_basename_conflicts(items: list[StimulusConfig]) -> None:
+def _check_no_basename_conflicts(stimuli: list[StimulusConfig]) -> None:
     """Reject DISTINCT stimulus files whose paths differ only in extension.
 
-    utt1.wav vs utt1.mp3 in one directory: loudness normalization would fold
+    item1.wav vs item1.mp3 in one directory: loudness normalization would fold
     such a pair onto one .wav output file - the later write silently replacing
     the earlier, making both ids serve identical audio - and allowing the pair
     only while normalization is off would make config validity depend on an
@@ -120,7 +120,7 @@ def _check_no_basename_conflicts(items: list[StimulusConfig]) -> None:
     output is the point.
     """
     by_basename: dict[tuple[str, str], set[str]] = {}
-    for s in items:
+    for s in stimuli:
         p = Path(s.path)
         by_basename.setdefault((str(p.parent), p.stem), set()).add(str(p))
     duplicated = {k: paths for k, paths in by_basename.items() if len(paths) > 1}
@@ -136,7 +136,7 @@ def _check_no_basename_conflicts(items: list[StimulusConfig]) -> None:
 
 
 def _check_audio_and_measure_durations(
-    items: list[StimulusConfig],
+    stimuli: list[StimulusConfig],
 ) -> dict[str, float]:
     """Validate each stimulus file and return {stimulus_id: duration_seconds}.
 
@@ -161,7 +161,7 @@ def _check_audio_and_measure_durations(
     import soundfile as sf
 
     durations: dict[str, float] = {}
-    for stimulus in items:
+    for stimulus in stimuli:
         if not Path(stimulus.path).is_file():
             raise FileNotFoundError(f"Audio file not found: {stimulus.path}")
         try:
@@ -200,10 +200,10 @@ def load_config(config_path: str | Path) -> Config:
     if isinstance(data.get("output"), dict) and "format" in data["output"]:
         data["output"]["format"] = str(data["output"]["format"]).lower()
 
-    # Normalize paths in stimuli.items[].path
+    # Normalize paths in stimuli.entries[].path
     if isinstance(data.get("stimuli"), dict):
-        for item in data["stimuli"].get("items") or []:
-            item["path"] = str(_normalize(Path(item["path"])))
+        for entry in data["stimuli"].get("entries") or []:
+            entry["path"] = str(_normalize(Path(entry["path"])))
 
     # Normalize paths in stimuli_dirs.systems[].path
     if isinstance(data.get("stimuli_dirs"), dict):
@@ -218,27 +218,27 @@ def load_config(config_path: str | Path) -> Config:
         ids = [s.id for s in expanded]
         if len(ids) != len(set(ids)):
             raise ValueError("stimulus IDs must be unique across stimuli_dirs")
-        n = config.stimuli_dirs.utterances_per_session
+        n = config.stimuli_dirs.items_per_session
         if n is not None:
-            unique_utterances = {s.utterance for s in expanded if s.utterance}
-            if n > len(unique_utterances):
+            unique_items = {s.item for s in expanded if s.item}
+            if n > len(unique_items):
                 raise ValueError(
-                    f"utterances_per_session ({n}) exceeds the total number of "
-                    f"utterances ({len(unique_utterances)})"
+                    f"items_per_session ({n}) exceeds the total number of "
+                    f"items ({len(unique_items)})"
                 )
-        config = config.model_copy(update={"stimuli": StimuliConfig(items=expanded)})
+        config = config.model_copy(update={"stimuli": StimuliConfig(entries=expanded)})
 
-    if config.stimuli is None or not config.stimuli.items:
+    if config.stimuli is None or not config.stimuli.entries:
         raise ValueError(
             "No audio stimuli found; check the paths and that files use a "
             "supported format (.wav, .mp3, .flac, .ogg)."
         )
 
-    _check_no_basename_conflicts(config.stimuli.items)
+    _check_no_basename_conflicts(config.stimuli.entries)
 
     if config.stimuli is not None and config.stimuli.stimuli_per_session is not None:
         n = config.stimuli.stimuli_per_session
-        total = len(config.stimuli.items)
+        total = len(config.stimuli.entries)
         if n > total:
             raise ValueError(
                 f"stimuli_per_session ({n}) exceeds the total number of "
@@ -256,61 +256,61 @@ def load_config(config_path: str | Path) -> Config:
 
     if isinstance(config, MOSConfig):
         _check_practice_count(
-            len(config.stimuli.items) if config.stimuli else 0, "stimuli"
+            len(config.stimuli.entries) if config.stimuli else 0, "stimuli"
         )
 
     config._durations = _check_audio_and_measure_durations(
-        config.stimuli.items if config.stimuli else []
+        config.stimuli.entries if config.stimuli else []
     )
 
     if isinstance(config, DMOSConfig):
         dmos_trials = build_dmos_trials(
-            config.stimuli.items if config.stimuli else [], config.reference_system
+            config.stimuli.entries if config.stimuli else [], config.reference_system
         )
         if not dmos_trials:
             raise ValueError(
-                "No utterance is present in both the reference and a test "
-                "system; this test type requires at least one paired utterance"
+                "No item is present in both the reference and a test "
+                "system; this test type requires at least one paired item"
             )
-        n = config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
-        unique_utterances = {t.utterance for t in dmos_trials}
-        if n is not None and n > len(unique_utterances):
+        n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
+        unique_items = {t.item for t in dmos_trials}
+        if n is not None and n > len(unique_items):
             raise ValueError(
-                f"utterances_per_session ({n}) exceeds the number of paired "
-                f"utterances ({len(unique_utterances)})"
+                f"items_per_session ({n}) exceeds the number of paired "
+                f"items ({len(unique_items)})"
             )
         _check_practice_count(len(dmos_trials), "trials")
 
     if isinstance(config, (CMOSConfig, ABConfig, ABXConfig)):
-        trials = build_ab_trials(config.stimuli.items if config.stimuli else [])
+        trials = build_ab_trials(config.stimuli.entries if config.stimuli else [])
         if not trials:
             raise ValueError(
-                "No utterance is present in both systems; this test type requires "
-                "at least one paired utterance"
+                "No item is present in both systems; this test type requires "
+                "at least one paired item"
             )
-        n = config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
+        n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
         if n is not None and n > len(trials):
             raise ValueError(
-                f"utterances_per_session ({n}) exceeds the number of paired "
+                f"items_per_session ({n}) exceeds the number of paired "
                 f"trials ({len(trials)})"
             )
         _check_practice_count(len(trials), "trials")
 
     if isinstance(config, XABConfig):
         xab_trials = build_xab_trials(
-            config.stimuli.items if config.stimuli else [], config.reference_system
+            config.stimuli.entries if config.stimuli else [], config.reference_system
         )
         if not xab_trials:
             raise ValueError(
-                "No utterance is present in the reference and both test "
+                "No item is present in the reference and both test "
                 "systems; this test type requires at least one complete "
-                "utterance"
+                "item"
             )
-        n = config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
+        n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
         if n is not None and n > len(xab_trials):
             raise ValueError(
-                f"utterances_per_session ({n}) exceeds the number of complete "
-                f"utterances ({len(xab_trials)})"
+                f"items_per_session ({n}) exceeds the number of complete "
+                f"items ({len(xab_trials)})"
             )
         _check_practice_count(len(xab_trials), "trials")
 
@@ -321,20 +321,20 @@ def load_config(config_path: str | Path) -> Config:
             if not s.reference
         }
         mushra_trials = build_mushra_trials(
-            config.stimuli.items if config.stimuli else [],
+            config.stimuli.entries if config.stimuli else [],
             config.reference_system,
             rateable_systems,
         )
         if not mushra_trials:
             raise ValueError(
-                "No utterance has a stimulus for every rateable system; this "
-                "test type requires at least one complete utterance"
+                "No item has a stimulus for every rateable system; this "
+                "test type requires at least one complete item"
             )
-        n = config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
+        n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
         if n is not None and n > len(mushra_trials):
             raise ValueError(
-                f"utterances_per_session ({n}) exceeds the number of complete "
-                f"utterances ({len(mushra_trials)})"
+                f"items_per_session ({n}) exceeds the number of complete "
+                f"items ({len(mushra_trials)})"
             )
         _check_practice_count(len(mushra_trials), "trials")
 

@@ -140,7 +140,7 @@ def test_mushra_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_
         "test_type": "mushra",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
@@ -200,9 +200,7 @@ def test_mushra_rating_labels_accepts_bare_numeric_keys(tmp_path, test_audio_fil
 def test_build_mushra_trials_pairs_reference_and_anchor_with_all_systems(
     tmp_path, test_audio_file
 ):
-    da, db, dc = three_system_dirs(
-        tmp_path, test_audio_file, utterances=("utt1", "utt2")
-    )
+    da, db, dc = three_system_dirs(tmp_path, test_audio_file, items=("utt1", "utt2"))
     data = stimuli_dirs_data(
         [
             {"path": str(da), "system": "Reference", "reference": True},
@@ -212,9 +210,9 @@ def test_build_mushra_trials_pairs_reference_and_anchor_with_all_systems(
         test_type="mushra",
     )
     result = load_config(write_config(tmp_path, data))
-    items = result.stimuli.items
+    stimuli = result.stimuli.entries
     rateable = {"B", "Anchor"}
-    trials = build_mushra_trials(items, result.reference_system, rateable)
+    trials = build_mushra_trials(stimuli, result.reference_system, rateable)
     assert len(trials) == 2
     for t in trials:
         assert t.reference_id is not None
@@ -222,19 +220,19 @@ def test_build_mushra_trials_pairs_reference_and_anchor_with_all_systems(
 
 
 def test_build_mushra_trials_without_reference(tmp_path, test_audio_file):
-    da, db = two_system_dirs(tmp_path, test_audio_file, utterances=("utt1",))
+    da, db = two_system_dirs(tmp_path, test_audio_file, items=("utt1",))
     data = stimuli_dirs_data(
         [{"path": str(da), "system": "A"}, {"path": str(db), "system": "B"}],
         test_type="mushra",
     )
     result = load_config(write_config(tmp_path, data))
-    items = result.stimuli.items
-    trials = build_mushra_trials(items, result.reference_system, {"A", "B"})
+    stimuli = result.stimuli.entries
+    trials = build_mushra_trials(stimuli, result.reference_system, {"A", "B"})
     assert len(trials) == 1
     assert trials[0].reference_id is None
 
 
-def test_build_mushra_trials_skips_utterance_missing_from_a_system(
+def test_build_mushra_trials_skips_item_missing_from_a_system(
     tmp_path, test_audio_file
 ):
     da = tmp_path / "sys_ref"
@@ -258,20 +256,18 @@ def test_build_mushra_trials_skips_utterance_missing_from_a_system(
     )
     with pytest.warns(UserWarning, match="not present in all systems"):
         result = load_config(write_config(tmp_path, data))
-    items = result.stimuli.items
-    trials = build_mushra_trials(items, result.reference_system, {"B", "C"})
+    stimuli = result.stimuli.entries
+    trials = build_mushra_trials(stimuli, result.reference_system, {"B", "C"})
     assert len(trials) == 1
-    assert trials[0].utterance == "utt1"
+    assert trials[0].item == "utt1"
 
 
-def test_mushra_utterances_per_session_exceeds_trial_count_raises(
-    tmp_path, test_audio_file
-):
-    da, db = two_system_dirs(tmp_path, test_audio_file, utterances=("utt1",))
+def test_mushra_items_per_session_exceeds_trial_count_raises(tmp_path, test_audio_file):
+    da, db = two_system_dirs(tmp_path, test_audio_file, items=("utt1",))
     data = stimuli_dirs_data(
         [{"path": str(da), "system": "A"}, {"path": str(db), "system": "B"}],
         test_type="mushra",
-        utterances_per_session=5,
+        items_per_session=5,
     )
-    with pytest.raises(ValueError, match="utterances_per_session"):
+    with pytest.raises(ValueError, match="items_per_session"):
         load_config(write_config(tmp_path, data))

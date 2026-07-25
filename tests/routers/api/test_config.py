@@ -72,7 +72,7 @@ def test_config_includes_audio_preload_level(tmp_path, test_audio_file, monkeypa
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "audio_preload": "none",
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         assert tc.get("/api/config").json()["audio_preload"] == "none"
@@ -94,7 +94,7 @@ def test_config_includes_survey_fields(tmp_path, test_audio_file, monkeypatch):
                 }
             ]
         },
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         survey = tc.get("/api/config").json()["survey"]
@@ -152,7 +152,7 @@ def test_config_version_changes_when_config_changes(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with _create_app_client(tmp_path, base, monkeypatch) as tc:
         v1 = tc.get("/api/config").json()["config_version"]

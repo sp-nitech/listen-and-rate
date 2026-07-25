@@ -19,7 +19,7 @@ def test_audio_served_is_loudness_normalized_when_configured(tmp_path, monkeypat
         "title": "T",
         "instructions": "I",
         "loudness_normalization": {"target": -20.0, "scope": "stimulus"},
-        "stimuli": {"items": [{"id": "s001", "path": str(sine)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(sine)}]},
     }
     cfg_path = write_config(tmp_path, config)
     monkeypatch.setenv("LISTEN_AND_RATE_CONFIG", str(cfg_path))
@@ -49,7 +49,7 @@ def test_normalization_cache_is_cleaned_up_when_startup_fails(tmp_path, monkeypa
         "title": "T",
         "instructions": "I",
         "loudness_normalization": {"target": -20.0},
-        "stimuli": {"items": [{"id": "s001", "path": str(sine)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(sine)}]},
     }
     cfg_path = write_config(tmp_path, config)
     monkeypatch.setenv("LISTEN_AND_RATE_CONFIG", str(cfg_path))

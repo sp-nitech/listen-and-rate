@@ -138,7 +138,7 @@ class PracticeConfig(_StrictModel):
 
 
 class LoudnessCriterion(_StrictModel):
-    """One loudness-check criterion (`per_system` or `per_stimulus`).
+    """One loudness-check criterion (`per_system` or `per_item`).
 
     The check exceeds when the relevant loudness difference (in LU) is greater
     than `threshold`; `verbose` prints the loudness figures every run,
@@ -152,13 +152,15 @@ class LoudnessCriterion(_StrictModel):
 class LoudnessCheckConfig(_StrictModel):
     """Optional pre-test loudness check (runs at serve/export when configured).
 
-    Each criterion, when present, is enabled: `per_system` compares the range
-    (max-min) of per-system mean loudness; `per_stimulus` compares, per
-    utterance, the loudness spread across systems. See listen_and_rate/loudness.py.
+    Each criterion, when present, is enabled. The two name the two axes of the
+    system x item grid whose cells are the stimuli: `per_system` compares the
+    range (max-min) of the per-system mean loudness (column means), while
+    `per_item` compares, within one item, the loudness spread across systems
+    (the spread inside a row). See listen_and_rate/loudness.py.
     """
 
     per_system: LoudnessCriterion | None = None
-    per_stimulus: LoudnessCriterion | None = None
+    per_item: LoudnessCriterion | None = None
 
 
 class LoudnessNormalizationConfig(_StrictModel):
@@ -169,7 +171,7 @@ class LoudnessNormalizationConfig(_StrictModel):
     `stimulus` normalizes each clip individually to `target` (flattening every
     clip to the same loudness); `system` applies one gain per system so that
     system's mean loudness reaches `target`, preserving the natural loudness
-    differences between utterances within a system. See listen_and_rate/loudness.py.
+    differences between items within a system. See listen_and_rate/loudness.py.
     """
 
     target: float = Field(default=-23.0, lt=0)  # integrated loudness, LUFS (EBU R128)
@@ -182,7 +184,7 @@ class StimulusConfig(_StrictModel):
     id: str
     path: str
     system: str | None = None
-    utterance: str | None = None
+    item: str | None = None
     label: str | None = None
 
     @field_validator("system", "label", mode="before")
@@ -215,7 +217,7 @@ class SystemDirEntry(_StrictModel):
 class StimuliDirsConfig(_StrictModel):
     """Directory-based multi-system stimulus definition."""
 
-    utterances_per_session: int | None = Field(default=None, ge=1)
+    items_per_session: int | None = Field(default=None, ge=1)
     systems: list[SystemDirEntry]
 
 
@@ -223,12 +225,12 @@ class StimuliConfig(_StrictModel):
     """Explicit stimulus list."""
 
     stimuli_per_session: int | None = Field(default=None, ge=1)
-    items: list[StimulusConfig]
+    entries: list[StimulusConfig]
 
-    @field_validator("items")
+    @field_validator("entries")
     @classmethod
     def ids_must_be_unique(cls, v: list[StimulusConfig]) -> list[StimulusConfig]:
-        """Reject configs where two items share the same id."""
+        """Reject configs where two entries share the same id."""
         ids = [s.id for s in v]
         if len(ids) != len(set(ids)):
             raise PydanticCustomError(

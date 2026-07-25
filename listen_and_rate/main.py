@@ -29,8 +29,9 @@ from .storage import make_result_saver
 async def lifespan(app: FastAPI):
     """Load config and build shared state once at startup.
 
-    Reads LISTEN_AND_RATE_CONFIG env var (default: ./config.yaml). All subsequent
-    requests share the same config, result_saver, and audio_map objects.
+    Reads LISTEN_AND_RATE_CONFIG env var (default: ./config.yaml). All
+    subsequent requests share the same config, result_saver, and audio_map
+    objects.
     """
     config_path = os.environ.get("LISTEN_AND_RATE_CONFIG", "./config.yaml")
     config = load_config_or_exit(config_path)
@@ -43,9 +44,10 @@ async def lifespan(app: FastAPI):
         [f.key for f in config.metadata.fields],
         [f.key for f in config.survey.fields],
     )
-    all_stimuli = config.stimuli.items if config.stimuli else []
-    # With loudness_normalization configured, pre-normalize every clip into a temp
-    # cache once at startup and serve from there; otherwise serve the originals.
+    all_stimuli = config.stimuli.entries if config.stimuli else []
+    # With loudness_normalization configured, pre-normalize every clip into
+    # a temp cache once at startup and serve from there; otherwise serve the
+    # originals.
     normalized_cache: Path | None = None
     if config.loudness_normalization is not None:
         normalized_cache = Path(tempfile.mkdtemp(prefix="lar-normalized-"))
@@ -88,7 +90,7 @@ def create_app() -> FastAPI:
 
     # PHP-compatible aliases at root level so the same frontend JS (which calls
     # "config.php" and "save.php" as relative URLs) works with both FastAPI and
-    # a static PHP deployment.  Must be registered before StaticFiles so FastAPI
+    # a static PHP deployment. Must be registered before StaticFiles so FastAPI
     # handles them rather than serving the raw .php source or returning 404.
     app.add_api_route(
         "/config.php", get_test_config, methods=["GET"], include_in_schema=False

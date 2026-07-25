@@ -33,7 +33,7 @@ def test_abx_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_fil
         "test_type": "abx",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))

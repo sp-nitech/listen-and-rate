@@ -9,25 +9,23 @@ from ._helpers import (
 )
 
 
-def test_utterances_per_session_samples_correctly(
-    tmp_path, test_audio_file, monkeypatch
-):
-    """Select N utterances, include every system for each, no duplicate ids."""
+def test_items_per_session_samples_correctly(tmp_path, test_audio_file, monkeypatch):
+    """Select N items, include every system for each, no duplicate ids."""
     config = _make_stimuli_dirs_config(
-        tmp_path, test_audio_file, n_utterances=5, n_systems=3, utterances_per_session=2
+        tmp_path, test_audio_file, n_items=5, n_systems=3, items_per_session=2
     )
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         stimuli = tc.get("/api/config").json()["stimuli"]
-        assert len(stimuli) == 6  # 2 utterances × 3 systems
+        assert len(stimuli) == 6  # 2 items × 3 systems
 
         ids = [s["id"] for s in stimuli]
         assert len(ids) == len(set(ids))
 
-        # Extract utterance index from IDs like "sys_0__utt2"
+        # Extract item index from IDs like "sys_0__utt2"
         from collections import Counter
 
         utt_counts = Counter(id_.split("__")[1] for id_ in ids)
-        # Every selected utterance must appear exactly once per system (3 times)
+        # Every selected item must appear exactly once per system (3 times)
         assert all(count == 3 for count in utt_counts.values())
 
 
@@ -40,7 +38,7 @@ def test_stimuli_per_session_samples_correctly(tmp_path, test_audio_file, monkey
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "stimuli": {
             "stimuli_per_session": 3,
-            "items": [
+            "entries": [
                 {"id": f"s{i:03d}", "path": str(test_audio_file)} for i in range(10)
             ],
         },
@@ -69,14 +67,14 @@ def test_stimuli_per_session_keeps_order_when_presentation_fixed(
         "presentation_order": "fixed",
         "stimuli": {
             "stimuli_per_session": 3,
-            "items": [
+            "entries": [
                 {"id": f"s{i:03d}", "path": str(test_audio_file)} for i in range(10)
             ],
         },
     }
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         # The subset is random, so check ordering across many draws: a random
-        # permutation of 3 items is already sorted only 1/6 of the time.
+        # permutation of 3 stimuli is already sorted only 1/6 of the time.
         for _ in range(30):
             ids = [s["id"] for s in tc.get("/api/config").json()["stimuli"]]
             assert ids == sorted(ids)
@@ -110,7 +108,7 @@ def test_config_includes_practice_stimuli_and_instructions(
         assert len(data["practice_stimuli"]) == 2
         pool_ids = {f"s{i:03d}" for i in range(4)}
         for s in data["practice_stimuli"]:
-            assert set(s) == {"id", "label"}  # blinded: no path/system/utterance
+            assert set(s) == {"id", "label"}  # blinded: no path/system/item
             assert s["id"] in pool_ids
 
 

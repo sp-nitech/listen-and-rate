@@ -99,7 +99,7 @@ def test_groups_parse_label_and_filters():
             {
                 "label": "Speaker F01 on headphones",
                 "metadata_filter": {"device": "Headphones"},
-                "stimuli_filter": {"utterance": ["F01_*", "F02_*"]},
+                "stimuli_filter": {"item": ["F01_*", "F02_*"]},
             },
         ]
     )
@@ -108,7 +108,7 @@ def test_groups_parse_label_and_filters():
     assert rc.groups[0].metadata_filter is None
     assert rc.groups[0].stimuli_filter is None
     assert rc.groups[1].metadata_filter == {"device": "Headphones"}
-    assert rc.groups[1].stimuli_filter == {"utterance": ["F01_*", "F02_*"]}
+    assert rc.groups[1].stimuli_filter == {"item": ["F01_*", "F02_*"]}
 
 
 def test_groups_coerce_numeric_filter_values_to_str():
@@ -135,7 +135,7 @@ def test_groups_parse_survey_filter():
 
 
 def test_groups_stimuli_filter_rejects_non_stimulus_key():
-    # stimuli_filter keys are a fixed allowlist (utterance/system); an outcome
+    # stimuli_filter keys are a fixed allowlist (item/system); an outcome
     # column like 'rating' must be rejected at load time.
     with pytest.raises(ValidationError):
         ReportConfig(groups=[{"label": "g", "stimuli_filter": {"rating": "5"}}])

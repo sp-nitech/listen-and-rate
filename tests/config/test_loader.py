@@ -42,7 +42,7 @@ def test_load_config_with_all_fields(tmp_path, test_audio_file):
         "presentation_order": "random",
         "output": {"format": "json", "path": "./out/"},
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "s001", "path": str(test_audio_file), "label": "A"},
                 {"id": "s002", "path": str(test_audio_file), "label": "B"},
             ]
@@ -51,15 +51,15 @@ def test_load_config_with_all_fields(tmp_path, test_audio_file):
     result = load_config(write_config(tmp_path, data))
     assert result.presentation_order == "random"
     assert result.output.format == "json"
-    assert len(result.stimuli.items) == 2
-    assert result.stimuli.items[0].label == "A"
+    assert len(result.stimuli.entries) == 2
+    assert result.stimuli.entries[0].label == "A"
 
 
 def test_relative_audio_path_resolved_to_absolute(tmp_path, test_audio_file):
     shutil.copy(test_audio_file, tmp_path / "sample.wav")
     result = load_config(write_config(tmp_path, minimal_config("./sample.wav")))
-    assert Path(result.stimuli.items[0].path).is_absolute()
-    assert Path(result.stimuli.items[0].path).exists()
+    assert Path(result.stimuli.entries[0].path).is_absolute()
+    assert Path(result.stimuli.entries[0].path).exists()
 
 
 def test_experiment_id_is_derived_from_config_filename(tmp_path, test_audio_file):
@@ -85,7 +85,7 @@ def test_duplicate_stimulus_ids_raise_error(tmp_path, test_audio_file):
         "title": "T",
         "instructions": "I",
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "dup", "path": str(test_audio_file)},
                 {"id": "dup", "path": str(test_audio_file)},
             ]
@@ -134,7 +134,7 @@ def test_same_dir_same_stem_stimuli_rejected(tmp_path, test_audio_file):
         "title": "T",
         "instructions": "I",
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "original", "path": str(d / "utt1.wav")},
                 {"id": "coded", "path": str(d / "utt1.flac")},
             ]
@@ -153,7 +153,7 @@ def test_same_file_referenced_by_multiple_stimuli_allowed(tmp_path, test_audio_f
         "title": "T",
         "instructions": "I",
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "first", "path": str(test_audio_file)},
                 {"id": "repeat", "path": str(test_audio_file)},
             ]
@@ -173,7 +173,7 @@ def test_same_stem_in_different_dirs_allowed(tmp_path, test_audio_file):
         "title": "T",
         "instructions": "I",
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "a", "path": str(da / "utt1.wav")},
                 {"id": "b", "path": str(db / "utt1.wav")},
             ]
@@ -189,10 +189,10 @@ def test_stimuli_dirs_expansion(tmp_path, test_audio_file):
     shutil.copy(test_audio_file, d / "002.wav")
     data = stimuli_dirs_data([{"path": str(d)}])
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.items) == 2
-    for s in result.stimuli.items:
+    assert len(result.stimuli.entries) == 2
+    for s in result.stimuli.entries:
         assert re.match(r"^[a-zA-Z0-9_\-]+$", s.id), f"ID not URL-safe: {s.id}"
-    assert result.stimuli.items[0].utterance in {"001", "002"}
+    assert result.stimuli.entries[0].item in {"001", "002"}
 
 
 def test_stimuli_dirs_system_field(tmp_path, test_audio_file):
@@ -203,12 +203,12 @@ def test_stimuli_dirs_system_field(tmp_path, test_audio_file):
     # Without system: directory name is used
     data = stimuli_dirs_data([{"path": str(d)}])
     result = load_config(write_config(tmp_path, data))
-    assert result.stimuli.items[0].system == "system_a"
+    assert result.stimuli.entries[0].system == "system_a"
 
     # With system: overrides directory name
     data = stimuli_dirs_data([{"path": str(d), "system": "System A"}])
     result = load_config(write_config(tmp_path, data))
-    assert result.stimuli.items[0].system == "System A"
+    assert result.stimuli.entries[0].system == "System A"
 
 
 def test_stimuli_dirs_multiple_systems(tmp_path, test_audio_file):
@@ -220,8 +220,8 @@ def test_stimuli_dirs_multiple_systems(tmp_path, test_audio_file):
     shutil.copy(test_audio_file, db / "001.wav")
     data = stimuli_dirs_data([{"path": str(da)}, {"path": str(db)}])
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.items) == 2
-    systems = {s.system for s in result.stimuli.items}
+    assert len(result.stimuli.entries) == 2
+    systems = {s.system for s in result.stimuli.entries}
     assert systems == {"sys_a", "sys_b"}
 
 
@@ -262,7 +262,7 @@ def test_stimuli_dirs_single_system_skips_cross_checks(tmp_path, test_audio_file
     shutil.copy(test_audio_file, da / "001.wav")
     data = stimuli_dirs_data([{"path": str(da)}])
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.items) == 1
+    assert len(result.stimuli.entries) == 1
 
 
 def test_stimuli_dirs_duplicate_basename_raises_error(tmp_path, test_audio_file):
@@ -318,20 +318,20 @@ def test_stimuli_dirs_explicit_system_name_collides_with_dir_basename_fallback(
         load_config(write_config(tmp_path, data))
 
 
-def test_utterances_per_session_validated_against_total(tmp_path, test_audio_file):
+def test_items_per_session_validated_against_total(tmp_path, test_audio_file):
     da = tmp_path / "sys_a"
     da.mkdir()
     shutil.copy(test_audio_file, da / "001.wav")
-    data = stimuli_dirs_data([{"path": str(da)}], utterances_per_session=5)
-    with pytest.raises(ValueError, match="utterances_per_session"):
+    data = stimuli_dirs_data([{"path": str(da)}], items_per_session=5)
+    with pytest.raises(ValueError, match="items_per_session"):
         load_config(write_config(tmp_path, data))
 
 
-def test_utterances_per_session_must_be_at_least_one(tmp_path, test_audio_file):
+def test_items_per_session_must_be_at_least_one(tmp_path, test_audio_file):
     da = tmp_path / "sys_a"
     da.mkdir()
     shutil.copy(test_audio_file, da / "001.wav")
-    data = stimuli_dirs_data([{"path": str(da)}], utterances_per_session=0)
+    data = stimuli_dirs_data([{"path": str(da)}], items_per_session=0)
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
 
@@ -343,7 +343,7 @@ def test_stimuli_per_session_validated_against_total(tmp_path, test_audio_file):
         "instructions": "I",
         "stimuli": {
             "stimuli_per_session": 10,
-            "items": [{"id": "s001", "path": str(test_audio_file)}],
+            "entries": [{"id": "s001", "path": str(test_audio_file)}],
         },
     }
     with pytest.raises(ValueError, match="stimuli_per_session"):
@@ -357,7 +357,7 @@ def test_stimuli_per_session_must_be_at_least_one(tmp_path, test_audio_file):
         "instructions": "I",
         "stimuli": {
             "stimuli_per_session": 0,
-            "items": [{"id": "s001", "path": str(test_audio_file)}],
+            "entries": [{"id": "s001", "path": str(test_audio_file)}],
         },
     }
     with pytest.raises(ValidationError):
@@ -391,4 +391,4 @@ def test_symlink_within_project_is_allowed(tmp_path, test_audio_file, tmp_path_f
     link.symlink_to(external_dir)
     data = stimuli_dirs_data([{"path": str(link)}])
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.items) == 1
+    assert len(result.stimuli.entries) == 1

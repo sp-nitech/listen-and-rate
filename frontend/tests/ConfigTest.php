@@ -46,33 +46,33 @@ final class ConfigTest extends TestCase
 
     // -- sample_stimuli -----------------------------------------------------
 
-    private function stimuliWithTwoSystemsTwoUtterances(): array
+    private function stimuliWithTwoSystemsTwoItems(): array
     {
         return [
-            ['id' => 'A__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'a/u1.wav'],
-            ['id' => 'A__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'a/u2.wav'],
-            ['id' => 'B__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'b/u1.wav'],
-            ['id' => 'B__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'b/u2.wav'],
+            ['id' => 'A__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'a/u1.wav'],
+            ['id' => 'A__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'a/u2.wav'],
+            ['id' => 'B__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'b/u1.wav'],
+            ['id' => 'B__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'b/u2.wav'],
         ];
     }
 
-    public function testSampleStimuliWithUtterancesPerSessionKeepsAllSystemsForChosenUtterance(): void
+    public function testSampleStimuliWithItemsPerSessionKeepsAllSystemsForChosenItem(): void
     {
-        $result = sample_stimuli($this->stimuliWithTwoSystemsTwoUtterances(), null, 1);
+        $result = sample_stimuli($this->stimuliWithTwoSystemsTwoItems(), null, 1);
         $this->assertCount(2, $result);
-        $utterances = array_unique(array_column($result, 'utterance'));
-        $this->assertCount(1, $utterances);
+        $items = array_unique(array_column($result, 'item'));
+        $this->assertCount(1, $items);
     }
 
     public function testSampleStimuliWithStimuliPerSessionPicksExactCount(): void
     {
-        $result = sample_stimuli($this->stimuliWithTwoSystemsTwoUtterances(), 2, null);
+        $result = sample_stimuli($this->stimuliWithTwoSystemsTwoItems(), 2, null);
         $this->assertCount(2, $result);
     }
 
     public function testSampleStimuliReturnsAllWhenNoSamplingConfigured(): void
     {
-        $stimuli = $this->stimuliWithTwoSystemsTwoUtterances();
+        $stimuli = $this->stimuliWithTwoSystemsTwoItems();
         $result = sample_stimuli($stimuli, null, null);
         $this->assertSame($stimuli, $result);
     }
@@ -94,8 +94,8 @@ final class ConfigTest extends TestCase
                 'metadata' => ['title' => 'Listener Information', 'fields' => []],
                 'survey' => ['title' => 'Questionnaire', 'fields' => []],
                 'stimuli_per_session' => null,
-                'utterances_per_session' => 1,
-                'stimuli' => $this->stimuliWithTwoSystemsTwoUtterances(),
+                'items_per_session' => 1,
+                'stimuli' => $this->stimuliWithTwoSystemsTwoItems(),
             ],
             $extra
         );
@@ -109,7 +109,7 @@ final class ConfigTest extends TestCase
         ]);
     }
 
-    public function testBuildConfigResponseAppliesUtterancesPerSession(): void
+    public function testBuildConfigResponseAppliesItemsPerSession(): void
     {
         $response = build_config_response($this->fakeConfigData());
         $this->assertCount(2, $response['stimuli']);
@@ -219,7 +219,7 @@ final class ConfigTest extends TestCase
         $extras = practice_extras(
             ['practice_count' => 2, 'practice_instructions' => 'W.'],
             $pool,
-            fn ($items) => $items
+            fn ($values) => $values
         );
         $this->assertSame('W.', $extras['practice_instructions']);
         $sampled = $extras['practice_trials'];
@@ -235,7 +235,7 @@ final class ConfigTest extends TestCase
         $extras = practice_extras(
             ['practice_count' => 1, 'practice_instructions' => 'W.'],
             ['a'],
-            fn ($items) => $items,
+            fn ($values) => $values,
             'practice_stimuli'
         );
         $this->assertSame(['a'], $extras['practice_stimuli']);
@@ -355,18 +355,18 @@ final class ConfigTest extends TestCase
 
     // -- group_dmos_trials ------------------------------------------------
 
-    private function stimuliWithReferenceAndTwoTestSystemsOneUtterance(): array
+    private function stimuliWithReferenceAndTwoTestSystemsOneItem(): array
     {
         return [
-            ['id' => 'Ref__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true],
-            ['id' => 'B__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false],
-            ['id' => 'C__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'c/u1.wav', 'reference' => false],
+            ['id' => 'Ref__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true],
+            ['id' => 'B__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false],
+            ['id' => 'C__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'c/u1.wav', 'reference' => false],
         ];
     }
 
     public function testGroupDmosTrialsPairsReferenceWithEachTestSystem(): void
     {
-        $trials = group_dmos_trials($this->stimuliWithReferenceAndTwoTestSystemsOneUtterance());
+        $trials = group_dmos_trials($this->stimuliWithReferenceAndTwoTestSystemsOneItem());
         $this->assertCount(2, $trials);
         foreach ($trials as $t) {
             $this->assertSame('Ref__u1', $t['reference']['id']);
@@ -376,38 +376,38 @@ final class ConfigTest extends TestCase
         $this->assertContains('C__u1', $testIds);
     }
 
-    public function testGroupDmosTrialsSkipsUtteranceMissingReference(): void
+    public function testGroupDmosTrialsSkipsItemMissingReference(): void
     {
         $stimuli = [
-            ['id' => 'Ref__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true],
-            ['id' => 'B__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false],
-            ['id' => 'B__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false],
+            ['id' => 'Ref__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true],
+            ['id' => 'B__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false],
+            ['id' => 'B__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false],
         ];
         $trials = group_dmos_trials($stimuli);
         $this->assertCount(1, $trials);
-        $this->assertSame('u1', $trials[0]['reference']['utterance']);
+        $this->assertSame('u1', $trials[0]['reference']['item']);
     }
 
     // -- sample_dmos_trials -----------------------------------------------
 
-    public function testSampleDmosTrialsAppliesUtterancesPerSessionKeepingAllTestSystems(): void
+    public function testSampleDmosTrialsAppliesItemsPerSessionKeepingAllTestSystems(): void
     {
         $stimuli = [
-            ['id' => 'Ref__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true],
-            ['id' => 'B__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false],
-            ['id' => 'C__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'c/u1.wav', 'reference' => false],
-            ['id' => 'Ref__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'ref/u2.wav', 'reference' => true],
-            ['id' => 'B__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false],
-            ['id' => 'C__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'c/u2.wav', 'reference' => false],
+            ['id' => 'Ref__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true],
+            ['id' => 'B__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false],
+            ['id' => 'C__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'c/u1.wav', 'reference' => false],
+            ['id' => 'Ref__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'ref/u2.wav', 'reference' => true],
+            ['id' => 'B__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false],
+            ['id' => 'C__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'c/u2.wav', 'reference' => false],
         ];
         $trials = group_dmos_trials($stimuli);
         $result = sample_dmos_trials($trials, 1);
-        $this->assertCount(2, $result); // 1 utterance x 2 test systems
+        $this->assertCount(2, $result); // 1 item x 2 test systems
     }
 
     public function testSampleDmosTrialsReturnsAllWhenNoLimit(): void
     {
-        $trials = group_dmos_trials($this->stimuliWithReferenceAndTwoTestSystemsOneUtterance());
+        $trials = group_dmos_trials($this->stimuliWithReferenceAndTwoTestSystemsOneItem());
         $result = sample_dmos_trials($trials, null);
         $this->assertCount(2, $result);
     }
@@ -420,8 +420,8 @@ final class ConfigTest extends TestCase
             'shortcuts' => ['rating' => ['1' => 1]],
             'rating_labels' => null,
             'reference_system' => 'Reference',
-            'utterances_per_session' => null,
-            'stimuli' => $this->stimuliWithReferenceAndTwoTestSystemsOneUtterance(),
+            'items_per_session' => null,
+            'stimuli' => $this->stimuliWithReferenceAndTwoTestSystemsOneItem(),
         ]);
     }
 
@@ -463,9 +463,9 @@ final class ConfigTest extends TestCase
     private function stimuliForMushra(): array
     {
         return [
-            ['id' => 'Ref__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true, 'anchor' => false],
-            ['id' => 'B__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false, 'anchor' => false],
-            ['id' => 'Anchor__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'anchor/u1.wav', 'reference' => false, 'anchor' => true],
+            ['id' => 'Ref__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true, 'anchor' => false],
+            ['id' => 'B__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false, 'anchor' => false],
+            ['id' => 'Anchor__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'anchor/u1.wav', 'reference' => false, 'anchor' => true],
         ];
     }
 
@@ -478,24 +478,24 @@ final class ConfigTest extends TestCase
         $this->assertSame(['B__u1'], array_column($trials[0]['systems'], 'id'));
     }
 
-    public function testGroupMushraTrialsSkipsIncompleteUtterance(): void
+    public function testGroupMushraTrialsSkipsIncompleteItem(): void
     {
         $stimuli = [
             ...$this->stimuliForMushra(),
-            ['id' => 'Ref__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'ref/u2.wav', 'reference' => true, 'anchor' => false],
-            ['id' => 'B__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false, 'anchor' => false],
+            ['id' => 'Ref__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'ref/u2.wav', 'reference' => true, 'anchor' => false],
+            ['id' => 'B__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false, 'anchor' => false],
             // u2 is missing the anchor stimulus - incomplete, must be skipped.
         ];
         $trials = group_mushra_trials($stimuli, 2);
         $this->assertCount(1, $trials);
-        $this->assertSame('u1', mushra_trial_utterance($trials[0]));
+        $this->assertSame('u1', mushra_trial_item($trials[0]));
     }
 
     public function testGroupMushraTrialsWithoutReference(): void
     {
         $stimuli = [
-            ['id' => 'A__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'a/u1.wav', 'reference' => false, 'anchor' => false],
-            ['id' => 'B__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false, 'anchor' => false],
+            ['id' => 'A__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'a/u1.wav', 'reference' => false, 'anchor' => false],
+            ['id' => 'B__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false, 'anchor' => false],
         ];
         $trials = group_mushra_trials($stimuli, 2);
         $this->assertCount(1, $trials);
@@ -505,13 +505,13 @@ final class ConfigTest extends TestCase
 
     // -- sample_mushra_trials ---------------------------------------------
 
-    public function testSampleMushraTrialsAppliesUtterancesPerSession(): void
+    public function testSampleMushraTrialsAppliesItemsPerSession(): void
     {
         $stimuli = [
             ...$this->stimuliForMushra(),
-            ['id' => 'Ref__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'ref/u2.wav', 'reference' => true, 'anchor' => false],
-            ['id' => 'B__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false, 'anchor' => false],
-            ['id' => 'Anchor__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'anchor/u2.wav', 'reference' => false, 'anchor' => true],
+            ['id' => 'Ref__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'ref/u2.wav', 'reference' => true, 'anchor' => false],
+            ['id' => 'B__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false, 'anchor' => false],
+            ['id' => 'Anchor__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'anchor/u2.wav', 'reference' => false, 'anchor' => true],
         ];
         $trials = group_mushra_trials($stimuli, 2);
         $result = sample_mushra_trials($trials, 1);
@@ -534,7 +534,7 @@ final class ConfigTest extends TestCase
             'rating_labels' => null,
             'reference_system' => 'Reference',
             'mushra_rateable_system_count' => 2,
-            'utterances_per_session' => null,
+            'items_per_session' => null,
             'stimuli' => $this->stimuliForMushra(),
         ]);
     }
@@ -588,7 +588,7 @@ final class ConfigTest extends TestCase
         ]);
     }
 
-    public function testBuildCmosConfigResponseAppliesUtterancesPerSession(): void
+    public function testBuildCmosConfigResponseAppliesItemsPerSession(): void
     {
         $response = build_cmos_config_response($this->fakeCmosConfigData());
         $this->assertCount(1, $response['trials']);
@@ -631,33 +631,33 @@ final class ConfigTest extends TestCase
 
     // -- group_ab_trials --------------------------------------------------
 
-    public function testGroupAbTrialsPairsByUtterance(): void
+    public function testGroupAbTrialsPairsByItem(): void
     {
-        $trials = group_ab_trials($this->stimuliWithTwoSystemsTwoUtterances());
+        $trials = group_ab_trials($this->stimuliWithTwoSystemsTwoItems());
         $this->assertCount(2, $trials);
         foreach ($trials as $t) {
             $this->assertCount(2, $t['stimuli']);
         }
     }
 
-    public function testGroupAbTrialsDropsUnpairedUtterance(): void
+    public function testGroupAbTrialsDropsUnpairedItem(): void
     {
-        $stimuli = $this->stimuliWithTwoSystemsTwoUtterances();
-        $stimuli[] = ['id' => 'A__u3', 'label' => null, 'utterance' => 'u3', 'audio_url' => 'a/u3.wav'];
+        $stimuli = $this->stimuliWithTwoSystemsTwoItems();
+        $stimuli[] = ['id' => 'A__u3', 'label' => null, 'item' => 'u3', 'audio_url' => 'a/u3.wav'];
         $trials = group_ab_trials($stimuli);
         $this->assertCount(2, $trials);
-        $utterances = array_map(fn ($t) => $t['stimuli'][0]['utterance'], $trials);
-        $this->assertNotContains('u3', $utterances);
+        $items = array_map(fn ($t) => $t['stimuli'][0]['item'], $trials);
+        $this->assertNotContains('u3', $items);
     }
 
-    public function testGroupAbTrialsIncludesUtteranceNamedZero(): void
+    public function testGroupAbTrialsIncludesItemNamedZero(): void
     {
         // PHP's !empty("0") is true (PHP treats the string "0" as "empty"),
-        // unlike Python's `if s.utterance:` which correctly treats "0" as a
-        // non-empty utterance name (listen_and_rate/config.py's build_ab_trials).
+        // unlike Python's `if s.item:` which correctly treats "0" as a
+        // non-empty item name (listen_and_rate/config.py's build_ab_trials).
         $stimuli = [
-            ['id' => 'A__0', 'label' => null, 'utterance' => '0', 'audio_url' => 'a/0.wav'],
-            ['id' => 'B__0', 'label' => null, 'utterance' => '0', 'audio_url' => 'b/0.wav'],
+            ['id' => 'A__0', 'label' => null, 'item' => '0', 'audio_url' => 'a/0.wav'],
+            ['id' => 'B__0', 'label' => null, 'item' => '0', 'audio_url' => 'b/0.wav'],
         ];
         $trials = group_ab_trials($stimuli);
         $this->assertCount(1, $trials);
@@ -665,16 +665,16 @@ final class ConfigTest extends TestCase
 
     // -- sample_ab_trials -------------------------------------------------
 
-    public function testSampleAbTrialsAppliesUtterancesPerSession(): void
+    public function testSampleAbTrialsAppliesItemsPerSession(): void
     {
-        $trials = group_ab_trials($this->stimuliWithTwoSystemsTwoUtterances());
+        $trials = group_ab_trials($this->stimuliWithTwoSystemsTwoItems());
         $result = sample_ab_trials($trials, 1);
         $this->assertCount(1, $result);
     }
 
     public function testSampleAbTrialsReturnsAllWhenNoLimit(): void
     {
-        $trials = group_ab_trials($this->stimuliWithTwoSystemsTwoUtterances());
+        $trials = group_ab_trials($this->stimuliWithTwoSystemsTwoItems());
         $result = sample_ab_trials($trials, null);
         $this->assertCount(2, $result);
     }
@@ -689,7 +689,7 @@ final class ConfigTest extends TestCase
         ]);
     }
 
-    public function testBuildAbConfigResponseAppliesUtterancesPerSession(): void
+    public function testBuildAbConfigResponseAppliesItemsPerSession(): void
     {
         $response = build_ab_config_response($this->fakeAbConfigData());
         $this->assertCount(1, $response['trials']);
@@ -729,7 +729,7 @@ final class ConfigTest extends TestCase
         ]);
     }
 
-    public function testBuildAbxConfigResponseAppliesUtterancesPerSession(): void
+    public function testBuildAbxConfigResponseAppliesItemsPerSession(): void
     {
         $response = build_abx_config_response($this->fakeAbxConfigData());
         $this->assertCount(1, $response['trials']);
@@ -776,12 +776,12 @@ final class ConfigTest extends TestCase
     private function stimuliForXab(): array
     {
         return [
-            ['id' => 'Ref__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true],
-            ['id' => 'A__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'a/u1.wav', 'reference' => false],
-            ['id' => 'B__u1', 'label' => null, 'utterance' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false],
-            ['id' => 'Ref__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'ref/u2.wav', 'reference' => true],
-            ['id' => 'A__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'a/u2.wav', 'reference' => false],
-            ['id' => 'B__u2', 'label' => null, 'utterance' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false],
+            ['id' => 'Ref__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'ref/u1.wav', 'reference' => true],
+            ['id' => 'A__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'a/u1.wav', 'reference' => false],
+            ['id' => 'B__u1', 'label' => null, 'item' => 'u1', 'audio_url' => 'b/u1.wav', 'reference' => false],
+            ['id' => 'Ref__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'ref/u2.wav', 'reference' => true],
+            ['id' => 'A__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'a/u2.wav', 'reference' => false],
+            ['id' => 'B__u2', 'label' => null, 'item' => 'u2', 'audio_url' => 'b/u2.wav', 'reference' => false],
         ];
     }
 
@@ -795,7 +795,7 @@ final class ConfigTest extends TestCase
         }
     }
 
-    public function testGroupXabTrialsSkipsUtteranceMissingReference(): void
+    public function testGroupXabTrialsSkipsItemMissingReference(): void
     {
         $stimuli = array_filter(
             $this->stimuliForXab(),
@@ -806,7 +806,7 @@ final class ConfigTest extends TestCase
         $this->assertSame('Ref__u1', $trials[0]['reference']['id']);
     }
 
-    public function testGroupXabTrialsSkipsUtteranceWithoutTwoTestStimuli(): void
+    public function testGroupXabTrialsSkipsItemWithoutTwoTestStimuli(): void
     {
         $stimuli = array_filter(
             $this->stimuliForXab(),
@@ -825,7 +825,7 @@ final class ConfigTest extends TestCase
         ]);
     }
 
-    public function testBuildXabConfigResponseAppliesUtterancesPerSession(): void
+    public function testBuildXabConfigResponseAppliesItemsPerSession(): void
     {
         $response = build_xab_config_response($this->fakeXabConfigData());
         $this->assertCount(1, $response['trials']);

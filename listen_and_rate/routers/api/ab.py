@@ -8,7 +8,7 @@ from ...config import ABConfig
 from ...models import SubmitRequest
 from ...storage import OUTCOME_A, OUTCOME_B, OUTCOME_TIE, ResultSaver
 from ._shared import (
-    _all_items,
+    _all_stimuli,
     _id_to_meta,
     _pair_config_response,
     _require_non_empty,
@@ -27,7 +27,7 @@ def _submit_ab(body: SubmitRequest, config: ABConfig, saver: ResultSaver) -> dic
     400 if empty, a pair is invalid/unknown, or a disallowed tie.
     """
     _require_non_empty(body.choices, "choices")
-    id_to_meta = _id_to_meta(_all_items(config))
+    id_to_meta = _id_to_meta(_all_stimuli(config))
 
     rows = []
     for choice in body.choices:
@@ -57,7 +57,7 @@ def _submit_ab(body: SubmitRequest, config: ABConfig, saver: ResultSaver) -> dic
             {
                 "system_a": system_a,
                 "system_b": system_b,
-                "utterance": meta1["utterance"],
+                "item": meta1["item"],
                 "winner": winner,
             }
         )

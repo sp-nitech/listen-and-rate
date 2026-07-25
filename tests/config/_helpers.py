@@ -12,7 +12,7 @@ def minimal_config(audio_path: str) -> dict:
         "test_type": "mos",
         "title": "Test",
         "instructions": "Rate the quality.",
-        "stimuli": {"items": [{"id": "s001", "path": audio_path}]},
+        "stimuli": {"entries": [{"id": "s001", "path": audio_path}]},
     }
 
 
@@ -25,23 +25,23 @@ def stimuli_dirs_data(dirs: list[dict], test_type: str = "mos", **kwargs) -> dic
     }
 
 
-def make_system_dirs(tmp_path, test_audio_file, names, utterances=("utt1", "utt2")):
+def make_system_dirs(tmp_path, test_audio_file, names, items=("utt1", "utt2")):
     """Create one audio directory per name in `names`, each with the same files."""
     dirs = []
     for name in names:
         d = tmp_path / name
         d.mkdir()
-        for u in utterances:
+        for u in items:
             shutil.copy(test_audio_file, d / f"{u}.wav")
         dirs.append(d)
     return tuple(dirs)
 
 
-def two_system_dirs(tmp_path, test_audio_file, utterances=("utt1", "utt2")):
-    return make_system_dirs(tmp_path, test_audio_file, ("sys_a", "sys_b"), utterances)
+def two_system_dirs(tmp_path, test_audio_file, items=("utt1", "utt2")):
+    return make_system_dirs(tmp_path, test_audio_file, ("sys_a", "sys_b"), items)
 
 
-def three_system_dirs(tmp_path, test_audio_file, utterances=("utt1", "utt2")):
+def three_system_dirs(tmp_path, test_audio_file, items=("utt1", "utt2")):
     return make_system_dirs(
-        tmp_path, test_audio_file, ("sys_ref", "sys_b", "sys_c"), utterances
+        tmp_path, test_audio_file, ("sys_ref", "sys_b", "sys_c"), items
     )

@@ -80,8 +80,8 @@ def test_generate_mos_report_handles_empty_system_values(tmp_path):
     rows = _with_session_meta(
         "mos",
         [
-            {"system": "", "utterance": "u1", "rating": 4},
-            {"system": "", "utterance": "u2", "rating": 3},
+            {"system": "", "item": "u1", "rating": 4},
+            {"system": "", "item": "u2", "rating": 3},
         ],
     )
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
@@ -295,7 +295,8 @@ def test_generate_mos_report_defaults_to_alphabetical_without_system_order(tmp_p
 
 def test_generate_mos_report_system_order_ignores_unknown_systems(tmp_path):
     """A system_order that omits a system present in the data must not crash -
-    that system falls back to appearing after the ordered ones, alphabetically."""
+    that system falls back to appearing after the ordered ones,
+    alphabetically."""
     rows = _mos_rows(
         [("s1", "Zebra", "u1", 4), ("s1", "Alpha", "u1", 3), ("s1", "Mid", "u1", 2)]
     )

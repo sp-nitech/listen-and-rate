@@ -17,8 +17,8 @@ SESSION_ID = "test-session-001"
 TEST_TYPE = "mos"
 EXPERIMENT_ID = "exp"
 RATINGS = [
-    {"system": "sys_a", "utterance": "utt001", "rating": 4},
-    {"system": "sys_b", "utterance": "utt002", "rating": 3},
+    {"system": "sys_a", "item": "utt001", "rating": 4},
+    {"system": "sys_b", "item": "utt002", "rating": 3},
 ]
 METADATA = {"listener": "Alice", "device": "Headphones"}
 
@@ -34,7 +34,7 @@ def test_csv_saver_writes_correct_header(tmp_path):
         "timestamp",
         "test_type",
         "system",
-        "utterance",
+        "item",
         "rating",
     }
 
@@ -46,7 +46,7 @@ def test_csv_saver_writes_correct_values(tmp_path):
     assert rows[0]["session_id"] == SESSION_ID
     assert rows[0]["test_type"] == TEST_TYPE
     assert rows[0]["system"] == "sys_a"
-    assert rows[0]["utterance"] == "utt001"
+    assert rows[0]["item"] == "utt001"
     assert rows[0]["rating"] == "4"
 
 
@@ -123,8 +123,8 @@ def test_csv_saver_creates_output_directory(tmp_path):
 
 def test_csv_saver_infers_columns_from_ab_row_shape(tmp_path):
     ab_rows = [
-        {"system_a": "A", "system_b": "B", "utterance": "u1", "winner": "a"},
-        {"system_a": "A", "system_b": "B", "utterance": "u2", "winner": "="},
+        {"system_a": "A", "system_b": "B", "item": "u1", "winner": "a"},
+        {"system_a": "A", "system_b": "B", "item": "u2", "winner": "="},
     ]
     CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, "ab", ab_rows)
     rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
@@ -134,7 +134,7 @@ def test_csv_saver_infers_columns_from_ab_row_shape(tmp_path):
         "test_type",
         "system_a",
         "system_b",
-        "utterance",
+        "item",
         "winner",
     ]
     assert rows[0]["winner"] == "a"
@@ -143,8 +143,8 @@ def test_csv_saver_infers_columns_from_ab_row_shape(tmp_path):
 
 def test_csv_saver_infers_columns_from_abx_row_shape(tmp_path):
     abx_rows = [
-        {"system_a": "A", "system_b": "B", "utterance": "u1", "correct": True},
-        {"system_a": "A", "system_b": "B", "utterance": "u2", "correct": False},
+        {"system_a": "A", "system_b": "B", "item": "u1", "correct": True},
+        {"system_a": "A", "system_b": "B", "item": "u2", "correct": False},
     ]
     CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, "abx", abx_rows)
     rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
@@ -154,7 +154,7 @@ def test_csv_saver_infers_columns_from_abx_row_shape(tmp_path):
         "test_type",
         "system_a",
         "system_b",
-        "utterance",
+        "item",
         "correct",
     ]
     # Booleans are written as JSON-style lowercase tokens (matching the JSON
@@ -170,9 +170,7 @@ def test_csv_saver_refuses_to_overwrite_existing_session(tmp_path):
         encoding="utf-8"
     )
     with pytest.raises(ResultExistsError):
-        saver.save(
-            SESSION_ID, TEST_TYPE, [{"system": "x", "utterance": "y", "rating": 1}]
-        )
+        saver.save(SESSION_ID, TEST_TYPE, [{"system": "x", "item": "y", "rating": 1}])
     # The collected data must be left untouched.
     assert (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").read_text(
         encoding="utf-8"
@@ -196,7 +194,7 @@ def test_json_saver_correct_values(tmp_path):
         "ratings",
         "metadata",
     } <= data.keys()
-    assert data["ratings"][0] == {"system": "sys_a", "utterance": "utt001", "rating": 4}
+    assert data["ratings"][0] == {"system": "sys_a", "item": "utt001", "rating": 4}
     assert data["metadata"] == {}
 
 
@@ -248,9 +246,7 @@ def test_json_saver_refuses_to_overwrite_existing_session(tmp_path):
         encoding="utf-8"
     )
     with pytest.raises(ResultExistsError):
-        saver.save(
-            SESSION_ID, TEST_TYPE, [{"system": "x", "utterance": "y", "rating": 1}]
-        )
+        saver.save(SESSION_ID, TEST_TYPE, [{"system": "x", "item": "y", "rating": 1}])
     assert (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(
         encoding="utf-8"
     ) == original

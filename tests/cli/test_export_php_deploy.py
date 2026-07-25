@@ -51,18 +51,18 @@ def _config_with_systems(tmp_path, test_audio_file) -> Path:
             "title": "T",
             "instructions": "I",
             "stimuli": {
-                "items": [
+                "entries": [
                     {
                         "id": "s001",
                         "path": str(test_audio_file),
                         "system": "System A",
-                        "utterance": "utt1",
+                        "item": "utt1",
                     },
                     {
                         "id": "s002",
                         "path": str(test_audio_file),
                         "system": "System B",
-                        "utterance": "utt1",
+                        "item": "utt1",
                     },
                 ]
             },
@@ -97,7 +97,7 @@ def test_export_invalid_config_exits_without_pydantic_url(
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"items": [{"id": "s001", "path": "/tmp/nonexistent.wav"}]},
+        "stimuli": {"entries": [{"id": "s001", "path": "/tmp/nonexistent.wav"}]},
         **mutation,
     }
     config_yaml = write_config(tmp_path, config)
@@ -167,7 +167,7 @@ def test_export_php_deploy_config_data_includes_session_sampling_params(
         "title": "T",
         "instructions": "I",
         "stimuli_dirs": {
-            "utterances_per_session": 1,
+            "items_per_session": 1,
             "systems": [{"path": "placeholder"}],
         },
     }
@@ -180,7 +180,7 @@ def test_export_php_deploy_config_data_includes_session_sampling_params(
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
-    assert "'utterances_per_session' => 1" in text
+    assert "'items_per_session' => 1" in text
     assert "'stimuli_per_session' => null" in text
     # config.php re-applies presentation_order per request, so the bundle must
     # carry it (defaulting to "random").
@@ -205,7 +205,7 @@ def test_export_php_deploy_config_data_includes_survey_fields(
                 }
             ]
         },
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
@@ -229,7 +229,7 @@ def test_export_php_deploy_config_data_includes_practice_params(
         "instructions": "I",
         "practice": {"count": 2, "instructions": "Warm-up."},
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": f"s{i:03d}", "path": str(test_audio_file)} for i in range(3)
             ]
         },
@@ -510,7 +510,8 @@ def test_export_php_deploy_config_data_includes_audio_preload(
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
     assert "'audio_preload' => 'auto'" in text
-    # Clip durations are baked in so config.php can serve them without soundfile.
+    # Clip durations are baked in so config.php can serve them without
+    # soundfile.
     assert "'durations' => [" in text
     assert "'s001' => 0.1" in text
 
@@ -520,7 +521,7 @@ def _config_with_output_path(tmp_path, test_audio_file, output_path=None) -> Pat
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     if output_path is not None:
         config["output"] = {"format": "csv", "path": output_path}
@@ -582,8 +583,8 @@ def test_export_php_deploy_writes_stimulus_map_php(
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "stimulus_map.php").read_text(encoding="utf-8")
     assert text.startswith("<?php")
-    assert "'s001' => ['system' => 'System A', 'utterance' => 'utt1']" in text
-    assert "'s002' => ['system' => 'System B', 'utterance' => 'utt1']" in text
+    assert "'s001' => ['system' => 'System A', 'item' => 'utt1']" in text
+    assert "'s002' => ['system' => 'System B', 'item' => 'utt1']" in text
 
 
 def test_export_php_deploy_requires_outdir_arg(config_yaml, monkeypatch):
@@ -687,7 +688,8 @@ def test_export_php_deploy_overwrite_regenerates_copied_audio(
     config_yaml, tmp_path, test_audio_file, monkeypatch
 ):
     """A --copy-audio bundle can be regenerated with --overwrite (the copied
-    files are reproducible clutter, cleared and rewritten like everything else)."""
+    files are reproducible clutter, cleared and rewritten like everything
+    else)."""
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch, copy_audio=True)
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True, copy_audio=True)
@@ -710,7 +712,7 @@ def test_export_normalizes_audio_into_bundle_as_real_wav(tmp_path, monkeypatch):
         "title": "T",
         "instructions": "I",
         "loudness_normalization": {"target": -20.0, "scope": "stimulus"},
-        "stimuli": {"items": [{"id": "s001", "path": str(sine)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(sine)}]},
     }
     outdir = tmp_path / "deploy"
     _run_export(write_config(tmp_path, config), outdir, monkeypatch)
@@ -739,7 +741,7 @@ def test_export_normalize_converts_non_wav_input_to_wav(tmp_path, monkeypatch):
         "title": "T",
         "instructions": "I",
         "loudness_normalization": {"target": -20.0},
-        "stimuli": {"items": [{"id": "s001", "path": str(tmp_path / "clip.mp3")}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(tmp_path / "clip.mp3")}]},
     }
     outdir = tmp_path / "deploy"
     _run_export(write_config(tmp_path, config), outdir, monkeypatch)
@@ -793,13 +795,13 @@ def test_export_php_deploy_overwrite_preserves_existing_results_directory(
     results_dir.mkdir(parents=True)
     collected = results_dir / "real-listener-session.csv"
     collected.write_text(
-        "session_id,timestamp,test_type,system,utterance,rating\n", encoding="utf-8"
+        "session_id,timestamp,test_type,system,item,rating\n", encoding="utf-8"
     )
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
     assert collected.is_file()
     assert (
         collected.read_text(encoding="utf-8")
-        == "session_id,timestamp,test_type,system,utterance,rating\n"
+        == "session_id,timestamp,test_type,system,item,rating\n"
     )
     assert (outdir / "config_data.php").is_file()
 

@@ -5,8 +5,7 @@ test_type: dmos
 title: "Audio Degradation Evaluation"
 
 instructions: |
-  You will hear a Reference sample followed by a Test sample of the same
-  utterance.
+  You will hear a Reference sample followed by a Test sample of the same item.
   Listen to both completely, then rate how much the Test sample is degraded
   relative to the Reference on a scale from 1 (Very annoying) to
   5 (Imperceptible).
@@ -33,7 +32,7 @@ output:
 # DMOS tests compare one reference system against one or more test systems,
 # defined via directories. Exactly one system must be flagged `reference: true`.
 stimuli_dirs:
-  utterances_per_session: 1 # optional: present N randomly chosen utterances per listener
+  items_per_session: 2 # optional: present N randomly chosen items per listener
   systems:
     - path: ./stimuli/examples/A
       reference: true
@@ -58,7 +57,7 @@ stimuli_dirs:
 #   per_system:
 #     threshold: .inf
 #     verbose: true
-#   per_stimulus:
+#   per_item:
 #     threshold: 1.0
 #     verbose: false
 
@@ -69,7 +68,7 @@ stimuli_dirs:
 # the check is the gate). `scope: stimulus` (default) brings every clip to the
 # same loudness; `scope: system` applies one gain per system so the system's
 # mean reaches target, preserving the natural loudness differences between
-# utterances within a system.
+# items within a system.
 # loudness_normalization:
 #   target: -23.0
 #   scope: stimulus

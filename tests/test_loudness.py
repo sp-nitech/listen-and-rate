@@ -9,8 +9,8 @@ import sys
 import pytest
 
 from listen_and_rate.loudness import (
+    per_item_spreads,
     per_system_stats,
-    per_utterance_spreads,
     system_mean_range,
 )
 
@@ -41,13 +41,13 @@ def test_system_mean_range_none_with_fewer_than_two_systems():
     assert system_mean_range(per_system_stats(rows)) is None
 
 
-def test_per_utterance_spreads_only_multi_system_utterances():
+def test_per_item_spreads_only_multi_system_items():
     rows = [
         ("A", "u1", -20.0),
         ("B", "u1", -23.0),  # u1 present in A and B -> spread 3.0
         ("A", "u2", -20.0),  # u2 only in A -> excluded (no cross-system spread)
     ]
-    spreads = per_utterance_spreads(rows)
+    spreads = per_item_spreads(rows)
     assert set(spreads) == {"u1"}
     spread, by_system = spreads["u1"]
     assert spread == pytest.approx(3.0)
@@ -346,8 +346,8 @@ def test_normalize_scope_system_matches_means_and_preserves_within_system(tmp_pa
         {"target": -20.0, "scope": "system"},
         {"A": [("utt1", 0.1), ("utt2", 0.6)], "B": [("utt1", 0.3), ("utt2", 0.3)]},
     )
-    by_id = {s.id: s for s in config.stimuli.items}
-    a_ids = [s.id for s in config.stimuli.items if s.system == "A"]
+    by_id = {s.id: s for s in config.stimuli.entries}
+    a_ids = [s.id for s in config.stimuli.entries if s.system == "A"]
     orig = {sid: measure_loudness(by_id[sid].path) for sid in a_ids}
 
     out = tmp_path / "normalized"
@@ -358,7 +358,7 @@ def test_normalize_scope_system_matches_means_and_preserves_within_system(tmp_pa
 
     # System A's mean lands on target...
     assert sum(new.values()) / len(new) == pytest.approx(-20.0, abs=0.5)
-    # ...but the within-system difference between utterances is preserved
+    # ...but the within-system difference between items is preserved
     # (one gain per system, not per clip).
     d_orig = orig[a_ids[0]] - orig[a_ids[1]]
     d_new = new[a_ids[0]] - new[a_ids[1]]

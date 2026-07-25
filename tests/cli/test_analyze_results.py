@@ -27,7 +27,7 @@ CSV_ROWS = [
         "timestamp": "2026-01-01",
         "test_type": "mos",
         "system": "A",
-        "utterance": "u1",
+        "item": "u1",
         "rating": 4,
     },
     {
@@ -35,7 +35,7 @@ CSV_ROWS = [
         "timestamp": "2026-01-01",
         "test_type": "mos",
         "system": "B",
-        "utterance": "u1",
+        "item": "u1",
         "rating": 3,
     },
 ]
@@ -123,7 +123,7 @@ def test_analyze_results_derives_results_dir_from_config(
             "title": "T",
             "instructions": "I",
             "output": {"format": "csv", "path": str(tmp_path / "results")},
-            "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     results_dir = tmp_path / "results" / config_yaml.stem
@@ -147,7 +147,7 @@ def test_analyze_results_derived_dir_without_files_raises(
             "title": "T",
             "instructions": "I",
             "output": {"format": "csv", "path": str(tmp_path / "results")},
-            "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     with pytest.raises(FileNotFoundError):
@@ -180,7 +180,7 @@ def test_analyze_results_root_resolves_output_path_under_root(
             # A non-default relative output.path proves --root resolution
             # honors output.path rather than assuming a "results" name.
             "output": {"format": "csv", "path": "./collected/"},
-            "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     deploy_root = tmp_path / "somewhere"
@@ -207,7 +207,7 @@ def test_analyze_results_root_with_absolute_output_path_exits_with_usage_error(
             "title": "T",
             "instructions": "I",
             "output": {"format": "csv", "path": str(tmp_path / "results")},
-            "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     with pytest.raises(SystemExit) as excinfo:
@@ -233,7 +233,7 @@ def test_analyze_results_root_with_positional_results_exits_with_usage_error(
             "title": "T",
             "instructions": "I",
             "output": {"format": "csv", "path": str(tmp_path / "results")},
-            "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
@@ -288,7 +288,7 @@ def test_analyze_results_config_flag_orders_systems(
             "timestamp": "t",
             "test_type": "mos",
             "system": "Zebra",
-            "utterance": "u1",
+            "item": "u1",
             "rating": 4,
         },
         {
@@ -296,7 +296,7 @@ def test_analyze_results_config_flag_orders_systems(
             "timestamp": "t",
             "test_type": "mos",
             "system": "Alpha",
-            "utterance": "u1",
+            "item": "u1",
             "rating": 3,
         },
     ]
@@ -399,7 +399,7 @@ def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):
             "test_type": "mos",
             "metadata_device": device,
             "system": system,
-            "utterance": "u1",
+            "item": "u1",
             "rating": rating,
         }
         for sid, device, ratings in [

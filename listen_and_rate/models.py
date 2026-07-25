@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-class RatingItem(BaseModel):
+class RatingEntry(BaseModel):
     """A single rating submitted by a listener.
 
     On its own for MOS, or relative to a reference stimulus for DMOS.
@@ -16,7 +16,7 @@ class RatingItem(BaseModel):
     rating: int
 
 
-class ChoiceItem(BaseModel):
+class ChoiceEntry(BaseModel):
     """A single AB/ABX/CMOS trial's outcome submitted by a listener.
 
     stimulus_ids is the pair of stimuli shown for this trial.
@@ -41,7 +41,7 @@ class SubmitRequest(BaseModel):
 
     session_id: str
     test_type: str
-    ratings: list[RatingItem] = Field(default_factory=list)  # MOS, DMOS, MUSHRA
-    choices: list[ChoiceItem] = Field(default_factory=list)  # CMOS, AB, ABX, XAB
+    ratings: list[RatingEntry] = Field(default_factory=list)  # MOS, DMOS, MUSHRA
+    choices: list[ChoiceEntry] = Field(default_factory=list)  # CMOS, AB, ABX, XAB
     metadata: dict[str, str] = Field(default_factory=dict)  # pre-test form answers
     survey: dict[str, str] = Field(default_factory=dict)  # post-test form answers

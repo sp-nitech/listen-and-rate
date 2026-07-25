@@ -21,16 +21,16 @@ from .errors import format_config_error
 
 # stimuli_filter's fixed key allowlist: the stimulus-side result columns. This
 # is what keeps outcome columns (rating/winner/...) structurally unfilterable.
-_STIMULI_FILTER_KEYS = {"utterance", "system"}
+_STIMULI_FILTER_KEYS = {"item", "system"}
 
 
 def _coerce_filter_values_to_str(v: object) -> object:
-    """Coerce bare numeric YAML filter values (scalars or list items) to str."""
+    """Coerce bare numeric YAML filter values (scalars or list elements) to str."""
     if not isinstance(v, dict):
         return v
     return {
         key: (
-            [_coerce_scalar_to_str(item) for item in value]
+            [_coerce_scalar_to_str(x) for x in value]
             if isinstance(value, list)
             else _coerce_scalar_to_str(value)
         )
@@ -48,7 +48,7 @@ class ReportGroupConfig(_StrictModel):
     survey_filter keys name post-test survey fields (both session-level: a
     non-matching session's rows all drop; the blocks are kept strictly apart
     via the stored metadata_/survey_ column prefixes); stimuli_filter keys
-    name stimulus-side columns - utterance or system - and drop individual
+    name stimulus-side columns - item or system - and drop individual
     trial rows.
     """
 

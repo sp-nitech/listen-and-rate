@@ -29,7 +29,7 @@ def test_submit_happy_path(client, config_yaml):
     assert res.json()["status"] == "ok"
     rows = list(csv.DictReader((results_dir / "config" / "sess-ok.csv").open()))
     assert "system" in rows[0]
-    assert "utterance" in rows[0]
+    assert "item" in rows[0]
     assert "stimulus_id" not in rows[0]
 
 
@@ -55,7 +55,7 @@ def test_submit_writes_json_when_format_is_json(tmp_path, test_audio_file, monke
         "instructions": "I",
         "output": {"format": "json", "path": str(tmp_path / "results")},
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
             ]
@@ -139,7 +139,7 @@ def _client_with_metadata_config(
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
             ]
@@ -294,7 +294,7 @@ def test_submit_survey_saved_as_json_object(tmp_path, test_audio_file, monkeypat
         "instructions": "I",
         "output": {"format": "json", "path": str(tmp_path / "results")},
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
             ]
@@ -318,7 +318,7 @@ def test_submit_strips_unknown_metadata_keys(tmp_path, test_audio_file, monkeypa
         "instructions": "I",
         "output": {"format": "json", "path": str(tmp_path / "results")},
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
             ]

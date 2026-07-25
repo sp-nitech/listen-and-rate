@@ -30,7 +30,8 @@ from ...storage import ResultSaver
 
 T = TypeVar("T")
 
-# Text form values. Kept in sync with frontend/js/metadata.js and frontend/save.php.
+# Text form values. Kept in sync with frontend/js/metadata.js and
+# frontend/save.php.
 _METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9.-]+$")
 
 
@@ -69,54 +70,53 @@ def _validate_metadata(
     return sanitized
 
 
-def _all_items(config: Config) -> list[StimulusConfig]:
+def _all_stimuli(config: Config) -> list[StimulusConfig]:
     """Return the config's full stimulus list ([] when none is resolved)."""
-    return config.stimuli.items if config.stimuli else []
+    return config.stimuli.entries if config.stimuli else []
 
 
-def _id_to_meta(all_items: list[StimulusConfig]) -> dict[str, dict[str, str]]:
-    """Build the id → {system, utterance} lookup shared by every _submit_* validator."""
+def _id_to_meta(all_stimuli: list[StimulusConfig]) -> dict[str, dict[str, str]]:
+    """Build the id → {system, item} lookup shared by every _submit_* validator."""
     return {
-        s.id: {"system": s.system or "", "utterance": s.utterance or s.id}
-        for s in all_items
+        s.id: {"system": s.system or "", "item": s.item or s.id} for s in all_stimuli
     }
 
 
-def _sample_keep_order(items: list[T], n: int) -> list[T]:
-    """Randomly select n items, preserving their original relative order.
+def _sample_keep_order(values: list[T], n: int) -> list[T]:
+    """Randomly select n values, preserving their original relative order.
 
-    random.sample() alone returns items in random order, which would ignore
+    random.sample() alone returns values in random order, which would ignore
     presentation_order="fixed"'s "keep the configured order" contract (the
     later shuffle applies it for "random"); mirrors frontend/config.php's
     sample_keep_order().
     """
-    n = min(n, len(items))
-    indices = sorted(random.sample(range(len(items)), n))
-    return [items[i] for i in indices]
+    n = min(n, len(values))
+    indices = sorted(random.sample(range(len(values)), n))
+    return [values[i] for i in indices]
 
 
-class _UtteranceTrial(Protocol):
-    """Structural type for whole-utterance-sampled trials (DMOSTrial, MUSHRATrial)."""
+class _ItemTrial(Protocol):
+    """Structural type for whole-item-sampled trials (DMOSTrial, MUSHRATrial)."""
 
     @property
-    def utterance(self) -> str:
-        """The utterance this trial belongs to."""
+    def item(self) -> str:
+        """The item this trial belongs to."""
         ...
 
 
-TrialT = TypeVar("TrialT", bound=_UtteranceTrial)
+TrialT = TypeVar("TrialT", bound=_ItemTrial)
 
 
-def _sample_trials_by_utterance(trials: list[TrialT], n: int) -> list[TrialT]:
-    """Randomly select n whole utterances, keeping every trial of each chosen one.
+def _sample_trials_by_item(trials: list[TrialT], n: int) -> list[TrialT]:
+    """Randomly select n whole items, keeping every trial of each chosen one.
 
-    Shared by DMOS and MUSHRA, whose utterances_per_session samples utterances
+    Shared by DMOS and MUSHRA, whose items_per_session samples items
     rather than individual trials; relative trial order is preserved
     (see _sample_keep_order).
     """
-    utterances = list(dict.fromkeys(t.utterance for t in trials))
-    selected = set(_sample_keep_order(utterances, n))
-    return [t for t in trials if t.utterance in selected]
+    items = list(dict.fromkeys(t.item for t in trials))
+    selected = set(_sample_keep_order(items, n))
+    return [t for t in trials if t.item in selected]
 
 
 def _config_version(config: Config) -> str:
@@ -191,9 +191,9 @@ def _practice_extras(
     }
 
 
-def _require_non_empty(items: list, name: str) -> None:
+def _require_non_empty(values: list, name: str) -> None:
     """Raise HTTPException(400) if the submitted ratings/choices list is empty."""
-    if not items:
+    if not values:
         raise HTTPException(status_code=400, detail=f"{name} must be a non-empty list")
 
 
@@ -224,7 +224,7 @@ def _validate_pair(
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Validate a submitted stimulus_ids pair.
 
-    Exactly 2 known ids, same utterance, different system.
+    Exactly 2 known ids, same item, different system.
     """
     if len(stimulus_ids) != 2:
         raise HTTPException(
@@ -237,7 +237,7 @@ def _validate_pair(
     if meta1 is None or meta2 is None:
         unknown = sorted(i for i in (id1, id2) if i not in id_to_meta)
         raise HTTPException(status_code=400, detail=f"Unknown stimulus IDs: {unknown}")
-    if meta1["utterance"] != meta2["utterance"] or meta1["system"] == meta2["system"]:
+    if meta1["item"] != meta2["item"] or meta1["system"] == meta2["system"]:
         raise HTTPException(
             status_code=400,
             detail=f"stimulus_ids do not form a valid {type_label} trial "
@@ -247,13 +247,13 @@ def _validate_pair(
 
 
 def _build_response_trials(
-    config: CMOSConfig | ABConfig | ABXConfig, all_items: list[StimulusConfig]
+    config: CMOSConfig | ABConfig | ABXConfig, all_stimuli: list[StimulusConfig]
 ) -> list[ABTrial]:
     """Pair and sample the trial list shared by CMOS's, AB's, and ABX's /api/config."""
-    trials = build_ab_trials(all_items)
+    trials = build_ab_trials(all_stimuli)
 
-    # Per-session sampling (trial = one utterance's pair of stimuli)
-    n = config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
+    # Per-session sampling (trial = one item's pair of stimuli)
+    n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
     if n is not None:
         trials = _sample_keep_order(trials, n)
     if config.shuffle_order:
@@ -281,14 +281,14 @@ def _pair_trials_to_response(
 
 def _pair_config_response(config: CMOSConfig | ABConfig, **type_extras: object) -> dict:
     """Build the full /api/config response shared by CMOS and AB."""
-    all_items = _all_items(config)
-    id_to_label = {s.id: s.label for s in all_items}
+    all_stimuli = _all_stimuli(config)
+    id_to_label = {s.id: s.label for s in all_stimuli}
     trials = _pair_trials_to_response(
-        _build_response_trials(config, all_items), id_to_label
+        _build_response_trials(config, all_stimuli), id_to_label
     )
     extras = _practice_extras(
         config,
-        build_ab_trials(all_items),
+        build_ab_trials(all_stimuli),
         lambda ts: _pair_trials_to_response(ts, id_to_label),
     )
     return _test_config_response(config, trials=trials, **type_extras, **extras)

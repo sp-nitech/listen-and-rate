@@ -1,7 +1,7 @@
 /**
  * AB (paired forced-choice preference) listening test UI.
  *
- * Displays one trial (a pair of same-utterance samples from two systems) per
+ * Displays one trial (a pair of same-item samples from two systems) per
  * page. Listeners must play both clips to completion before the choice
  * buttons become active (playback-gated choice), mirroring MOSTest's UX.
  * Sample position within a trial is already randomized server-side, so the
@@ -37,10 +37,6 @@ export class ABTest extends PairedTrialTest {
   }
 
   // -- build-once structure -------------------------------------------------
-
-  _stimulusLabel(current) {
-    return `Audio Pair ${current}`;
-  }
 
   _listenStepsHtml() {
     return `

@@ -1,7 +1,7 @@
 /**
  * CMOS (comparative MOS / ITU-T P.800 CCR) listening test UI.
  *
- * Displays one trial (a pair of same-utterance samples from two systems) per
+ * Displays one trial (a pair of same-item samples from two systems) per
  * page, labeled purely positionally ("A"/"B") like ABTest - never system
  * names, since which system plays in which position is randomized
  * server-side per trial. Listeners must play both clips to completion before
@@ -65,10 +65,6 @@ export class CMOSTest extends PairedTrialTest {
   }
 
   // -- build-once structure -------------------------------------------------
-
-  _stimulusLabel(current) {
-    return `Audio Pair ${current}`;
-  }
 
   _listenStepsHtml() {
     return `

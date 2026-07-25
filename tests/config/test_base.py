@@ -41,11 +41,11 @@ def test_stimulus_config_system_bare_number_is_coerced_to_str(
         "title": "T",
         "instructions": "I",
         "stimuli": {
-            "items": [{"id": "s001", "path": str(test_audio_file), "system": 1}]
+            "entries": [{"id": "s001", "path": str(test_audio_file), "system": 1}]
         },
     }
     result = load_config(write_config(tmp_path, data))
-    assert result.stimuli.items[0].system == "1"
+    assert result.stimuli.entries[0].system == "1"
 
 
 def test_stimulus_config_label_bare_number_is_coerced_to_str(tmp_path, test_audio_file):
@@ -54,11 +54,11 @@ def test_stimulus_config_label_bare_number_is_coerced_to_str(tmp_path, test_audi
         "title": "T",
         "instructions": "I",
         "stimuli": {
-            "items": [{"id": "s001", "path": str(test_audio_file), "label": 2}]
+            "entries": [{"id": "s001", "path": str(test_audio_file), "label": 2}]
         },
     }
     result = load_config(write_config(tmp_path, data))
-    assert result.stimuli.items[0].label == "2"
+    assert result.stimuli.entries[0].label == "2"
 
 
 def test_stimuli_dirs_system_list_value_still_rejected(tmp_path, test_audio_file):
@@ -148,7 +148,7 @@ def test_stimuli_and_stimuli_dirs_mutually_exclusive(tmp_path, test_audio_file):
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         "stimuli_dirs": {"systems": [{"path": str(d)}]},
     }
     with pytest.raises(ValidationError, match="mutually exclusive"):
@@ -447,20 +447,20 @@ def test_loudness_check_empty_subblock_enables_with_defaults(tmp_path, test_audi
     assert result.loudness_check.per_system is not None
     assert result.loudness_check.per_system.threshold == 1.0
     assert result.loudness_check.per_system.verbose is False
-    assert result.loudness_check.per_stimulus is None
+    assert result.loudness_check.per_item is None
 
 
 def test_loudness_check_parses_both_criteria(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
     data["loudness_check"] = {
         "per_system": {"threshold": 2.0, "verbose": True},
-        "per_stimulus": {"threshold": 0.5},
+        "per_item": {"threshold": 0.5},
     }
     result = load_config(write_config(tmp_path, data))
     assert result.loudness_check.per_system.threshold == 2.0
     assert result.loudness_check.per_system.verbose is True
-    assert result.loudness_check.per_stimulus.threshold == 0.5
-    assert result.loudness_check.per_stimulus.verbose is False
+    assert result.loudness_check.per_item.threshold == 0.5
+    assert result.loudness_check.per_item.verbose is False
 
 
 def test_loudness_check_rejects_non_positive_threshold(tmp_path, test_audio_file):
@@ -511,7 +511,7 @@ def test_loudness_normalization_rejects_non_negative_target(
 
 def test_loudness_normalization_rejects_invalid_scope(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
-    data["loudness_normalization"] = {"scope": "utterance"}
+    data["loudness_normalization"] = {"scope": "item"}
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
 

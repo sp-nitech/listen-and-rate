@@ -18,7 +18,7 @@ class MUSHRAConfig(RatingLabelsConfigMixin, BaseTestConfig):
 
     Rates every non-reference system (test systems and, optionally, one
     disclosed anchor) on a single 0-100 slider per system, in one trial per
-    utterance. Unlike DMOS, both the reference and the anchor are optional
+    item. Unlike DMOS, both the reference and the anchor are optional
     (0 or 1 each) rather than mandatory, and every non-reference system is
     rated together in one trial instead of pairing the reference against one
     test system at a time.
@@ -103,33 +103,33 @@ class MUSHRAConfig(RatingLabelsConfigMixin, BaseTestConfig):
 
 @dataclass(frozen=True)
 class MUSHRATrial:
-    """One MUSHRA trial: all rateable systems' clips for one utterance."""
+    """One MUSHRA trial: all rateable systems' clips for one item."""
 
-    utterance: str
+    item: str
     reference_id: str | None
     system_ids: tuple[tuple[str, str], ...]  # ((system, stimulus_id), ...)
 
 
 def build_mushra_trials(
-    items: list[StimulusConfig],
+    stimuli: list[StimulusConfig],
     reference_system: str | None,
     rateable_systems: set[str],
 ) -> list[MUSHRATrial]:
-    """Group stimuli into one MUSHRA trial per utterance.
+    """Group stimuli into one MUSHRA trial per item.
 
     A trial requires every system in `rateable_systems` to have a stimulus
-    for that utterance; utterances missing one are silently skipped,
+    for that item; items missing one are silently skipped,
     mirroring build_ab_trials()/build_dmos_trials(). The reference's
-    stimulus, if `reference_system` is set and present for that utterance,
+    stimulus, if `reference_system` is set and present for that item,
     is attached as reference_id; its absence does not skip the trial.
     """
-    by_utterance: dict[str, list[StimulusConfig]] = {}
-    for s in items:
-        if s.utterance:
-            by_utterance.setdefault(s.utterance, []).append(s)
+    by_item: dict[str, list[StimulusConfig]] = {}
+    for s in stimuli:
+        if s.item:
+            by_item.setdefault(s.item, []).append(s)
 
     trials = []
-    for utterance, group in sorted(by_utterance.items()):
+    for item, group in sorted(by_item.items()):
         by_system = {s.system or "": s for s in group}
         if not rateable_systems <= by_system.keys():
             continue
@@ -141,7 +141,7 @@ def build_mushra_trials(
         )
         trials.append(
             MUSHRATrial(
-                utterance=utterance,
+                item=item,
                 reference_id=reference_stimulus.id if reference_stimulus else None,
                 system_ids=system_ids,
             )

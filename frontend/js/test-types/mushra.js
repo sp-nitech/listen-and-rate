@@ -1,7 +1,7 @@
 /**
  * MUSHRA (ITU-R BS.1534) listening test UI.
  *
- * Displays one trial (all rateable systems' clips for one utterance, plus
+ * Displays one trial (all rateable systems' clips for one item, plus
  * an optional Reference clip) per page, with one vertical 0-100 slider per
  * rateable system, all laid out in a single horizontal row alongside a
  * shared tick/band-label axis (rendered once, not per slider). The
@@ -204,7 +204,6 @@ export class MUSHRATest extends PairedTrialTest {
       <div class="stimulus-page">
         <div class="stimulus-meta">
           <span class="page-counter"></span>
-          <span class="stimulus-label"></span>
         </div>
         ${stepsHtml}
         <div class="mushra-trial">
@@ -222,7 +221,6 @@ export class MUSHRATest extends PairedTrialTest {
 
     this._el = {
       counter: this._pageSlot.querySelector('.page-counter'),
-      label: this._pageSlot.querySelector('.stimulus-label'),
       steps: this._pageSlot.querySelector('.listen-steps'),
       sliderCols: [...this._pageSlot.querySelectorAll('.mushra-slider-col')],
       referenceAudio: this._pageSlot.querySelector('.mushra-reference-col audio'),
@@ -389,7 +387,6 @@ export class MUSHRATest extends PairedTrialTest {
     const rated = this.choices.get(this.currentIndex);
 
     this._el.counter.textContent = `${practiceCounterPrefix(this.config)}${current} / ${total}`;
-    this._el.label.textContent = `Audio Set ${current}`;
 
     if (this._el.referenceAudio) {
       const url = this._audioUrl(trial.reference);

@@ -163,7 +163,7 @@ def test_cmos_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_fi
         "test_type": "cmos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))

@@ -10,7 +10,7 @@ from ...config import MOSConfig, StimulusConfig
 from ...models import SubmitRequest
 from ...storage import ResultSaver
 from ._shared import (
-    _all_items,
+    _all_stimuli,
     _id_to_meta,
     _practice_extras,
     _require_non_empty,
@@ -20,33 +20,33 @@ from ._shared import (
 )
 
 
-def _stimuli_to_response(items: list[StimulusConfig]) -> list[dict]:
+def _stimuli_to_response(stimuli: list[StimulusConfig]) -> list[dict]:
     """Map stimuli to their blinded (id/label only) response shape."""
-    return [{"id": s.id, "label": s.label} for s in items]
+    return [{"id": s.id, "label": s.label} for s in stimuli]
 
 
 def _get_mos_test_config(config: MOSConfig) -> dict:
-    all_items = _all_items(config)
+    all_stimuli = _all_stimuli(config)
 
     # Per-session sampling
-    if config.stimuli_dirs and config.stimuli_dirs.utterances_per_session is not None:
-        n = config.stimuli_dirs.utterances_per_session
-        utterances = list({s.utterance for s in all_items if s.utterance})
-        selected = set(random.sample(utterances, n))
-        items = [s for s in all_items if s.utterance in selected]
+    if config.stimuli_dirs and config.stimuli_dirs.items_per_session is not None:
+        n = config.stimuli_dirs.items_per_session
+        items = list({s.item for s in all_stimuli if s.item})
+        selected = set(random.sample(items, n))
+        selected_stimuli = [s for s in all_stimuli if s.item in selected]
     elif config.stimuli and config.stimuli.stimuli_per_session is not None:
         n = config.stimuli.stimuli_per_session
-        items = _sample_keep_order(all_items, n)
+        selected_stimuli = _sample_keep_order(all_stimuli, n)
     else:
-        items = list(all_items)
+        selected_stimuli = list(all_stimuli)
 
     if config.shuffle_order:
-        items = random.sample(items, len(items))
+        selected_stimuli = random.sample(selected_stimuli, len(selected_stimuli))
 
-    stimuli = _stimuli_to_response(items)
+    stimuli = _stimuli_to_response(selected_stimuli)
 
     extras = _practice_extras(
-        config, all_items, _stimuli_to_response, key="practice_stimuli"
+        config, all_stimuli, _stimuli_to_response, key="practice_stimuli"
     )
     return _test_config_response(
         config, stimuli=stimuli, rating_labels=config.rating_labels, **extras
@@ -59,7 +59,7 @@ def _submit_mos(body: SubmitRequest, config: MOSConfig, saver: ResultSaver) -> d
     400 if empty, a stimulus ID is unknown, or a rating is outside 1-5.
     """
     _require_non_empty(body.ratings, "ratings")
-    id_to_meta = _id_to_meta(_all_items(config))
+    id_to_meta = _id_to_meta(_all_stimuli(config))
 
     unknown = {r.stimulus_id for r in body.ratings} - id_to_meta.keys()
     if unknown:

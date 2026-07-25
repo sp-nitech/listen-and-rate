@@ -75,7 +75,7 @@ output:
   path: ./results/
 
 stimuli_dirs:
-  # utterances_per_session: 1
+  # items_per_session: 1
   systems:
     - path: ./stimuli/examples/A
       system: A
@@ -88,8 +88,8 @@ stimuli_dirs:
 > Files that are missing from any directory are excluded from the experiment (a warning is shown when the configuration is loaded).
 
 > [!TIP]
-> If you don't want every listener sitting through the entire stimulus set, `utterances_per_session` limits how many utterances each listener is presented with.
-> For example, setting it to `1` in a two-system experiment means each listener evaluates a single utterance (one pair of stimuli).
+> If you don't want every listener sitting through the entire stimulus set, `items_per_session` limits how many items each listener is presented with.
+> For example, setting it to `1` in a two-system experiment means each listener evaluates a single item (one pair of stimuli).
 
 ### 2.A. PHP deployment
 

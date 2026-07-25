@@ -21,12 +21,10 @@ def test_dmos_config_returns_trials_not_stimuli(tmp_path, test_audio_file, monke
         assert "test" in data["trials"][0]
 
 
-def test_dmos_config_blinds_utterance_and_system(
-    tmp_path, test_audio_file, monkeypatch
-):
+def test_dmos_config_blinds_item_and_system(tmp_path, test_audio_file, monkeypatch):
     with _dmos_client(tmp_path, test_audio_file, monkeypatch) as tc:
         text = json.dumps(tc.get("/api/config").json())
-        assert "utterance" not in text
+        assert "item" not in text
         assert '"Test0"' not in text
         assert '"Reference"' not in text
 
@@ -35,14 +33,14 @@ def test_dmos_config_multiple_test_systems_produces_multiple_trials(
     tmp_path, test_audio_file, monkeypatch
 ):
     with _dmos_client(
-        tmp_path, test_audio_file, monkeypatch, n_utterances=1, n_test_systems=2
+        tmp_path, test_audio_file, monkeypatch, n_items=1, n_test_systems=2
     ) as tc:
         trials = tc.get("/api/config").json()["trials"]
-        assert len(trials) == 2  # 1 utterance x 2 test systems
+        assert len(trials) == 2  # 1 item x 2 test systems
 
 
 def test_dmos_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
-    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         res = tc.post(
             "/api/submit",
@@ -61,14 +59,14 @@ def test_dmos_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
         assert res.status_code == 200
         rows = list(csv.DictReader((tmp_path / "results" / "config" / "s1.csv").open()))
         assert rows[0]["system"] == "Test0"
-        assert rows[0]["utterance"] == "utt0"
+        assert rows[0]["item"] == "utt0"
         assert rows[0]["rating"] == "4"
 
 
 def test_dmos_submit_missing_reference_id_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         res = tc.post(
             "/api/submit",
@@ -84,7 +82,7 @@ def test_dmos_submit_missing_reference_id_returns_400(
 def test_dmos_submit_rating_out_of_range_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         res = tc.post(
             "/api/submit",
@@ -107,7 +105,7 @@ def test_dmos_submit_reference_id_not_actually_reference_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
     with _dmos_client(
-        tmp_path, test_audio_file, monkeypatch, n_utterances=1, n_test_systems=2
+        tmp_path, test_audio_file, monkeypatch, n_items=1, n_test_systems=2
     ) as tc:
         trials = tc.get("/api/config").json()["trials"]
         # Use two test-system stimuli as if one were the reference - invalid.
@@ -131,7 +129,7 @@ def test_dmos_submit_reference_id_not_actually_reference_returns_400(
 def test_dmos_submit_stimulus_id_is_reference_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         res = tc.post(
             "/api/submit",
@@ -150,10 +148,10 @@ def test_dmos_submit_stimulus_id_is_reference_returns_400(
         assert res.status_code == 400
 
 
-def test_dmos_submit_mismatched_utterance_returns_400(
+def test_dmos_submit_mismatched_item_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=2) as tc:
+    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_items=2) as tc:
         trials = tc.get("/api/config").json()["trials"]
         res = tc.post(
             "/api/submit",
@@ -173,7 +171,7 @@ def test_dmos_submit_mismatched_utterance_returns_400(
 
 
 def test_dmos_submit_empty_ratings_returns_400(tmp_path, test_audio_file, monkeypatch):
-    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         res = tc.post("/api/submit", json={"session_id": "s1", "test_type": "dmos"})
         assert res.status_code == 400
 
@@ -181,7 +179,7 @@ def test_dmos_submit_empty_ratings_returns_400(tmp_path, test_audio_file, monkey
 def test_dmos_submit_unknown_stimulus_id_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         res = tc.post(
             "/api/submit",
@@ -222,6 +220,6 @@ def test_dmos_config_omits_practice_fields_when_not_configured(
 def test_practice_trials_blind_sensitive_fields(tmp_path, test_audio_file, monkeypatch):
     with _dmos_client(tmp_path, test_audio_file, monkeypatch, practice=_PRACTICE) as tc:
         text = json.dumps(tc.get("/api/config").json())
-        assert "utterance" not in text
+        assert "item" not in text
         assert '"Test0"' not in text
         assert '"Reference"' not in text

@@ -11,7 +11,7 @@ from typing import Any
 from .config import Config
 from .config.base import LoudnessCriterion, LoudnessNormalizationConfig, StimulusConfig
 
-# One measured clip: system, utterance, and integrated loudness (LUFS).
+# One measured clip: system, item, and integrated loudness (LUFS).
 LoudnessRow = tuple[str, str, float]
 
 _MIN_DURATION_SECONDS = 1.0
@@ -20,7 +20,7 @@ _MIN_DURATION_SECONDS = 1.0
 def per_system_stats(rows: list[LoudnessRow]) -> dict[str, tuple[float, float, int]]:
     """Per system, the mean loudness, population std, and clip count."""
     by_system: dict[str, list[float]] = {}
-    for system, _utterance, lufs in rows:
+    for system, _item, lufs in rows:
         by_system.setdefault(system, []).append(lufs)
     return {
         system: (statistics.fmean(values), statistics.pstdev(values), len(values))
@@ -36,23 +36,23 @@ def system_mean_range(stats: dict[str, tuple[float, float, int]]) -> float | Non
     return max(means) - min(means)
 
 
-def per_utterance_spreads(
+def per_item_spreads(
     rows: list[LoudnessRow],
 ) -> dict[str, tuple[float, dict[str, float]]]:
-    """Per utterance in >= 2 systems: cross-system spread (max-min) + each value.
+    """Per item in >= 2 systems: cross-system spread (max-min) + each value.
 
-    Utterances present in fewer than two systems have no cross-system spread and
+    Items present in fewer than two systems have no cross-system spread and
     are omitted.
     """
-    by_utterance: dict[str, dict[str, float]] = {}
-    for system, utterance, lufs in rows:
-        by_utterance.setdefault(utterance, {})[system] = lufs
+    by_item: dict[str, dict[str, float]] = {}
+    for system, item, lufs in rows:
+        by_item.setdefault(item, {})[system] = lufs
     spreads: dict[str, tuple[float, dict[str, float]]] = {}
-    for utterance, by_system in by_utterance.items():
+    for item, by_system in by_item.items():
         if len(by_system) < 2:
             continue
         values = by_system.values()
-        spreads[utterance] = (max(values) - min(values), by_system)
+        spreads[item] = (max(values) - min(values), by_system)
     return spreads
 
 
@@ -84,7 +84,9 @@ def _meter_for(rate: int) -> Any:
     return _meters[rate]
 
 
-def _measure_items(items: list[StimulusConfig], desc: str) -> dict[str, float | None]:
+def _measure_stimuli(
+    stimuli: list[StimulusConfig], desc: str
+) -> dict[str, float | None]:
     """Measure each stimulus's integrated loudness (LUFS), keyed by id.
 
     The progress bar goes to stderr (separate from the stdout report) and,
@@ -95,19 +97,19 @@ def _measure_items(items: list[StimulusConfig], desc: str) -> dict[str, float | 
     from tqdm import tqdm
 
     return {
-        item.id: measure_loudness(item.path)
-        for item in tqdm(items, desc=desc, unit="clip", disable=None)
+        s.id: measure_loudness(s.path)
+        for s in tqdm(stimuli, desc=desc, unit="clip", disable=None)
     }
 
 
 def _measured_rows(
-    items: list[StimulusConfig], loudness_by_id: dict[str, float | None]
+    stimuli: list[StimulusConfig], loudness_by_id: dict[str, float | None]
 ) -> list[LoudnessRow]:
-    """Build the (system, utterance, LUFS) rows of the measurable items, in order."""
+    """Build the (system, item, LUFS) rows of the measurable stimuli, in order."""
     return [
-        (item.system or "", item.utterance or item.id, lufs)
-        for item in items
-        if (lufs := loudness_by_id[item.id]) is not None
+        (s.system or "", s.item or s.id, lufs)
+        for s in stimuli
+        if (lufs := loudness_by_id[s.id]) is not None
     ]
 
 
@@ -121,19 +123,19 @@ def run_configured_loudness_check(config: Config) -> None:
     if check is None:
         return
 
-    items = config.stimuli.items if config.stimuli else []
-    loudness_by_id = _measure_items(items, desc="Measuring loudness")
-    rows = _measured_rows(items, loudness_by_id)
+    stimuli = config.stimuli.entries if config.stimuli else []
+    loudness_by_id = _measure_stimuli(stimuli, desc="Measuring loudness")
+    rows = _measured_rows(stimuli, loudness_by_id)
 
-    excluded = len(items) - len(rows)
+    excluded = len(stimuli) - len(rows)
     if excluded:
         print(f"[loudness] {excluded} clip(s) excluded (shorter than 1s or silent).")
 
     failed = False
     if check.per_system is not None:
         failed |= _check_per_system(rows, check.per_system)
-    if check.per_stimulus is not None:
-        failed |= _check_per_stimulus(rows, check.per_stimulus)
+    if check.per_item is not None:
+        failed |= _check_per_item(rows, check.per_item)
 
     if failed:
         raise SystemExit(1)
@@ -153,18 +155,20 @@ def _check_per_system(rows: list[LoudnessRow], criterion: LoudnessCriterion) -> 
     return exceeded
 
 
-def _check_per_stimulus(rows: list[LoudnessRow], criterion: LoudnessCriterion) -> bool:
-    spreads = per_utterance_spreads(rows)
+def _check_per_item(rows: list[LoudnessRow], criterion: LoudnessCriterion) -> bool:
+    spreads = per_item_spreads(rows)
     offenders = {
-        u: v for u, (spread, v) in spreads.items() if spread > criterion.threshold
+        item: by_system
+        for item, (spread, by_system) in spreads.items()
+        if spread > criterion.threshold
     }
     if criterion.verbose:
-        _print_per_stimulus(spreads)
+        _print_per_item(spreads)
     elif offenders:
-        _print_per_stimulus({u: spreads[u] for u in offenders})
+        _print_per_item({item: spreads[item] for item in offenders})
     if offenders:
         print(
-            f"[loudness] per_stimulus: {len(offenders)} utterance(s) exceed "
+            f"[loudness] per_item: {len(offenders)} item(s) exceed "
             f"threshold {criterion.threshold:.2f} LU: {sorted(offenders)}"
         )
     return bool(offenders)
@@ -178,15 +182,15 @@ def _print_per_system(stats: dict[str, tuple[float, float, int]]) -> None:
         print(f"  {system}: mean {mean:.2f}  std {std:.2f}  (n={count})")
 
 
-def _print_per_stimulus(
+def _print_per_item(
     spreads: dict[str, tuple[float, dict[str, float]]],
 ) -> None:
-    # Within each utterance, systems keep their config declaration order.
-    print("[loudness] per-utterance loudness across systems (LUFS):")
-    for utterance in sorted(spreads):
-        spread, by_system = spreads[utterance]
+    # Within each item, systems keep their config declaration order.
+    print("[loudness] per-item loudness across systems (LUFS):")
+    for item in sorted(spreads):
+        spread, by_system = spreads[item]
         per_sys = "  ".join(f"{s}={lufs:.2f}" for s, lufs in by_system.items())
-        print(f"  {utterance}: spread {spread:.2f}  [{per_sys}]")
+        print(f"  {item}: spread {spread:.2f}  [{per_sys}]")
 
 
 # -- Loudness normalization ----------------------------------------------------
@@ -223,37 +227,37 @@ def apply_gain_and_write(
 
 
 def _normalization_gains(
-    items: list[StimulusConfig],
+    stimuli: list[StimulusConfig],
     loudness_by_id: dict[str, float | None],
     norm: LoudnessNormalizationConfig,
 ) -> tuple[dict[str, float], list[str]]:
     """Compute each stimulus id's gain (dB), plus the ids that couldn't be measured.
 
-    scope="stimulus": each clip gets its own gain to reach target. scope="system":
-    one gain per system, derived from that system's mean loudness (reusing
-    per_system_stats), so within-system loudness differences are preserved.
-    Unmeasurable clips (silent / < 1s) are excluded from measurement and listed
-    for reporting; with scope="stimulus" they get gain 0 (written unchanged),
-    while with scope="system" they still receive their system's shared gain -
-    gain 0 would shift their loudness relative to their measurable siblings,
-    defeating the one-gain-per-system contract.
+    scope="stimulus": each clip gets its own gain to reach target.
+    scope="system": one gain per system, derived from that system's mean
+    loudness (reusing per_system_stats), so within-system loudness differences
+    are preserved. Unmeasurable clips (silent / < 1s) are excluded from
+    measurement and listed for reporting; with scope="stimulus" they get gain
+    0 (written unchanged), while with scope="system" they still receive their
+    system's shared gain - gain 0 would shift their loudness relative to their
+    measurable siblings, defeating the one-gain-per-system contract.
     """
-    unmeasured = [item.id for item in items if loudness_by_id[item.id] is None]
+    unmeasured = [s.id for s in stimuli if loudness_by_id[s.id] is None]
 
     # The loudness each clip is shifted toward: for scope="system" it is the
     # clip's system mean (one gain per system, preserving within-system
     # differences); for scope="stimulus" it is the clip's own loudness.
     if norm.scope == "system":
-        stats = per_system_stats(_measured_rows(items, loudness_by_id))
+        stats = per_system_stats(_measured_rows(stimuli, loudness_by_id))
         system_mean = {system: mean for system, (mean, _std, _n) in stats.items()}
-        reference_of = {item.id: system_mean.get(item.system or "") for item in items}
+        reference_of = {s.id: system_mean.get(s.system or "") for s in stimuli}
     else:
-        reference_of = {item.id: loudness_by_id[item.id] for item in items}
+        reference_of = {s.id: loudness_by_id[s.id] for s in stimuli}
 
     gains: dict[str, float] = {}
-    for item in items:
-        reference = reference_of[item.id]
-        gains[item.id] = 0.0 if reference is None else norm.target - reference
+    for s in stimuli:
+        reference = reference_of[s.id]
+        gains[s.id] = 0.0 if reference is None else norm.target - reference
     return gains, unmeasured
 
 
@@ -262,35 +266,35 @@ def run_configured_loudness_normalization(
 ) -> dict[str, str]:
     """Normalize stimuli per config.loudness_normalization, writing each via dst_for.
 
-    Returns id -> written output path (str); {} (no-op) when loudness_normalization
-    is unset. dst_for(stimulus) resolves each output path so the caller controls
-    the bundle/cache layout; every output is written as WAV (see
-    apply_gain_and_write). Prints a summary of clips that couldn't be measured
-    (silent / < 1s, written unchanged) or clipped after gain. Does not exit -
-    this is the corrective step, not a QA gate.
+    Returns id -> written output path (str); {} (no-op) when
+    loudness_normalization is unset. dst_for(stimulus) resolves each output
+    path so the caller controls the bundle/cache layout; every output is
+    written as WAV (see apply_gain_and_write). Prints a summary of clips that
+    couldn't be measured (silent / < 1s, written unchanged) or clipped after
+    gain. Does not exit - this is the corrective step, not a QA gate.
     """
     norm = config.loudness_normalization
     if norm is None:
         return {}
 
-    items = config.stimuli.items if config.stimuli else []
+    stimuli = config.stimuli.entries if config.stimuli else []
 
     # Phase 1: measure every clip's integrated loudness once.
-    loudness_by_id = _measure_items(items, desc="Normalizing loudness")
+    loudness_by_id = _measure_stimuli(stimuli, desc="Normalizing loudness")
 
     # Phase 2: decide each clip's gain (per-clip, or one gain per system).
-    gains, unmeasured = _normalization_gains(items, loudness_by_id, norm)
+    gains, unmeasured = _normalization_gains(stimuli, loudness_by_id, norm)
 
     # Phase 3: apply the gain and write each output.
     result: dict[str, str] = {}
     clipped: list[str] = []
-    for item in items:
-        dst = dst_for(item)
+    for s in stimuli:
+        dst = dst_for(s)
         dst.parent.mkdir(parents=True, exist_ok=True)
-        warning = apply_gain_and_write(item.path, dst, gains[item.id])
+        warning = apply_gain_and_write(s.path, dst, gains[s.id])
         if warning is not None:
             clipped.append(warning)
-        result[item.id] = str(dst)
+        result[s.id] = str(dst)
 
     if unmeasured:
         # scope="system" still applies the system's shared gain to these clips

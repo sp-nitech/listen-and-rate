@@ -8,9 +8,8 @@
  * player (audio-player.js) around a bare <audio> - so nothing flickers on
  * prev/next and there's no native control to right-click-save. Subclasses
  * supply the type-specific pieces via hooks: _audioRegionHtml, _choiceButtonsHtml,
- * _ratingButtonsClass, _listenStepsHtml, _stimulusLabel, _trialAudioClips,
- * _syncChoiceButtons, _onChoiceButton, _canChoose, _handleChoiceKey,
- * _choiceHintHtml, _submit.
+ * _ratingButtonsClass, _listenStepsHtml, _trialAudioClips, _syncChoiceButtons,
+ * _onChoiceButton, _canChoose, _handleChoiceKey, _choiceHintHtml, _submit.
  * MUSHRA overrides _buildPage/_syncPage entirely (sliders, no native controls).
  */
 
@@ -76,7 +75,6 @@ export class PairedTrialTest {
       <div class="stimulus-page">
         <div class="stimulus-meta">
           <span class="page-counter"></span>
-          <span class="stimulus-label"></span>
         </div>
         ${this._audioRegionHtml()}
         <div class="rating-section">
@@ -93,7 +91,6 @@ export class PairedTrialTest {
 
     this._el = {
       counter: this._pageSlot.querySelector('.page-counter'),
-      label: this._pageSlot.querySelector('.stimulus-label'),
       ratingSection: this._pageSlot.querySelector('.rating-section'),
       buttons: [...this._pageSlot.querySelectorAll('.rating-btn')],
       audios: [...this._pageSlot.querySelectorAll('audio')],
@@ -178,7 +175,6 @@ export class PairedTrialTest {
     const isLast = this.currentIndex === total - 1;
 
     this._el.counter.textContent = `${practiceCounterPrefix(this.config)}${current} / ${total}`;
-    this._el.label.textContent = this._stimulusLabel(current);
     this._syncAudioSrcs();
     this._syncChoiceButtons();
     this._el.ratingSection.classList.toggle('played', this._canChoose(this.currentIndex));

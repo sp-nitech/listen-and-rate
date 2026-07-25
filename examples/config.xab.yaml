@@ -34,7 +34,7 @@ output:
 # must be flagged `reference: true`; it provides the X clip and is never
 # rated itself.
 stimuli_dirs:
-  utterances_per_session: 2 # optional: present N randomly chosen trials per listener
+  items_per_session: 2 # optional: present N randomly chosen trials per listener
   systems:
     - path: ./stimuli/examples/A
       reference: true
@@ -59,7 +59,7 @@ stimuli_dirs:
 #   per_system:
 #     threshold: .inf
 #     verbose: true
-#   per_stimulus:
+#   per_item:
 #     threshold: 1.0
 #     verbose: false
 
@@ -70,7 +70,7 @@ stimuli_dirs:
 # the check is the gate). `scope: stimulus` (default) brings every clip to the
 # same loudness; `scope: system` applies one gain per system so the system's
 # mean reaches target, preserving the natural loudness differences between
-# utterances within a system.
+# items within a system.
 # loudness_normalization:
 #   target: -23.0
 #   scope: stimulus

@@ -171,7 +171,7 @@ final class SaveTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
         validate_mos_ratings(
-            ['a1' => ['system' => 'A', 'utterance' => 'u1']],
+            ['a1' => ['system' => 'A', 'item' => 'u1']],
             [['stimulus_id' => 'a1', 'rating' => 4]]
         );
     }
@@ -180,7 +180,7 @@ final class SaveTest extends TestCase
     {
         $this->expectException(SaveRequestError::class);
         validate_mos_ratings(
-            ['a1' => ['system' => 'A', 'utterance' => 'u1']],
+            ['a1' => ['system' => 'A', 'item' => 'u1']],
             [['stimulus_id' => 'unknown', 'rating' => 4]]
         );
     }
@@ -189,7 +189,7 @@ final class SaveTest extends TestCase
     {
         $this->expectException(SaveRequestError::class);
         validate_mos_ratings(
-            ['a1' => ['system' => 'A', 'utterance' => 'u1']],
+            ['a1' => ['system' => 'A', 'item' => 'u1']],
             [['rating' => 4]]
         );
     }
@@ -364,10 +364,10 @@ final class SaveTest extends TestCase
             'test_type'  => 'mos',
             'ratings'    => [['stimulus_id' => 'a1', 'rating' => 4]],
         ];
-        $stimulusMap = ['a1' => ['system' => 'System A', 'utterance' => 'utt1']];
+        $stimulusMap = ['a1' => ['system' => 'System A', 'item' => 'utt1']];
         $result = build_json_result($data, [], $stimulusMap, '2026-01-01T00:00:00+00:00');
         $this->assertSame('System A', $result['ratings'][0]['system']);
-        $this->assertSame('utt1', $result['ratings'][0]['utterance']);
+        $this->assertSame('utt1', $result['ratings'][0]['item']);
         $this->assertSame(4, $result['ratings'][0]['rating']);
     }
 
@@ -378,7 +378,7 @@ final class SaveTest extends TestCase
             'test_type'  => 'mos',
             'ratings'    => [['stimulus_id' => 'a1', 'rating' => 4]],
         ];
-        $stimulusMap = ['a1' => ['system' => 'System A', 'utterance' => 'utt1']];
+        $stimulusMap = ['a1' => ['system' => 'System A', 'item' => 'utt1']];
         [$fields, $rows] = build_csv_rows(
             $data,
             ['listener' => 'Alice'],
@@ -387,37 +387,37 @@ final class SaveTest extends TestCase
             '2026-01-01'
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system', 'utterance', 'rating'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system', 'item', 'rating'],
             $fields
         );
         $this->assertSame(['s1', '2026-01-01', 'mos', 'Alice', 'System A', 'utt1', 4], $rows[0]);
     }
 
-    public function testBuildJsonResultDoesNotFallBackToClientSuppliedSystemUtterance(): void
+    public function testBuildJsonResultDoesNotFallBackToClientSuppliedSystemItem(): void
     {
         // A rating whose stimulus_id is missing from the stimulus map must not
-        // let the client inject arbitrary system/utterance strings into the
+        // let the client inject arbitrary system/item strings into the
         // stored result (unknown IDs are rejected upstream by
         // validate_mos_ratings; this guards the enrichment itself).
         $data = [
             'session_id' => 's1',
             'test_type'  => 'mos',
             'ratings'    => [
-                ['stimulus_id' => 'unknown', 'system' => 'Injected', 'utterance' => 'evil', 'rating' => 4],
+                ['stimulus_id' => 'unknown', 'system' => 'Injected', 'item' => 'evil', 'rating' => 4],
             ],
         ];
         $result = build_json_result($data, [], [], '2026-01-01T00:00:00+00:00');
         $this->assertSame('', $result['ratings'][0]['system']);
-        $this->assertSame('', $result['ratings'][0]['utterance']);
+        $this->assertSame('', $result['ratings'][0]['item']);
     }
 
-    public function testBuildCsvRowsDoesNotFallBackToClientSuppliedSystemUtterance(): void
+    public function testBuildCsvRowsDoesNotFallBackToClientSuppliedSystemItem(): void
     {
         $data = [
             'session_id' => 's1',
             'test_type'  => 'mos',
             'ratings'    => [
-                ['stimulus_id' => 'unknown', 'system' => 'Injected', 'utterance' => 'evil', 'rating' => 4],
+                ['stimulus_id' => 'unknown', 'system' => 'Injected', 'item' => 'evil', 'rating' => 4],
             ],
         ];
         [, $rows] = build_csv_rows($data, [], [], [], '2026-01-01');
@@ -429,10 +429,10 @@ final class SaveTest extends TestCase
     private function dmosStimulusMap(): array
     {
         return [
-            'ref1'  => ['system' => 'Reference', 'utterance' => 'u1'],
-            'test1' => ['system' => 'Test', 'utterance' => 'u1'],
-            'ref2'  => ['system' => 'Reference', 'utterance' => 'u2'],
-            'test2' => ['system' => 'Test', 'utterance' => 'u2'],
+            'ref1'  => ['system' => 'Reference', 'item' => 'u1'],
+            'test1' => ['system' => 'Test', 'item' => 'u1'],
+            'ref2'  => ['system' => 'Reference', 'item' => 'u2'],
+            'test2' => ['system' => 'Test', 'item' => 'u2'],
         ];
     }
 
@@ -444,7 +444,7 @@ final class SaveTest extends TestCase
             'Reference'
         );
         $this->assertSame('Test', $meta['system']);
-        $this->assertSame('u1', $meta['utterance']);
+        $this->assertSame('u1', $meta['item']);
     }
 
     public function testValidateDmosRatingRejectsMissingReferenceId(): void
@@ -467,7 +467,7 @@ final class SaveTest extends TestCase
         );
     }
 
-    public function testValidateDmosRatingRejectsMismatchedUtterance(): void
+    public function testValidateDmosRatingRejectsMismatchedItem(): void
     {
         $this->expectException(SaveRequestError::class);
         validate_dmos_rating(
@@ -511,7 +511,7 @@ final class SaveTest extends TestCase
         $result = build_json_result($data, [], $this->dmosStimulusMap(), '2026-01-01T00:00:00+00:00');
         $row = $result['ratings'][0];
         $this->assertSame('Test', $row['system']);
-        $this->assertSame('u1', $row['utterance']);
+        $this->assertSame('u1', $row['item']);
         $this->assertSame(4, $row['rating']);
     }
 
@@ -525,7 +525,7 @@ final class SaveTest extends TestCase
             ],
         ];
         [$fields, $rows] = build_csv_rows($data, [], [], $this->dmosStimulusMap(), '2026-01-01');
-        $this->assertSame(['session_id', 'timestamp', 'test_type', 'system', 'utterance', 'rating'], $fields);
+        $this->assertSame(['session_id', 'timestamp', 'test_type', 'system', 'item', 'rating'], $fields);
         $this->assertSame(['s1', '2026-01-01', 'dmos', 'Test', 'u1', 4], $rows[0]);
     }
 
@@ -534,9 +534,9 @@ final class SaveTest extends TestCase
     private function mushraStimulusMap(): array
     {
         return [
-            'ref1' => ['system' => 'Reference', 'utterance' => 'u1'],
-            'b1'   => ['system' => 'B', 'utterance' => 'u1'],
-            'c1'   => ['system' => 'C', 'utterance' => 'u1'],
+            'ref1' => ['system' => 'Reference', 'item' => 'u1'],
+            'b1'   => ['system' => 'B', 'item' => 'u1'],
+            'c1'   => ['system' => 'C', 'item' => 'u1'],
         ];
     }
 
@@ -544,7 +544,7 @@ final class SaveTest extends TestCase
     {
         $meta = validate_mushra_rating($this->mushraStimulusMap(), ['stimulus_id' => 'b1', 'rating' => 70], 'Reference');
         $this->assertSame('B', $meta['system']);
-        $this->assertSame('u1', $meta['utterance']);
+        $this->assertSame('u1', $meta['item']);
     }
 
     public function testValidateMushraRatingRejectsUnknownId(): void
@@ -626,7 +626,7 @@ final class SaveTest extends TestCase
         $result = build_json_result($data, [], $this->mushraStimulusMap(), '2026-01-01T00:00:00+00:00');
         $row = $result['ratings'][0];
         $this->assertSame('B', $row['system']);
-        $this->assertSame('u1', $row['utterance']);
+        $this->assertSame('u1', $row['item']);
         $this->assertSame(70, $row['rating']);
     }
 
@@ -640,7 +640,7 @@ final class SaveTest extends TestCase
             ],
         ];
         [$fields, $rows] = build_csv_rows($data, [], [], $this->mushraStimulusMap(), '2026-01-01');
-        $this->assertSame(['session_id', 'timestamp', 'test_type', 'system', 'utterance', 'rating'], $fields);
+        $this->assertSame(['session_id', 'timestamp', 'test_type', 'system', 'item', 'rating'], $fields);
         $this->assertSame(['s1', '2026-01-01', 'mushra', 'B', 'u1', 70], $rows[0]);
     }
 
@@ -649,9 +649,9 @@ final class SaveTest extends TestCase
     private function abStimulusMap(): array
     {
         return [
-            'a1' => ['system' => 'A', 'utterance' => 'u1'],
-            'b1' => ['system' => 'B', 'utterance' => 'u1'],
-            'a2' => ['system' => 'A', 'utterance' => 'u2'],
+            'a1' => ['system' => 'A', 'item' => 'u1'],
+            'b1' => ['system' => 'B', 'item' => 'u1'],
+            'a2' => ['system' => 'A', 'item' => 'u2'],
         ];
     }
 
@@ -685,7 +685,7 @@ final class SaveTest extends TestCase
 
     // -- build_cmos_json_result / build_cmos_csv_rows -----------------------
 
-    public function testBuildCmosJsonResultProducesUtteranceSystemASystemBRating(): void
+    public function testBuildCmosJsonResultProducesItemSystemASystemBRating(): void
     {
         $data = [
             'session_id' => 's1',
@@ -694,7 +694,7 @@ final class SaveTest extends TestCase
         ];
         $result = build_cmos_json_result($data, [], $this->abStimulusMap(), '2026-01-01T00:00:00+00:00');
         $row = $result['ratings'][0];
-        $this->assertSame('u1', $row['utterance']);
+        $this->assertSame('u1', $row['item']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
         $this->assertSame(2, $row['rating']);
@@ -731,7 +731,7 @@ final class SaveTest extends TestCase
             '2026-01-01'
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'utterance', 'rating'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'rating'],
             $fields
         );
         $this->assertSame(['s1', '2026-01-01', 'cmos', 'Alice', 'A', 'B', 'u1', -1], $rows[0]);
@@ -758,7 +758,7 @@ final class SaveTest extends TestCase
         validate_ab_choice_pair($this->abStimulusMap(), ['a1', 'unknown']);
     }
 
-    public function testValidateAbChoicePairRejectsMismatchedUtterance(): void
+    public function testValidateAbChoicePairRejectsMismatchedItem(): void
     {
         $this->expectException(SaveRequestError::class);
         validate_ab_choice_pair($this->abStimulusMap(), ['a1', 'a2']);
@@ -802,7 +802,7 @@ final class SaveTest extends TestCase
 
     // -- build_ab_json_result / build_ab_csv_rows --------------------------
 
-    public function testBuildAbJsonResultProducesUtteranceSystemASystemBWinner(): void
+    public function testBuildAbJsonResultProducesItemSystemASystemBWinner(): void
     {
         $data = [
             'session_id' => 's1',
@@ -811,7 +811,7 @@ final class SaveTest extends TestCase
         ];
         $result = build_ab_json_result($data, [], $this->abStimulusMap(), '2026-01-01T00:00:00+00:00');
         $row = $result['ratings'][0];
-        $this->assertSame('u1', $row['utterance']);
+        $this->assertSame('u1', $row['item']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
         $this->assertSame('a', $row['winner']);
@@ -834,8 +834,8 @@ final class SaveTest extends TestCase
         // named "tie"/"=" - which used to collide with the old "tie" sentinel -
         // are recorded unambiguously.
         $stimulusMap = [
-            'a1' => ['system' => '=', 'utterance' => 'u1'],   // sorts before "tie"
-            'b1' => ['system' => 'tie', 'utterance' => 'u1'],
+            'a1' => ['system' => '=', 'item' => 'u1'],   // sorts before "tie"
+            'b1' => ['system' => 'tie', 'item' => 'u1'],
         ];
         $data = [
             'session_id' => 's1',
@@ -859,8 +859,8 @@ final class SaveTest extends TestCase
         // (listen_and_rate/routers/api.py's `sorted([meta1["system"], meta2["system"]])`).
         // system_a/system_b must be assigned the same way in both deployments.
         $stimulusMap = [
-            'a1' => ['system' => '128', 'utterance' => 'u1'],
-            'b1' => ['system' => '64', 'utterance' => 'u1'],
+            'a1' => ['system' => '128', 'item' => 'u1'],
+            'b1' => ['system' => '64', 'item' => 'u1'],
         ];
         $data = [
             'session_id' => 's1',
@@ -888,7 +888,7 @@ final class SaveTest extends TestCase
             '2026-01-01'
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'utterance', 'winner'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'winner'],
             $fields
         );
         $this->assertSame(['s1', '2026-01-01', 'ab', 'Alice', 'A', 'B', 'u1', 'b'], $rows[0]);
@@ -978,7 +978,7 @@ final class SaveTest extends TestCase
             self::ABX_SECRET
         );
         $row = $result['ratings'][0];
-        $this->assertSame('u1', $row['utterance']);
+        $this->assertSame('u1', $row['item']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
         $this->assertTrue($row['correct']);
@@ -1023,7 +1023,7 @@ final class SaveTest extends TestCase
             self::ABX_SECRET
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'utterance', 'correct'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'correct'],
             $fields
         );
         $this->assertSame(['s1', '2026-01-01', 'abx', 'Alice', 'A', 'B', 'u1', 'true'], $rows[0]);
@@ -1034,9 +1034,9 @@ final class SaveTest extends TestCase
     private function xabStimulusMap(): array
     {
         return [
-            'ref1' => ['system' => 'Reference', 'utterance' => 'u1'],
-            'a1'   => ['system' => 'A', 'utterance' => 'u1'],
-            'b1'   => ['system' => 'B', 'utterance' => 'u1'],
+            'ref1' => ['system' => 'Reference', 'item' => 'u1'],
+            'a1'   => ['system' => 'A', 'item' => 'u1'],
+            'b1'   => ['system' => 'B', 'item' => 'u1'],
         ];
     }
 
@@ -1074,7 +1074,7 @@ final class SaveTest extends TestCase
 
     public function testValidateXabChoiceRejectsReferenceInPair(): void
     {
-        // ref1/a1 share an utterance and differ in system, so the generic
+        // ref1/a1 share an item and differ in system, so the generic
         // pair check passes - the reference-specific check must reject it.
         $this->expectException(SaveRequestError::class);
         validate_xab_choice(
@@ -1096,7 +1096,7 @@ final class SaveTest extends TestCase
 
     // -- build_xab_json_result / build_xab_csv_rows -------------------------
 
-    public function testBuildXabJsonResultProducesUtteranceSystemASystemBCloser(): void
+    public function testBuildXabJsonResultProducesItemSystemASystemBCloser(): void
     {
         $data = [
             'session_id' => 's1',
@@ -1105,7 +1105,7 @@ final class SaveTest extends TestCase
         ];
         $result = build_xab_json_result($data, [], $this->xabStimulusMap(), '2026-01-01T00:00:00+00:00', 'Reference');
         $row = $result['ratings'][0];
-        $this->assertSame('u1', $row['utterance']);
+        $this->assertSame('u1', $row['item']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
         $this->assertSame('b', $row['closer']);
@@ -1127,7 +1127,7 @@ final class SaveTest extends TestCase
             'Reference'
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'utterance', 'closer'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'closer'],
             $fields
         );
         $this->assertSame(['s1', '2026-01-01', 'xab', 'Alice', 'A', 'B', 'u1', 'a'], $rows[0]);

@@ -58,7 +58,8 @@ def test_report_bar_colors_default(tmp_path):
 
 
 def test_report_count_bar_color_applies_to_count_bars(tmp_path):
-    # count_bar_color colors the raw-count bars (AB/ABX counts, CMOS categories).
+    # count_bar_color colors the raw-count bars (AB/ABX counts, CMOS
+    # categories).
     for rows in (AB_CSV_ROWS, CMOS_CSV_ROWS):
         html = generate_report_html(
             [_write_csv(tmp_path / "s.csv", rows)], count_bar_color="#654321"
@@ -75,7 +76,8 @@ def test_report_config_font_styles_charts_only_not_html(tmp_path):
     small = generate_report_html([path], font_family="Courier", font_size=8)
 
     def html_chrome(html):
-        # The HTML CSS font-* declarations (chart fonts live in the plotly JSON).
+        # The HTML CSS font-* declarations (chart fonts live in the plotly
+        # JSON).
         return sorted(re.findall(r"font-(?:family|size):[^;\"]+", html))
 
     assert html_chrome(big) == html_chrome(small)  # HTML unaffected by config font
@@ -149,7 +151,7 @@ def test_generate_report_no_mos_rows(tmp_path):
             "timestamp": "t",
             "test_type": "other",
             "system": "A",
-            "utterance": "u",
+            "item": "u",
             "rating": 4,
         }
     ]
@@ -261,8 +263,8 @@ def test_generate_report_escapes_system_name_in_pvalue_table(tmp_path):
     rows = _with_session_meta(
         "ab",
         [
-            {"system_a": "A<b>", "system_b": "B", "utterance": "u1", "winner": "a"},
-            {"system_a": "A<b>", "system_b": "B", "utterance": "u2", "winner": "b"},
+            {"system_a": "A<b>", "system_b": "B", "item": "u1", "winner": "a"},
+            {"system_a": "A<b>", "system_b": "B", "item": "u2", "winner": "b"},
         ],
     )
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
@@ -397,7 +399,7 @@ def test_significance_alpha_follows_confidence(tmp_path):
 # -- groups (stacked filtered sections) ---------------------------------------
 
 
-def _mos_row(session_id, device, system, utterance, rating, trial_count="Appropriate"):
+def _mos_row(session_id, device, system, item, rating, trial_count="Appropriate"):
     # Form answers live under the metadata_/survey_ column prefixes in stored
     # CSVs (see storage.py); filter keys in report configs stay unprefixed.
     return {
@@ -407,7 +409,7 @@ def _mos_row(session_id, device, system, utterance, rating, trial_count="Appropr
         "metadata_device": device,
         "survey_trial_count": trial_count,
         "system": system,
-        "utterance": utterance,
+        "item": item,
         "rating": rating,
     }
 
@@ -443,10 +445,10 @@ def test_groups_render_labeled_sections_in_order(tmp_path):
     assert ">1</td>" in chunks[2] and ">2</td>" in chunks[2]
 
 
-def test_groups_stimuli_filter_globs_on_utterance(tmp_path):
+def test_groups_stimuli_filter_globs_on_item(tmp_path):
     html = generate_report_html(
         [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
-        groups=[{"label": "Speaker F01", "stimuli_filter": {"utterance": "F01_*"}}],
+        groups=[{"label": "Speaker F01", "stimuli_filter": {"item": "F01_*"}}],
     )
     section = _section_chunks(html)[1]
     assert ">2</td>" in section  # 2 of the 4 records match F01_*
@@ -462,7 +464,7 @@ def test_groups_filters_combine_with_and(tmp_path):
             {
                 "label": "F01 on headphones",
                 "metadata_filter": {"device": "Headphones"},
-                "stimuli_filter": {"utterance": "F01_*"},
+                "stimuli_filter": {"item": "F01_*"},
             }
         ],
     )

@@ -83,7 +83,7 @@ class CSVResultSaver(ResultSaver):
 
     Column layout: session_id, timestamp, test_type, [metadata_* keys...],
     [survey_* keys...], then whatever keys the row dicts themselves carry
-    (e.g. system/utterance/rating for MOS, utterance/system_a/system_b/winner
+    (e.g. system/item/rating for MOS, item/system_a/system_b/winner
     for AB) - the tail columns are inferred from the first row rather than
     hardcoded, so this saver works for any test type's row shape. Form
     columns are inserted in the order given by metadata_keys/survey_keys and

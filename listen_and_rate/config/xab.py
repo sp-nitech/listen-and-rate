@@ -64,31 +64,31 @@ class XABConfig(BaseTestConfig):
 
 @dataclass(frozen=True)
 class XABTrial:
-    """One XAB trial: a reference plus the same utterance from both test systems."""
+    """One XAB trial: a reference plus the same item from both test systems."""
 
-    utterance: str
+    item: str
     reference_id: str
     stimulus_ids: tuple[str, str]
     systems: tuple[str, str]
 
 
 def build_xab_trials(
-    items: list[StimulusConfig], reference_system: str
+    stimuli: list[StimulusConfig], reference_system: str
 ) -> list[XABTrial]:
-    """Group stimuli into one XAB trial per utterance.
+    """Group stimuli into one XAB trial per item.
 
     A trial requires the reference and exactly 2 test-system stimuli for the
-    same utterance; utterances missing any of the three are silently skipped,
+    same item; items missing any of the three are silently skipped,
     mirroring build_ab_trials()/build_dmos_trials(). Test stimuli are ordered
     by system name, matching build_ab_trials()'s canonical pair order.
     """
-    by_utterance: dict[str, list[StimulusConfig]] = {}
-    for s in items:
-        if s.utterance:
-            by_utterance.setdefault(s.utterance, []).append(s)
+    by_item: dict[str, list[StimulusConfig]] = {}
+    for s in stimuli:
+        if s.item:
+            by_item.setdefault(s.item, []).append(s)
 
     trials = []
-    for utterance, group in sorted(by_utterance.items()):
+    for item, group in sorted(by_item.items()):
         reference_stimulus = next(
             (s for s in group if (s.system or "") == reference_system), None
         )
@@ -102,7 +102,7 @@ def build_xab_trials(
             continue
         trials.append(
             XABTrial(
-                utterance=utterance,
+                item=item,
                 reference_id=reference_stimulus.id,
                 stimulus_ids=(test_stimuli[0].id, test_stimuli[1].id),
                 systems=(test_stimuli[0].system or "", test_stimuli[1].system or ""),

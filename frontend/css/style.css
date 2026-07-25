@@ -231,6 +231,10 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* MOS only, and only when the config gives a stimulus an explicit `label:` -
+   the element stays empty otherwise. Every other test type shows just the
+   page counter here, since a generated "Audio Pair N" would only repeat the
+   counter's own N. */
 .stimulus-label {
   font-size: 1rem;
   font-weight: 600;

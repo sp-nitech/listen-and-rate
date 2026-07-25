@@ -32,18 +32,18 @@ output:
 # Method 1: list individual files
 # stimuli:
 #   stimuli_per_session: 2 # optional: present N randomly chosen stimuli per listener
-#   items:
-#     - id: A_utt1
-#       path: ./stimuli/examples/A/utt1.wav
+#   entries:
+#     - id: A_item1
+#       path: ./stimuli/examples/A/item1.wav
 #       system: A
 #       label: "Sample 1" # optional: shown to listener
-#     - id: A_utt2
-#       path: ./stimuli/examples/A/utt2.wav
+#     - id: A_item2
+#       path: ./stimuli/examples/A/item2.wav
 #       system: A
 
 # Method 2: specify directories (each dir should contain the same filenames)
 stimuli_dirs:
-  utterances_per_session: 2 # optional: present N randomly chosen utterances per listener
+  items_per_session: 2 # optional: present N randomly chosen items per listener
   systems:
     - path: ./stimuli/examples/A
       system: A # Clean
@@ -66,7 +66,7 @@ stimuli_dirs:
 #   per_system:
 #     threshold: .inf
 #     verbose: true
-#   per_stimulus:
+#   per_item:
 #     threshold: 1.0
 #     verbose: false
 
@@ -77,7 +77,7 @@ stimuli_dirs:
 # the check is the gate). `scope: stimulus` (default) brings every clip to the
 # same loudness; `scope: system` applies one gain per system so the system's
 # mean reaches target, preserving the natural loudness differences between
-# utterances within a system.
+# items within a system.
 # loudness_normalization:
 #   target: -23.0
 #   scope: stimulus

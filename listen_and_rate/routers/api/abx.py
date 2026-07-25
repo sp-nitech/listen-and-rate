@@ -11,7 +11,7 @@ from ...models import SubmitRequest
 from ...storage import ResultSaver
 from ...x_token import commit, resolve
 from ._shared import (
-    _all_items,
+    _all_stimuli,
     _build_response_trials,
     _id_to_meta,
     _practice_extras,
@@ -43,15 +43,15 @@ def _abx_trials_to_response(
 
 
 def _get_abx_test_config(config: ABXConfig, x_secret: bytes) -> dict:
-    all_items = _all_items(config)
-    id_to_label = {s.id: s.label for s in all_items}
+    all_stimuli = _all_stimuli(config)
+    id_to_label = {s.id: s.label for s in all_stimuli}
     response_trials = _abx_trials_to_response(
-        _build_response_trials(config, all_items), id_to_label, x_secret
+        _build_response_trials(config, all_stimuli), id_to_label, x_secret
     )
 
     extras = _practice_extras(
         config,
-        build_ab_trials(all_items),
+        build_ab_trials(all_stimuli),
         lambda ts: _abx_trials_to_response(ts, id_to_label, x_secret),
     )
     return _test_config_response(config, trials=response_trials, **extras)
@@ -65,14 +65,15 @@ def _submit_abx(
     400 if empty, a pair is invalid/unknown, or the x_token doesn't verify.
     """
     _require_non_empty(body.choices, "choices")
-    id_to_meta = _id_to_meta(_all_items(config))
+    id_to_meta = _id_to_meta(_all_stimuli(config))
 
     rows = []
     for choice in body.choices:
         meta1, meta2 = _validate_pair(id_to_meta, choice.stimulus_ids, "ABX")
         id1, id2 = choice.stimulus_ids
         if choice.selected_stimulus_id is None:
-            # ABX is forced-choice today; unlike AB, None isn't a valid tie response.
+            # ABX is forced-choice today; unlike AB, None isn't a valid tie
+            # response.
             raise HTTPException(
                 status_code=400, detail="selected_stimulus_id is required for ABX"
             )
@@ -93,7 +94,7 @@ def _submit_abx(
             {
                 "system_a": system_a,
                 "system_b": system_b,
-                "utterance": meta1["utterance"],
+                "item": meta1["item"],
                 "correct": choice.selected_stimulus_id == ground_truth,
             }
         )

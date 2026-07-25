@@ -1,7 +1,7 @@
 /**
  * DMOS (rating relative to a reference) listening test UI.
  *
- * Displays one trial (a Reference clip and a Test clip, same utterance) per
+ * Displays one trial (a Reference clip and a Test clip, same item) per
  * page. Listeners must play both clips to completion before rating buttons
  * become active (playback-gated rating), mirroring MOSTest's 1-5 scale.
  * Unlike ABX's hidden "X", the Reference/Test roles are never blinded - the
@@ -45,10 +45,6 @@ export class DMOSTest extends PairedTrialTest {
   }
 
   // -- build-once structure -------------------------------------------------
-
-  _stimulusLabel(current) {
-    return `Audio Pair ${current}`;
-  }
 
   _listenStepsHtml() {
     return `

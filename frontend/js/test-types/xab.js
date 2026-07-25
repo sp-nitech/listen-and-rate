@@ -2,7 +2,7 @@
  * XAB (similarity to a reference) listening test UI.
  *
  * Displays one trial (a disclosed reference X on top, then a pair of
- * same-utterance samples from two systems below - the inverse layout of
+ * same-item samples from two systems below - the inverse layout of
  * ABX) per page. Listeners must play all three clips to completion before
  * choosing which of A/B sounds closer to X (playback-gated, forced
  * two-way choice - no tie).
@@ -40,10 +40,6 @@ export class XABTest extends PairedTrialTest {
   }
 
   // -- build-once structure -------------------------------------------------
-
-  _stimulusLabel(current) {
-    return `Audio Set ${current}`;
-  }
 
   _listenStepsHtml() {
     return `

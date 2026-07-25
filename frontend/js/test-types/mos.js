@@ -180,7 +180,7 @@ export class MOSTest {
     const isLast = this.currentIndex === total - 1;
 
     this._el.counter.textContent = `${practiceCounterPrefix(this.config)}${current} / ${total}`;
-    this._el.label.textContent = s.label ?? `Audio Sample ${current}`;
+    this._el.label.textContent = s.label ?? '';
 
     // Swap only the src on the persistent <audio>, rewound to the start, and
     // reset the custom player's icon/progress.
@@ -354,7 +354,7 @@ export class MOSTest {
   }
 
   async _submit() {
-    // system/utterance are never sent: the server enriches each rating from
+    // system/item are never sent: the server enriches each rating from
     // its own stimulus map, and the config response withholds both anyway.
     await submitPayload(this, () => ({
       ratings: Array.from(this.ratings.entries()).map(([stimulus_id, rating]) => ({

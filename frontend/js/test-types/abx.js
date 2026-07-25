@@ -48,10 +48,6 @@ export class ABXTest extends PairedTrialTest {
 
   // -- build-once structure -------------------------------------------------
 
-  _stimulusLabel(current) {
-    return `Audio Set ${current}`;
-  }
-
   _listenStepsHtml() {
     return `
       <span class="step-listen">① Listen to A, B, and X</span>

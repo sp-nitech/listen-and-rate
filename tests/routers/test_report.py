@@ -23,7 +23,7 @@ def test_report_with_results_returns_html(client, config_yaml):
             "timestamp": "2026-01-01",
             "test_type": "mos",
             "system": "A",
-            "utterance": "u1",
+            "item": "u1",
             "rating": 4,
         },
         {
@@ -31,7 +31,7 @@ def test_report_with_results_returns_html(client, config_yaml):
             "timestamp": "2026-01-01",
             "test_type": "mos",
             "system": "B",
-            "utterance": "u1",
+            "item": "u1",
             "rating": 3,
         },
     ]

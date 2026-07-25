@@ -14,17 +14,17 @@ from ._helpers import (
 )
 
 
-def test_abx_config_utterances_per_session_preserves_order_when_presentation_fixed(
+def test_abx_config_items_per_session_preserves_order_when_presentation_fixed(
     tmp_path, test_audio_file, monkeypatch
 ):
     """With presentation_order="fixed", the sampled trial subset must keep its original
-    utterance order (utt0 < utt1 < ...), not an arbitrary permutation."""
+    item order (utt0 < utt1 < ...), not an arbitrary permutation."""
     with _abx_client(
         tmp_path,
         test_audio_file,
         monkeypatch,
-        n_utterances=6,
-        utterances_per_session=4,
+        n_items=6,
+        items_per_session=4,
         presentation_order="fixed",
     ) as tc:
         for _ in range(20):
@@ -79,35 +79,35 @@ def test_abx_config_returns_trials_with_x_token(tmp_path, test_audio_file, monke
         assert "token" in trial["x"]
 
 
-def test_abx_config_blinds_utterance_and_system(tmp_path, test_audio_file, monkeypatch):
+def test_abx_config_blinds_item_and_system(tmp_path, test_audio_file, monkeypatch):
     with _abx_client(tmp_path, test_audio_file, monkeypatch) as tc:
         text = json.dumps(tc.get("/api/config").json())
-        assert "utterance" not in text
+        assert "item" not in text
         assert "system" not in text
         assert '"A"' not in text
         assert '"B"' not in text
 
 
 def test_abx_x_token_is_not_a_real_stimulus_id(tmp_path, test_audio_file, monkeypatch):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         x_token = trial["x"]["token"]
         assert x_token not in ids
 
 
-def test_abx_config_utterances_per_session_samples_trial_count(
+def test_abx_config_items_per_session_samples_trial_count(
     tmp_path, test_audio_file, monkeypatch
 ):
     with _abx_client(
-        tmp_path, test_audio_file, monkeypatch, n_utterances=3, utterances_per_session=1
+        tmp_path, test_audio_file, monkeypatch, n_items=3, items_per_session=1
     ) as tc:
         assert len(tc.get("/api/config").json()["trials"]) == 1
 
 
 def test_abx_submit_missing_choices_returns_400(tmp_path, test_audio_file, monkeypatch):
     """An abx submission with no choices key must be rejected, not silently accepted."""
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         res = tc.post("/api/submit", json={"session_id": "s1", "test_type": "abx"})
         assert res.status_code == 400
 
@@ -115,7 +115,7 @@ def test_abx_submit_missing_choices_returns_400(tmp_path, test_audio_file, monke
 def test_abx_submit_scores_exactly_one_of_two_opposite_guesses_correct(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         x_token = trial["x"]["token"]
@@ -166,15 +166,15 @@ def test_abx_submit_scores_exactly_one_of_two_opposite_guesses_correct(
             "test_type",
             "system_a",
             "system_b",
-            "utterance",
+            "item",
             "correct",
         ]
         assert {rows1[0]["system_a"], rows1[0]["system_b"]} == {"A", "B"}
-        assert rows1[0]["utterance"] == "utt0"
+        assert rows1[0]["item"] == "utt0"
 
 
 def test_abx_submit_forged_x_token_returns_400(tmp_path, test_audio_file, monkeypatch):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         res = tc.post(
@@ -197,7 +197,7 @@ def test_abx_submit_forged_x_token_returns_400(tmp_path, test_audio_file, monkey
 def test_abx_submit_matched_not_in_pair_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         x_token = trial["x"]["token"]
@@ -218,10 +218,10 @@ def test_abx_submit_matched_not_in_pair_returns_400(
         assert res.status_code == 400
 
 
-def test_abx_submit_mismatched_utterance_pair_returns_400(
+def test_abx_submit_mismatched_item_pair_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=2) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=2) as tc:
         trials = tc.get("/api/config").json()["trials"]
         id1 = trials[0]["stimuli"][0]["id"]
         id2 = trials[1]["stimuli"][0]["id"]
@@ -245,7 +245,7 @@ def test_abx_submit_mismatched_utterance_pair_returns_400(
 def test_abx_submit_same_system_pair_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=2) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=2) as tc:
         res = tc.post(
             "/api/submit",
             json={
@@ -266,7 +266,7 @@ def test_abx_submit_same_system_pair_returns_400(
 def test_abx_submit_unknown_stimulus_id_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         good_id = trial["stimuli"][0]["id"]
         res = tc.post(
@@ -287,7 +287,7 @@ def test_abx_submit_unknown_stimulus_id_returns_400(
 
 
 def test_abx_audio_x_resolves_to_real_file(tmp_path, test_audio_file, monkeypatch):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         x_token = trial["x"]["token"]
@@ -297,7 +297,7 @@ def test_abx_audio_x_resolves_to_real_file(tmp_path, test_audio_file, monkeypatc
 
 
 def test_abx_audio_x_forged_token_returns_404(tmp_path, test_audio_file, monkeypatch):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         res = tc.get("/audio/x/" + "0" * 20, params={"a": ids[0], "b": ids[1]})
@@ -307,7 +307,7 @@ def test_abx_audio_x_forged_token_returns_404(tmp_path, test_audio_file, monkeyp
 def test_audio_x_php_alias(tmp_path, test_audio_file, monkeypatch):
     """The frontend uses one relative URL (audio_x.php?token=&a=&b=) in both
     deployment modes, matching the config.php/save.php alias pattern."""
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         x_token = trial["x"]["token"]

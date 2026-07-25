@@ -29,7 +29,8 @@ def _error_for(data: dict) -> ValidationError:
         (lambda d: d.pop("title"), "title"),
         (
             lambda d: d.__setitem__(
-                "stimuli", {"stimuli_per_session": -1, "items": d["stimuli"]["items"]}
+                "stimuli",
+                {"stimuli_per_session": -1, "entries": d["stimuli"]["entries"]},
             ),
             "stimuli_per_session",
         ),

@@ -317,7 +317,8 @@ def _render_ci_bar_chart(
     rate_fig.update_layout(
         showlegend=True,
         # Above the plot area (not overlaid on it) so it never covers bars,
-        # error whiskers, or annotations regardless of how many pairs there are.
+        # error whiskers, or annotations regardless of how many pairs there
+        # are.
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         height=round(260 * height_scale),
         bargap=_bar_gap(bar_width_scale),

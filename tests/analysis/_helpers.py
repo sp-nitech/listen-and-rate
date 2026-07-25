@@ -129,25 +129,25 @@ def _with_session_meta(
 def _mos_rows(
     entries: list[tuple[str, str, str, int]], timestamp: str = "t"
 ) -> list[dict]:
-    """Build MOS CSV rows from (session_id, system, utterance, rating) tuples."""
+    """Build MOS CSV rows from (session_id, system, item, rating) tuples."""
     return [
         {
             "session_id": sid,
             "timestamp": timestamp,
             "test_type": "mos",
             "system": system,
-            "utterance": utterance,
+            "item": item,
             "rating": rating,
         }
-        for sid, system, utterance, rating in entries
+        for sid, system, item, rating in entries
     ]
 
 
 RATINGS_A_B = [
-    {"system": "A", "utterance": "u1", "rating": 4},
-    {"system": "A", "utterance": "u2", "rating": 5},
-    {"system": "B", "utterance": "u1", "rating": 2},
-    {"system": "B", "utterance": "u2", "rating": 3},
+    {"system": "A", "item": "u1", "rating": 4},
+    {"system": "A", "item": "u2", "rating": 5},
+    {"system": "B", "item": "u1", "rating": 2},
+    {"system": "B", "item": "u2", "rating": 3},
 ]
 
 CSV_ROWS = _with_session_meta("mos", RATINGS_A_B)
@@ -155,19 +155,19 @@ CSV_ROWS = _with_session_meta("mos", RATINGS_A_B)
 DMOS_CSV_ROWS = _with_session_meta("dmos", RATINGS_A_B)
 
 MUSHRA_ROWS = [
-    {"system": "A", "utterance": "u1", "rating": 80},
-    {"system": "A", "utterance": "u2", "rating": 90},
-    {"system": "B", "utterance": "u1", "rating": 30},
-    {"system": "B", "utterance": "u2", "rating": 40},
+    {"system": "A", "item": "u1", "rating": 80},
+    {"system": "A", "item": "u2", "rating": 90},
+    {"system": "B", "item": "u1", "rating": 30},
+    {"system": "B", "item": "u2", "rating": 40},
 ]
 
 MUSHRA_CSV_ROWS = _with_session_meta("mushra", MUSHRA_ROWS)
 
 CMOS_ROWS = [
-    {"utterance": "u1", "system_a": "A", "system_b": "B", "rating": 2},
-    {"utterance": "u2", "system_a": "A", "system_b": "B", "rating": 1},
-    {"utterance": "u3", "system_a": "A", "system_b": "B", "rating": -1},
-    {"utterance": "u4", "system_a": "A", "system_b": "B", "rating": 0},
+    {"item": "u1", "system_a": "A", "system_b": "B", "rating": 2},
+    {"item": "u2", "system_a": "A", "system_b": "B", "rating": 1},
+    {"item": "u3", "system_a": "A", "system_b": "B", "rating": -1},
+    {"item": "u4", "system_a": "A", "system_b": "B", "rating": 0},
 ]
 
 CMOS_CSV_ROWS = _with_session_meta("cmos", CMOS_ROWS)
@@ -177,39 +177,39 @@ CMOS_CSV_ROWS = _with_session_meta("cmos", CMOS_ROWS)
 # system_a/system_b column names and encode the pair SIDE regardless of what
 # the systems are actually called.
 AB_ROWS = [
-    {"system_a": "A", "system_b": "B", "utterance": "u1", "winner": "a"},
-    {"system_a": "A", "system_b": "B", "utterance": "u2", "winner": "a"},
-    {"system_a": "A", "system_b": "B", "utterance": "u3", "winner": "b"},
-    {"system_a": "A", "system_b": "B", "utterance": "u4", "winner": "="},
+    {"system_a": "A", "system_b": "B", "item": "u1", "winner": "a"},
+    {"system_a": "A", "system_b": "B", "item": "u2", "winner": "a"},
+    {"system_a": "A", "system_b": "B", "item": "u3", "winner": "b"},
+    {"system_a": "A", "system_b": "B", "item": "u4", "winner": "="},
 ]
 
 AB_CSV_ROWS = _with_session_meta("ab", AB_ROWS)
 
 ABX_ROWS = [
-    {"system_a": "A", "system_b": "B", "utterance": "u1", "correct": True},
-    {"system_a": "A", "system_b": "B", "utterance": "u2", "correct": True},
-    {"system_a": "A", "system_b": "B", "utterance": "u3", "correct": False},
-    {"system_a": "A", "system_b": "B", "utterance": "u4", "correct": False},
+    {"system_a": "A", "system_b": "B", "item": "u1", "correct": True},
+    {"system_a": "A", "system_b": "B", "item": "u2", "correct": True},
+    {"system_a": "A", "system_b": "B", "item": "u3", "correct": False},
+    {"system_a": "A", "system_b": "B", "item": "u4", "correct": False},
 ]
 
 ABX_CSV_ROWS = _with_session_meta("abx", ABX_ROWS)
 
 XAB_ROWS = [
-    {"system_a": "A", "system_b": "B", "utterance": "u1", "closer": "a"},
-    {"system_a": "A", "system_b": "B", "utterance": "u2", "closer": "a"},
-    {"system_a": "A", "system_b": "B", "utterance": "u3", "closer": "a"},
-    {"system_a": "A", "system_b": "B", "utterance": "u4", "closer": "b"},
+    {"system_a": "A", "system_b": "B", "item": "u1", "closer": "a"},
+    {"system_a": "A", "system_b": "B", "item": "u2", "closer": "a"},
+    {"system_a": "A", "system_b": "B", "item": "u3", "closer": "a"},
+    {"system_a": "A", "system_b": "B", "item": "u4", "closer": "b"},
 ]
 
 XAB_CSV_ROWS = _with_session_meta("xab", XAB_ROWS)
 
 THREE_SYSTEM_RATINGS = [
-    {"system": "A", "utterance": "u1", "rating": 4},
-    {"system": "A", "utterance": "u2", "rating": 5},
-    {"system": "B", "utterance": "u1", "rating": 2},
-    {"system": "B", "utterance": "u2", "rating": 3},
-    {"system": "C", "utterance": "u1", "rating": 3},
-    {"system": "C", "utterance": "u2", "rating": 4},
+    {"system": "A", "item": "u1", "rating": 4},
+    {"system": "A", "item": "u2", "rating": 5},
+    {"system": "B", "item": "u1", "rating": 2},
+    {"system": "B", "item": "u2", "rating": 3},
+    {"system": "C", "item": "u1", "rating": 3},
+    {"system": "C", "item": "u2", "rating": 4},
 ]
 
 THREE_SYSTEM_CSV_ROWS = _with_session_meta("mos", THREE_SYSTEM_RATINGS)

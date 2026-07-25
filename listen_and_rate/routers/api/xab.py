@@ -10,7 +10,7 @@ from ...config import StimulusConfig, XABConfig, XABTrial, build_xab_trials
 from ...models import SubmitRequest
 from ...storage import OUTCOME_A, OUTCOME_B, ResultSaver
 from ._shared import (
-    _all_items,
+    _all_stimuli,
     _id_to_meta,
     _practice_extras,
     _require_non_empty,
@@ -22,12 +22,12 @@ from ._shared import (
 
 
 def _build_xab_response_trials(
-    config: XABConfig, all_items: list[StimulusConfig]
+    config: XABConfig, all_stimuli: list[StimulusConfig]
 ) -> list[XABTrial]:
-    """Pair and sample the trial list for XAB's /api/config (one per utterance)."""
-    trials = build_xab_trials(all_items, config.reference_system)
+    """Pair and sample the trial list for XAB's /api/config (one per item)."""
+    trials = build_xab_trials(all_stimuli, config.reference_system)
 
-    n = config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
+    n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
     if n is not None:
         trials = _sample_keep_order(trials, n)
     if config.shuffle_order:
@@ -56,15 +56,15 @@ def _xab_trials_to_response(
 
 
 def _get_xab_test_config(config: XABConfig) -> dict:
-    all_items = _all_items(config)
-    id_to_label = {s.id: s.label for s in all_items}
+    all_stimuli = _all_stimuli(config)
+    id_to_label = {s.id: s.label for s in all_stimuli}
     response_trials = _xab_trials_to_response(
-        _build_xab_response_trials(config, all_items), id_to_label
+        _build_xab_response_trials(config, all_stimuli), id_to_label
     )
 
     extras = _practice_extras(
         config,
-        build_xab_trials(all_items, config.reference_system),
+        build_xab_trials(all_stimuli, config.reference_system),
         lambda ts: _xab_trials_to_response(ts, id_to_label),
     )
     return _test_config_response(config, trials=response_trials, **extras)
@@ -77,7 +77,7 @@ def _submit_xab(body: SubmitRequest, config: XABConfig, saver: ResultSaver) -> d
     a selection.
     """
     _require_non_empty(body.choices, "choices")
-    id_to_meta = _id_to_meta(_all_items(config))
+    id_to_meta = _id_to_meta(_all_stimuli(config))
     reference_system = config.reference_system
 
     rows = []
@@ -108,7 +108,7 @@ def _submit_xab(body: SubmitRequest, config: XABConfig, saver: ResultSaver) -> d
             {
                 "system_a": system_a,
                 "system_b": system_b,
-                "utterance": meta1["utterance"],
+                "item": meta1["item"],
                 "closer": closer,
             }
         )

@@ -34,7 +34,7 @@ def _generate_mos_report(
     """Build the MOS/DMOS/MUSHRA report: mean+CI and distribution charts, t-tests.
 
     Shared by all three test types - a DMOS/MUSHRA submission's stored row
-    shape (utterance/system/rating) is identical to MOS's, so only the y-axis
+    shape (item/system/rating) is identical to MOS's, so only the y-axis
     label (`metric_label`) and the scale-dependent parameters differ:
     `axis_step` (the scale's natural increment the zoomed range is snapped to;
     ticks within it are auto), `axis_tickformat` (mean-axis tick label format -
@@ -170,7 +170,8 @@ def _generate_mos_report(
     mos_fig.update_layout(
         showlegend=True,
         # Above the plot area (not overlaid on it) so it never covers bars,
-        # error whiskers, or annotations regardless of how many systems there are.
+        # error whiskers, or annotations regardless of how many systems there
+        # are.
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         height=round(320 * height_scale),
         bargap=_bar_gap(bar_width_scale),
@@ -216,8 +217,8 @@ def _generate_mos_report(
             continue
         # Near-identical (or exactly identical) samples make scipy warn about
         # precision loss in its internal variance calculation; we already
-        # handle the degenerate NaN outcome below (N/A), so the warning
-        # itself is noise to a CLI user by this point, not something actionable.
+        # handle the degenerate NaN outcome below (N/A), so the warning itself
+        # is noise to a CLI user by this point, not something actionable.
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
             raw_p = float(stats.ttest_ind(raw[sys_i], raw[sys_j]).pvalue)  # type: ignore[arg-type]

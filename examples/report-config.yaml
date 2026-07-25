@@ -51,7 +51,7 @@ confidence: 0.95
 #   - label: All listeners
 #   - label: Speaker m001
 #     stimuli_filter:
-#       utterance: "*_m001_*"
+#       item: "*_m001_*"
 #   - label: Headphones only
 #     metadata_filter:
 #       device: Headphones

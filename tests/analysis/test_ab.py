@@ -104,10 +104,10 @@ def test_generate_ab_report_positional_tokens_are_name_agnostic(tmp_path):
     rows = _with_session_meta(
         "ab",
         [
-            {"system_a": "=", "system_b": "tie", "utterance": "u1", "winner": "a"},
-            {"system_a": "=", "system_b": "tie", "utterance": "u2", "winner": "a"},
-            {"system_a": "=", "system_b": "tie", "utterance": "u3", "winner": "b"},
-            {"system_a": "=", "system_b": "tie", "utterance": "u4", "winner": "="},
+            {"system_a": "=", "system_b": "tie", "item": "u1", "winner": "a"},
+            {"system_a": "=", "system_b": "tie", "item": "u2", "winner": "a"},
+            {"system_a": "=", "system_b": "tie", "item": "u3", "winner": "b"},
+            {"system_a": "=", "system_b": "tie", "item": "u4", "winner": "="},
         ],
     )
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
@@ -125,8 +125,8 @@ def test_generate_ab_report_rate_follows_positional_token_under_swap(tmp_path):
     rows = _with_session_meta(
         "ab",
         [
-            {"system_a": "Mid", "system_b": "Zebra", "utterance": "u1", "winner": "a"},
-            {"system_a": "Mid", "system_b": "Zebra", "utterance": "u2", "winner": "a"},
+            {"system_a": "Mid", "system_b": "Zebra", "item": "u1", "winner": "a"},
+            {"system_a": "Mid", "system_b": "Zebra", "item": "u2", "winner": "a"},
         ],
     )
     html = generate_report_html(
@@ -175,7 +175,7 @@ def test_generate_ab_report_orders_pairs_by_system_order(tmp_path):
             "session_id": "s1",
             "timestamp": "t",
             "test_type": "ab",
-            "utterance": "u1",
+            "item": "u1",
             "system_a": "Alpha",
             "system_b": "Zebra",
             "winner": "a",  # Alpha (system_a) won
@@ -196,7 +196,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "session_id": "s1",
             "timestamp": "t",
             "test_type": "ab",
-            "utterance": "u1",
+            "item": "u1",
             "system_a": "Mid",
             "system_b": "Zebra",
             "winner": "a",  # Mid (system_a) won
@@ -205,7 +205,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "session_id": "s1",
             "timestamp": "t",
             "test_type": "ab",
-            "utterance": "u2",
+            "item": "u2",
             "system_a": "Alpha",
             "system_b": "Zebra",
             "winner": "a",  # Alpha (system_a) won
@@ -214,7 +214,7 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
             "session_id": "s1",
             "timestamp": "t",
             "test_type": "ab",
-            "utterance": "u3",
+            "item": "u3",
             "system_a": "Alpha",
             "system_b": "Mid",
             "winner": "a",  # Alpha (system_a) won
@@ -244,7 +244,8 @@ def test_generate_xab_report_shows_closer_rate_and_ci(tmp_path):
 def test_generate_xab_report_has_no_tie_category(tmp_path):
     """XAB is forced-choice, so the counts chart must not show a Tie bar."""
     html = generate_report_html([_write_csv(tmp_path / "s.csv", XAB_CSV_ROWS)])
-    # The counts chart is the second Plotly.newPlot call (after the rate chart).
+    # The counts chart is the second Plotly.newPlot call (after the rate
+    # chart).
     traces, _ = _plotly_call_args(html, occurrence=1)
     assert traces[0]["x"] == ["A", "B"]
     assert traces[0]["y"] == [3, 1]

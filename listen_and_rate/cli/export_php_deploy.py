@@ -81,13 +81,15 @@ def _seed_results_dir(outdir: Path, results_subpath: Path | None) -> None:
         return
     results_dir = outdir / results_subpath
     results_dir.mkdir(parents=True, exist_ok=True)
-    # World-writable so save.php (running as the web server user) can create
-    # per-experiment subdirectories, matching save.php's own mkdir(...,0777,...).
+    # World-writable so save.php (running as the web server user) can
+    # create per-experiment subdirectories, matching save.php's own
+    # mkdir(...,0777,...).
     results_dir.chmod(0o777)
     content = textwrap.dedent(r"""\
-    # Block direct web access to raw per-listener rating data (.csv/.json), but
-    # allow everything else (e.g. report.html) so a generated report can live
-    # alongside the raw files it summarizes. Raw files are downloaded via SSH/SCP.
+    # Block direct web access to raw per-listener rating data (.csv/.json),
+    # but allow everything else (e.g. report.html) so a generated report can
+    # live alongside the raw files it summarizes. Raw files are downloaded via
+    # SSH/SCP.
 
     <IfModule mod_authz_core.c>
         <FilesMatch "\.(csv|json)$">
@@ -166,7 +168,7 @@ def _symlinks_supported(outdir: Path) -> bool:
 
 
 def _symlink_audio_files(
-    outdir: Path, all_items: list[StimulusConfig], audio_urls: dict[str, str]
+    outdir: Path, all_stimuli: list[StimulusConfig], audio_urls: dict[str, str]
 ) -> None:
     """Symlink each stimulus's audio file into outdir at its audio_url path.
 
@@ -187,9 +189,9 @@ def _symlink_audio_files(
             "Mode); copying audio into the bundle instead. Pass --copy-audio "
             "to make this the explicit, intended behavior."
         )
-        _copy_audio_files(outdir, all_items, audio_urls)
+        _copy_audio_files(outdir, all_stimuli, audio_urls)
         return
-    for s in all_items:
+    for s in all_stimuli:
         dst = outdir / audio_urls[s.id]
         dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.is_symlink() or dst.exists():
@@ -198,7 +200,7 @@ def _symlink_audio_files(
 
 
 def _copy_audio_files(
-    outdir: Path, all_items: list[StimulusConfig], audio_urls: dict[str, str]
+    outdir: Path, all_stimuli: list[StimulusConfig], audio_urls: dict[str, str]
 ) -> None:
     """Hard-copy each stimulus's audio file into outdir at its audio_url path.
 
@@ -210,7 +212,7 @@ def _copy_audio_files(
     symlink, so the result is always a real file. The source is resolved to an
     absolute path, matching _symlink_audio_files' target resolution.
     """
-    for s in all_items:
+    for s in all_stimuli:
         dst = outdir / audio_urls[s.id]
         dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.is_symlink() or dst.exists():
@@ -234,18 +236,18 @@ def _php_value(value: object) -> str:
     if isinstance(value, str):
         return f"'{_php_string(value)}'"
     if isinstance(value, dict):
-        items = ", ".join(
+        parts = ", ".join(
             f"'{_php_string(str(k))}' => {_php_value(v)}" for k, v in value.items()
         )
-        return f"[{items}]"
+        return f"[{parts}]"
     if isinstance(value, (list, tuple)):
-        items = ", ".join(_php_value(v) for v in value)
-        return f"[{items}]"
+        parts = ", ".join(_php_value(v) for v in value)
+        return f"[{parts}]"
     raise TypeError(f"Cannot render {value!r} as a PHP value")
 
 
-def _render_stimulus_map_php(items: list[StimulusConfig]) -> str:
-    """Render a PHP file returning id -> {system, utterance} for save.php.
+def _render_stimulus_map_php(stimuli: list[StimulusConfig]) -> str:
+    """Render a PHP file returning id -> {system, item} for save.php.
 
     This is deliberately kept out of config_data.php (read by config.php to
     build the browser-facing response) so listeners cannot see which system a
@@ -254,11 +256,11 @@ def _render_stimulus_map_php(items: list[StimulusConfig]) -> str:
     the web root.
     """
     lines = ["<?php", "", "return ["]
-    for s in items:
+    for s in stimuli:
         lines.append(
             f"    '{_php_string(s.id)}' => "
             f"['system' => '{_php_string(s.system or '')}', "
-            f"'utterance' => '{_php_string(s.utterance or '')}'],"
+            f"'item' => '{_php_string(s.item or '')}'],"
         )
     lines.append("];")
     lines.append("")
@@ -269,7 +271,7 @@ def _render_config_data_php(data: dict) -> str:
     """Render the static experiment definition as a PHP file for config.php.
 
     config.php includes this at request time to build the browser-facing
-    response, re-sampling stimuli_per_session/utterances_per_session and
+    response, re-sampling stimuli_per_session/items_per_session and
     re-applying presentation_order fresh on every request (see
     frontend/config.php).
     """
@@ -279,7 +281,7 @@ def _render_config_data_php(data: dict) -> str:
 def _build_config_data(
     config: Config,
     experiment_id: str,
-    all_items: list[StimulusConfig],
+    all_stimuli: list[StimulusConfig],
     audio_urls: dict[str, str],
 ) -> dict:
     """Assemble the static experiment definition written to config_data.php.
@@ -300,7 +302,7 @@ def _build_config_data(
         {
             "id": s.id,
             "label": s.label,
-            "utterance": s.utterance,
+            "item": s.item,
             "audio_url": audio_urls[s.id],
             # Not sensitive (unlike 'system') - it's the same distinction
             # already visible to the listener as the "Reference"/"Test" label.
@@ -309,7 +311,7 @@ def _build_config_data(
             # always shown last and labeled "Anchor" to the listener.
             "anchor": anchor_system is not None and s.system == anchor_system,
         }
-        for s in all_items
+        for s in all_stimuli
     ]
 
     practice = config.practice
@@ -326,9 +328,10 @@ def _build_config_data(
         # fetch. See _shared.py's _test_config_response.
         "durations": config.durations,
         "output_format": config.output.format,
-        # save.php resolves this against the bundle directory when relative
-        # (see its resolve_results_dir()), mirroring the FastAPI deployment's
-        # use of output.path - both layouts are <deployment root>/<output.path>.
+        # save.php resolves this against the bundle directory when
+        # relative (see its resolve_results_dir()), mirroring the FastAPI
+        # deployment's use of output.path - both layouts are <deployment
+        # root>/<output.path>.
         "output_path": config.output.path,
         # One {title, fields} block per form, the same shape as the YAML and
         # the FastAPI response - a single shape across every layer.
@@ -343,7 +346,7 @@ def _build_config_data(
         "shortcuts": config.shortcuts.browser_dict(),
         "rating_labels": getattr(config, "rating_labels", None),
         # Server-side only (never echoed to the browser response) - used by
-        # config.php to identify the reference stimulus in each utterance
+        # config.php to identify the reference stimulus in each item
         # group via stimulus_map.php, the same way save.php already looks up
         # 'system' there without exposing it to the client.
         "reference_system": reference_system,
@@ -378,8 +381,8 @@ def _build_config_data(
         # request, independently of the session sampling above.
         "practice_count": (practice.count if practice else 0),
         "practice_instructions": (practice.instructions if practice else None),
-        "utterances_per_session": (
-            config.stimuli_dirs.utterances_per_session if config.stimuli_dirs else None
+        "items_per_session": (
+            config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
         ),
         "stimuli": stimuli,
     }
@@ -392,7 +395,7 @@ def main() -> None:
     config.php) into --outdir, then writes config_data.php and
     stimulus_map.php there too, so --outdir ends up as a self-contained bundle
     ready to upload as-is. config_data.php holds the raw experiment
-    definition (including stimuli_per_session/utterances_per_session); it is
+    definition (including stimuli_per_session/items_per_session); it is
     read by config.php, which re-applies per-session sampling and
     presentation_order on every request rather than baking in one fixed
     subset, and withholds
@@ -444,7 +447,7 @@ def main() -> None:
     if config.stimuli is None:
         raise RuntimeError("config.stimuli is None after loading")
 
-    all_items = config.stimuli.items
+    all_stimuli = config.stimuli.entries
     # Normalized audio is always written out as WAV (see apply_gain_and_write),
     # so its URL carries a .wav suffix even when the source was e.g. .mp3.
     # The rewrite cannot collide two stimuli onto one output path: load_config
@@ -456,10 +459,10 @@ def main() -> None:
             if normalize
             else _audio_url(Path(s.path))
         )
-        for s in all_items
+        for s in all_stimuli
     }
     config_data = _build_config_data(
-        config, Path(args.config).stem, all_items, audio_urls
+        config, Path(args.config).stem, all_stimuli, audio_urls
     )
 
     outdir = Path(args.outdir)
@@ -481,15 +484,17 @@ def main() -> None:
             config, lambda s: outdir / audio_urls[s.id]
         )
     elif args.copy_audio:
-        _copy_audio_files(outdir, all_items, audio_urls)
+        _copy_audio_files(outdir, all_stimuli, audio_urls)
     else:
-        _symlink_audio_files(outdir, all_items, audio_urls)
+        _symlink_audio_files(outdir, all_stimuli, audio_urls)
 
     config_data_path = outdir / "config_data.php"
     config_data_path.write_text(_render_config_data_php(config_data), encoding="utf-8")
 
     stimulus_map_path = outdir / "stimulus_map.php"
-    stimulus_map_path.write_text(_render_stimulus_map_php(all_items), encoding="utf-8")
+    stimulus_map_path.write_text(
+        _render_stimulus_map_php(all_stimuli), encoding="utf-8"
+    )
 
     logger.info(
         "Copy `%s` to your public_html or www directory to deploy the experiment",

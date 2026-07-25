@@ -35,7 +35,7 @@ def config_yaml(tmp_path, test_audio_file) -> Path:
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "presentation_order": "fixed",
         "stimuli": {
-            "items": [
+            "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
             ]

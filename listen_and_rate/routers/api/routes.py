@@ -43,7 +43,7 @@ def get_test_config(
 ):
     """Return test parameters for the frontend.
 
-    Only id and label are sent per stimulus - path, system, and utterance are
+    Only id and label are sent per stimulus - path, system, and item are
     withheld to keep listeners blind to the underlying system under test.
     """
     if isinstance(config, MOSConfig):

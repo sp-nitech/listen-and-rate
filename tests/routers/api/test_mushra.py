@@ -17,7 +17,7 @@ from ._helpers import (
 def test_mushra_config_returns_trials_with_reference_systems_and_anchor(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         data = tc.get("/api/config").json()
         assert "trials" in data
         assert "stimuli" not in data
@@ -34,7 +34,7 @@ def test_mushra_config_without_reference_or_anchor(
         tmp_path,
         test_audio_file,
         monkeypatch,
-        n_utterances=1,
+        n_items=1,
         with_reference=False,
         with_anchor=False,
     ) as tc:
@@ -47,7 +47,7 @@ def test_mushra_config_without_reference_or_anchor(
 def test_mushra_config_blinds_system_identity(tmp_path, test_audio_file, monkeypatch):
     with _mushra_client(tmp_path, test_audio_file, monkeypatch) as tc:
         text = json.dumps(tc.get("/api/config").json())
-        assert "utterance" not in text
+        assert "item" not in text
         assert '"Test0"' not in text
         assert '"Test1"' not in text
         assert '"Reference"' not in text
@@ -57,7 +57,7 @@ def test_mushra_config_blinds_system_identity(tmp_path, test_audio_file, monkeyp
 def test_mushra_config_anchor_never_mixed_into_systems(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         for _ in range(20):
             trial = tc.get("/api/config").json()["trials"][0]
             system_ids = {s["id"] for s in trial["systems"]}
@@ -65,7 +65,7 @@ def test_mushra_config_anchor_never_mixed_into_systems(
 
 
 def test_mushra_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ratings = [{"stimulus_id": s["id"], "rating": 70} for s in trial["systems"]]
         ratings.append({"stimulus_id": trial["anchor"]["id"], "rating": 20})
@@ -79,14 +79,14 @@ def test_mushra_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
         systems = {r["system"] for r in rows}
         assert systems == {"Test0", "Test1", "Anchor"}
         for r in rows:
-            assert r["utterance"] == "utt0"
+            assert r["item"] == "utt0"
 
 
 @pytest.mark.parametrize("rating", [-1, 101])
 def test_mushra_submit_rating_out_of_range_returns_400(
     tmp_path, test_audio_file, monkeypatch, rating
 ):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ratings = [{"stimulus_id": s["id"], "rating": 50} for s in trial["systems"]]
         ratings.append({"stimulus_id": trial["anchor"]["id"], "rating": rating})
@@ -100,7 +100,7 @@ def test_mushra_submit_rating_out_of_range_returns_400(
 def test_mushra_submit_unknown_stimulus_id_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         res = tc.post(
             "/api/submit",
             json={
@@ -115,7 +115,7 @@ def test_mushra_submit_unknown_stimulus_id_returns_400(
 def test_mushra_submit_reference_stimulus_id_rejected(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         res = tc.post(
             "/api/submit",
@@ -128,10 +128,10 @@ def test_mushra_submit_reference_stimulus_id_rejected(
         assert res.status_code == 400
 
 
-def test_mushra_submit_incomplete_utterance_returns_400(
+def test_mushra_submit_incomplete_item_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ratings = [{"stimulus_id": trial["systems"][0]["id"], "rating": 50}]
         res = tc.post(
@@ -144,7 +144,7 @@ def test_mushra_submit_incomplete_utterance_returns_400(
 def test_mushra_submit_empty_ratings_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         res = tc.post("/api/submit", json={"session_id": "s1", "test_type": "mushra"})
         assert res.status_code == 400
 

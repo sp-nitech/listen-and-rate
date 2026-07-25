@@ -70,7 +70,7 @@ def test_generate_abx_report_orders_pairs_by_system_order(tmp_path):
             "session_id": "s1",
             "timestamp": "t",
             "test_type": "abx",
-            "utterance": "u1",
+            "item": "u1",
             "system_a": "Alpha",
             "system_b": "Zebra",
             "correct": True,

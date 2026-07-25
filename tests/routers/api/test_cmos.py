@@ -22,22 +22,20 @@ def test_cmos_config_returns_trials_not_stimuli(tmp_path, test_audio_file, monke
         assert len(data["trials"][0]["stimuli"]) == 2
 
 
-def test_cmos_config_blinds_utterance_and_system(
-    tmp_path, test_audio_file, monkeypatch
-):
+def test_cmos_config_blinds_item_and_system(tmp_path, test_audio_file, monkeypatch):
     with _cmos_client(tmp_path, test_audio_file, monkeypatch) as tc:
         text = json.dumps(tc.get("/api/config").json())
-        assert "utterance" not in text
+        assert "item" not in text
         assert "system" not in text
         assert '"A"' not in text
         assert '"B"' not in text
 
 
-def test_cmos_config_utterances_per_session_samples_trial_count(
+def test_cmos_config_items_per_session_samples_trial_count(
     tmp_path, test_audio_file, monkeypatch
 ):
     with _cmos_client(
-        tmp_path, test_audio_file, monkeypatch, n_utterances=3, utterances_per_session=1
+        tmp_path, test_audio_file, monkeypatch, n_items=3, items_per_session=1
     ) as tc:
         assert len(tc.get("/api/config").json()["trials"]) == 1
 
@@ -45,13 +43,13 @@ def test_cmos_config_utterances_per_session_samples_trial_count(
 def test_cmos_submit_missing_choices_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         res = tc.post("/api/submit", json={"session_id": "s1", "test_type": "cmos"})
         assert res.status_code == 400
 
 
 def test_cmos_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
-    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         res = tc.post(
@@ -65,7 +63,7 @@ def test_cmos_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
         assert res.status_code == 200
         rows = list(csv.DictReader((tmp_path / "results" / "config" / "s1.csv").open()))
         assert {rows[0]["system_a"], rows[0]["system_b"]} == {"A", "B"}
-        assert rows[0]["utterance"] == "utt0"
+        assert rows[0]["item"] == "utt0"
         assert rows[0]["rating"] in ("2", "-2")
         # Column order matches MOS's system-first convention.
         assert list(rows[0].keys()) == [
@@ -74,7 +72,7 @@ def test_cmos_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
             "test_type",
             "system_a",
             "system_b",
-            "utterance",
+            "item",
             "rating",
         ]
 
@@ -85,7 +83,7 @@ def test_cmos_submit_rating_sign_matches_canonical_system_order(
     """rating is 'stimulus_ids[1] relative to stimulus_ids[0]'; the stored
     rating must be flipped when stimulus_ids[0] isn't the canonical
     (alphabetically-first) system."""
-    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         id_a = next(i for i in ids if i.startswith("sys_a"))
@@ -109,7 +107,7 @@ def test_cmos_submit_rating_sign_matches_canonical_system_order(
 
 
 def test_cmos_submit_rating_missing_returns_400(tmp_path, test_audio_file, monkeypatch):
-    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         res = tc.post(
@@ -127,7 +125,7 @@ def test_cmos_submit_rating_missing_returns_400(tmp_path, test_audio_file, monke
 def test_cmos_submit_rating_out_of_range_returns_400(
     tmp_path, test_audio_file, monkeypatch, rating
 ):
-    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
         res = tc.post(
@@ -141,10 +139,10 @@ def test_cmos_submit_rating_out_of_range_returns_400(
         assert res.status_code == 400
 
 
-def test_cmos_submit_mismatched_utterance_pair_returns_400(
+def test_cmos_submit_mismatched_item_pair_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=2) as tc:
+    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=2) as tc:
         trials = tc.get("/api/config").json()["trials"]
         id1 = trials[0]["stimuli"][0]["id"]
         id2 = trials[1]["stimuli"][0]["id"]
@@ -162,7 +160,7 @@ def test_cmos_submit_mismatched_utterance_pair_returns_400(
 def test_cmos_submit_same_system_pair_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=2) as tc:
+    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=2) as tc:
         res = tc.post(
             "/api/submit",
             json={
@@ -179,7 +177,7 @@ def test_cmos_submit_same_system_pair_returns_400(
 def test_cmos_submit_unknown_stimulus_id_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
-    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_utterances=1) as tc:
+    with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         good_id = trial["stimuli"][0]["id"]
         res = tc.post(

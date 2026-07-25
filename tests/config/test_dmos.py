@@ -85,7 +85,7 @@ def test_dmos_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_fi
         "test_type": "dmos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"items": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
@@ -119,9 +119,7 @@ def test_dmos_supports_multiple_test_systems(tmp_path, test_audio_file):
 def test_build_dmos_trials_pairs_reference_with_each_test_system(
     tmp_path, test_audio_file
 ):
-    da, db, dc = three_system_dirs(
-        tmp_path, test_audio_file, utterances=("utt1", "utt2")
-    )
+    da, db, dc = three_system_dirs(tmp_path, test_audio_file, items=("utt1", "utt2"))
     data = stimuli_dirs_data(
         [
             {"path": str(da), "system": "Reference", "reference": True},
@@ -131,20 +129,18 @@ def test_build_dmos_trials_pairs_reference_with_each_test_system(
         test_type="dmos",
     )
     result = load_config(write_config(tmp_path, data))
-    items = result.stimuli.items
-    trials = build_dmos_trials(items, result.reference_system)
-    # 2 utterances x 2 test systems = 4 trials
+    stimuli = result.stimuli.entries
+    trials = build_dmos_trials(stimuli, result.reference_system)
+    # 2 items x 2 test systems = 4 trials
     assert len(trials) == 4
     test_systems = {t.test_system for t in trials}
     assert test_systems == {"B", "C"}
-    reference_ids = {s.id for s in items if s.system == "Reference"}
+    reference_ids = {s.id for s in stimuli if s.system == "Reference"}
     for t in trials:
         assert t.reference_id in reference_ids
 
 
-def test_build_dmos_trials_skips_utterance_missing_from_a_system(
-    tmp_path, test_audio_file
-):
+def test_build_dmos_trials_skips_item_missing_from_a_system(tmp_path, test_audio_file):
     da = tmp_path / "sys_ref"
     db = tmp_path / "sys_b"
     da.mkdir()
@@ -161,7 +157,7 @@ def test_build_dmos_trials_skips_utterance_missing_from_a_system(
     )
     with pytest.warns(UserWarning, match="not present in all systems"):
         result = load_config(write_config(tmp_path, data))
-    items = result.stimuli.items
-    trials = build_dmos_trials(items, result.reference_system)
+    stimuli = result.stimuli.entries
+    trials = build_dmos_trials(stimuli, result.reference_system)
     assert len(trials) == 1
-    assert trials[0].utterance == "utt1"
+    assert trials[0].item == "utt1"

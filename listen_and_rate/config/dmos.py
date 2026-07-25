@@ -77,28 +77,28 @@ class DMOSConfig(RatingLabelsConfigMixin, BaseTestConfig):
 class DMOSTrial:
     """One DMOS trial: a reference paired with one test-system stimulus."""
 
-    utterance: str
+    item: str
     reference_id: str
     test_id: str
     test_system: str
 
 
 def build_dmos_trials(
-    items: list[StimulusConfig], reference_system: str
+    stimuli: list[StimulusConfig], reference_system: str
 ) -> list[DMOSTrial]:
-    """Pair the reference with each non-reference system's stimulus, by utterance.
+    """Pair the reference with each non-reference system's stimulus, by item.
 
-    One trial per (utterance, test system) where both the reference and
-    that test system have a stimulus for that utterance; combinations
+    One trial per (item, test system) where both the reference and
+    that test system have a stimulus for that item; combinations
     missing either are silently skipped, mirroring build_ab_trials().
     """
-    by_utterance: dict[str, list[StimulusConfig]] = {}
-    for s in items:
-        if s.utterance:
-            by_utterance.setdefault(s.utterance, []).append(s)
+    by_item: dict[str, list[StimulusConfig]] = {}
+    for s in stimuli:
+        if s.item:
+            by_item.setdefault(s.item, []).append(s)
 
     trials = []
-    for utterance, group in sorted(by_utterance.items()):
+    for item, group in sorted(by_item.items()):
         reference_stimulus = next(
             (s for s in group if (s.system or "") == reference_system), None
         )
@@ -108,7 +108,7 @@ def build_dmos_trials(
         for test_stimulus in sorted(test_stimuli, key=lambda s: s.system or ""):
             trials.append(
                 DMOSTrial(
-                    utterance=utterance,
+                    item=item,
                     reference_id=reference_stimulus.id,
                     test_id=test_stimulus.id,
                     test_system=test_stimulus.system or "",

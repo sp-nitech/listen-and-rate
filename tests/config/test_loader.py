@@ -265,6 +265,75 @@ def test_stimuli_dirs_single_system_skips_cross_checks(tmp_path, test_audio_file
     assert len(result.stimuli.entries) == 1
 
 
+def test_stimuli_dirs_same_path_under_distinct_system_names(tmp_path, test_audio_file):
+    """One directory may back several systems - ids follow the system name.
+
+    A deliberate repeat of one set of clips under two names (e.g. an
+    intra-rater consistency condition) is legitimate, and the system names
+    are already required to be unique, so the ids derived from them are too.
+    """
+    d = tmp_path / "sys_a"
+    d.mkdir()
+    shutil.copy(test_audio_file, d / "utt1.wav")
+    data = stimuli_dirs_data(
+        [
+            {"path": str(d), "system": "First"},
+            {"path": str(d), "system": "Second"},
+        ]
+    )
+    result = load_config(write_config(tmp_path, data))
+    assert [s.id for s in result.stimuli.entries] == ["First__utt1", "Second__utt1"]
+    assert [s.system for s in result.stimuli.entries] == ["First", "Second"]
+    # Both ids resolve to the same file - that is the point of the repeat.
+    assert len({s.path for s in result.stimuli.entries}) == 1
+
+
+def test_stimuli_dirs_same_basename_distinct_system_names(tmp_path, test_audio_file):
+    """Same-basename directories are fine once each names its system.
+
+    Only the dirname-derived default collides here; ids come from the system
+    name, so spelling both out resolves it.
+    """
+    sub_a = tmp_path / "group_a" / "audio"
+    sub_b = tmp_path / "group_b" / "audio"
+    sub_a.mkdir(parents=True)
+    sub_b.mkdir(parents=True)
+    shutil.copy(test_audio_file, sub_a / "001.wav")
+    shutil.copy(test_audio_file, sub_b / "001.wav")
+    data = stimuli_dirs_data(
+        [
+            {"path": str(sub_a), "system": "A"},
+            {"path": str(sub_b), "system": "B"},
+        ]
+    )
+    result = load_config(write_config(tmp_path, data))
+    assert [s.id for s in result.stimuli.entries] == ["A__001", "B__001"]
+
+
+def test_stimuli_dirs_system_names_colliding_once_url_safe_raise_error(
+    tmp_path, test_audio_file
+):
+    """Distinct system names that sanitize to one id are still rejected.
+
+    _safe_id replaces URL-unsafe characters, so "A B" and "A_B" are distinct
+    system names but a single id - the backstop check must still catch it.
+    """
+    da = tmp_path / "d1"
+    db = tmp_path / "d2"
+    da.mkdir()
+    db.mkdir()
+    shutil.copy(test_audio_file, da / "001.wav")
+    shutil.copy(test_audio_file, db / "001.wav")
+    data = stimuli_dirs_data(
+        [
+            {"path": str(da), "system": "A B"},
+            {"path": str(db), "system": "A_B"},
+        ]
+    )
+    with pytest.raises(ValueError, match="A_B__001"):
+        load_config(write_config(tmp_path, data))
+
+
 def test_stimuli_dirs_duplicate_basename_raises_error(tmp_path, test_audio_file):
     sub_a = tmp_path / "group_a" / "audio"
     sub_b = tmp_path / "group_b" / "audio"

@@ -154,11 +154,25 @@ body {
   margin-bottom: 40px;
 }
 
+/* The title line doubles as the status row: the practice badge sits inline
+   after the title, the page counter is pinned to the right end. Keeping both
+   here means every test type shows progress in the same place, whatever its
+   page content happens to be (one card, a pair, or a row of sliders). */
+.test-title-row {
+  display: flex;
+  /* Centered, not baseline-aligned: a baseline would sit the counter pill's
+     text on the h1's baseline, dropping the pill's padding below it. Centering
+     matches .practice-badge, which rides the same line on vertical-align. */
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
 .test-header h1 {
   font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  margin-bottom: 12px;
 }
 
 .test-header .instructions {
@@ -213,14 +227,10 @@ body {
   }
 }
 
-.stimulus-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
+/* Lives in .test-title-row, not in the page - see the comment there.
+   flex-shrink keeps a long title from squeezing the count onto two lines. */
 .page-counter {
+  flex-shrink: 0;
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--color-text-muted);
@@ -229,16 +239,23 @@ body {
   border-radius: 99px;
   letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* MOS only, and only when the config gives a stimulus an explicit `label:` -
-   the element stays empty otherwise. Every other test type shows just the
-   page counter here, since a generated "Audio Pair N" would only repeat the
-   counter's own N. */
+   the element is emptied otherwise and :empty then collapses its row away.
+   No other test type has one: a generated "Audio Pair N" would say nothing
+   the page counter does not already say. */
 .stimulus-label {
+  display: block;
+  margin-bottom: 24px;
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-text);
+}
+
+.stimulus-label:empty {
+  display: none;
 }
 
 /* -- Audio player card -------------------------------------------------- */
@@ -571,10 +588,18 @@ audio {
   justify-content: center;
   flex-wrap: wrap;
   gap: 4px;
-  margin: 0 auto 28px;
-  /* Shrink to fit its columns instead of stretching to the page's full
-     width - still wraps within whatever space is actually available. */
-  width: fit-content;
+  /* Sized to its columns, but allowed out of #app's 680px reading column and
+     centred on the viewport instead (margin-left 50% + the translate below).
+     That width is right for prose and wrong here: it caps the panel at five
+     systems per row on any display, and a wrapped row carries neither the
+     axis nor its Reference/Anchor tab. max-content keeps every column on one
+     line until the viewport itself runs out, and only then does flex-wrap
+     take over. The slack in max-width leaves room for a scrollbar, which
+     100vw does not account for. */
+  width: max-content;
+  max-width: calc(100vw - 48px);
+  margin: 0 0 28px 50%;
+  transform: translateX(-50%);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);

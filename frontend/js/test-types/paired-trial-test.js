@@ -1,7 +1,9 @@
 /**
- * Shared base for playback-gated, paired-trial listening tests (AB, ABX, XAB,
- * CMOS, DMOS): one trial per page, sequential prev/next navigation gated on a
- * choice being made, a progress bar, and the trial header.
+ * Shared base for the playback-gated, multi-clip listening tests (AB, ABX,
+ * XAB, CMOS, DMOS, MUSHRA): one trial per page, several clips per trial, and
+ * choosing gated on every clip having been heard. Navigation, the progress
+ * bar, the resume record, and the keyboard handler come from ListeningTest;
+ * this layer adds the clip handling those types share.
  *
  * The page DOM is built once (_buildPage) and updated in place on every
  * navigation (_syncPage) rather than rebuilt, and each clip uses a custom
@@ -9,7 +11,7 @@
  * prev/next and there's no native control to right-click-save. Subclasses
  * supply the type-specific pieces via hooks: _audioRegionHtml, _choiceButtonsHtml,
  * _ratingButtonsClass, _listenStepsHtml, _trialAudioClips, _syncChoiceButtons,
- * _onChoiceButton, _canChoose, _handleChoiceKey, _choiceHintHtml, _submit.
+ * _onChoiceButton, _canChoose, plus ListeningTest's own hooks.
  * MUSHRA overrides _buildPage/_syncPage entirely (sliders, no native controls).
  */
 
@@ -20,47 +22,27 @@ import {
   rewindAudio,
 } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
-import {
-  finalButtonLabel,
-  finalConfirmHint,
-  practiceBadgeHtml,
-  practiceBannerHtml,
-  practiceCounterPrefix,
-} from '../practice.js';
+import { ListeningTest } from './listening-test.js';
 
-export class PairedTrialTest {
+export class PairedTrialTest extends ListeningTest {
   constructor(config, sessionId, onSubmit) {
-    this.config = config;
-    this.sessionId = sessionId;
-    this.onSubmit = onSubmit;
+    super(config, sessionId, onSubmit);
     this.trials = config.trials;
-    this.currentIndex = 0;
     this.choices = new Map();
     this.played = new Map(); // trial index → Set of played local indices
     this._playCursor = new Map(); // trial index → audios[] position last started via the play shortcut
-    this._boundKeydown = this._handleKeydown.bind(this);
   }
 
-  /** Mount the header, build the trial page DOM once, then sync it to the first trial. */
-  render(container) {
-    this.container = container;
-    this._renderHeader();
-    this._buildPage();
-    this._syncPage();
-    document.addEventListener('keydown', this._boundKeydown);
+  _trialCount() {
+    return this.trials.length;
   }
 
-  _renderHeader() {
-    const header = document.createElement('div');
-    header.className = 'test-header';
-    header.innerHTML = `
-      <h1>${escapeHtml(this.config.title)}${practiceBadgeHtml(this.config)}</h1>
-      ${practiceBannerHtml(this.config)}
-      <p class="instructions">${escapeHtml(this.config.instructions)}</p>
-    `;
-    this.container.appendChild(header);
-    this._pageSlot = document.createElement('div');
-    this.container.appendChild(this._pageSlot);
+  _isAnswered(index) {
+    return this.choices.has(index);
+  }
+
+  _answeredCount() {
+    return this.choices.size;
   }
 
   // -- Build once / sync in place (choice-button test types) ----------------
@@ -73,9 +55,6 @@ export class PairedTrialTest {
   _buildPage() {
     this._pageSlot.innerHTML = `
       <div class="stimulus-page">
-        <div class="stimulus-meta">
-          <span class="page-counter"></span>
-        </div>
         ${this._audioRegionHtml()}
         <div class="rating-section">
           <div class="listen-steps">${this._listenStepsHtml()}</div>
@@ -90,7 +69,7 @@ export class PairedTrialTest {
     `;
 
     this._el = {
-      counter: this._pageSlot.querySelector('.page-counter'),
+      counter: this.container.querySelector('.page-counter'),
       ratingSection: this._pageSlot.querySelector('.rating-section'),
       buttons: [...this._pageSlot.querySelectorAll('.rating-btn')],
       audios: [...this._pageSlot.querySelectorAll('audio')],
@@ -170,20 +149,10 @@ export class PairedTrialTest {
 
   /** Update the persistent page elements to reflect the current trial. */
   _syncPage() {
-    const total = this.trials.length;
-    const current = this.currentIndex + 1;
-    const isLast = this.currentIndex === total - 1;
-
-    this._el.counter.textContent = `${practiceCounterPrefix(this.config)}${current} / ${total}`;
     this._syncAudioSrcs();
     this._syncChoiceButtons();
     this._el.ratingSection.classList.toggle('played', this._canChoose(this.currentIndex));
-    this._el.prev.disabled = this.currentIndex === 0;
-    this._el.next.textContent = isLast ? finalButtonLabel(this.config) : 'Next →';
-    this._el.hint.innerHTML = this._shortcutHintHtml(isLast);
-    this._syncNextEnabled();
-    this._updateProgressBar();
-    this._onChange?.();
+    this._syncChrome();
   }
 
   /**
@@ -221,13 +190,6 @@ export class PairedTrialTest {
     }
   }
 
-  /** Enable Next/Submit: current trial chosen (intermediate) or all chosen (last). */
-  _syncNextEnabled() {
-    const isLast = this.currentIndex === this.trials.length - 1;
-    const allChosen = this.choices.size === this.trials.length;
-    this._el.next.disabled = isLast ? !allChosen : !this.choices.has(this.currentIndex);
-  }
-
   /** Record a choice and reflect it on the buttons and Next state in place. */
   _setChoice(trialIndex, value) {
     this.choices.set(trialIndex, value);
@@ -238,54 +200,29 @@ export class PairedTrialTest {
   }
 
   /**
-   * Serialize progress for resume: current trial, choices, and which clips of
-   * each trial have been heard (so restored answered trials aren't re-gated).
-   * Choice values are JSON-safe (numbers or the 'tie' string), as are played
-   * local indices (numbers, or 'x' for ABX).
+   * The resume record's two halves. Choice values are JSON-safe (numbers or
+   * the 'tie' string), as are played local indices (numbers, or 'x' for ABX);
+   * played is per trial so restored answered trials aren't re-gated.
    */
-  getProgress() {
-    return {
-      currentIndex: this.currentIndex,
-      answers: [...this.choices],
-      played: [...this.played].map(([index, set]) => [index, [...set]]),
-    };
+  _serializeAnswers() {
+    return [...this.choices];
   }
 
-  /** Restore serialized progress (see getProgress) and re-sync the page. */
-  restoreProgress(saved) {
-    this.choices = new Map(saved.answers ?? []);
-    this.played = new Map((saved.played ?? []).map(([index, arr]) => [index, new Set(arr)]));
-    this.currentIndex = Math.min(saved.currentIndex ?? 0, this.trials.length - 1);
-    this._syncPage();
+  _restoreAnswers(saved) {
+    this.choices = new Map(saved);
+  }
+
+  _serializePlayed() {
+    return [...this.played].map(([index, set]) => [index, [...set]]);
+  }
+
+  _restorePlayed(saved) {
+    this.played = new Map(saved.map(([index, arr]) => [index, new Set(arr)]));
   }
 
   _playedSet(index) {
     if (!this.played.has(index)) this.played.set(index, new Set());
     return this.played.get(index);
-  }
-
-  /** Move to an adjacent page; forward navigation is blocked without a choice. */
-  _navigate(delta) {
-    if (delta > 0 && !this.choices.has(this.currentIndex)) return;
-    const next = this.currentIndex + delta;
-    if (next < 0 || next >= this.trials.length) return;
-    this.currentIndex = next;
-    this._syncPage();
-  }
-
-  _nextOrSubmit() {
-    const isLast = this.currentIndex === this.trials.length - 1;
-    if (isLast) {
-      if (this.choices.size === this.trials.length) this._submit();
-    } else {
-      this._navigate(1);
-    }
-  }
-
-  _updateProgressBar() {
-    const pct = (this.choices.size / this.trials.length) * 100;
-    const bar = document.getElementById('progress-bar');
-    if (bar) bar.style.width = `${pct}%`;
   }
 
   /**
@@ -349,18 +286,6 @@ export class PairedTrialTest {
   }
 
   /**
-   * Whether pausing preserves the playback position. When false (MUSHRA),
-   * one concept drives three behaviors: every start plays from the beginning
-   * (_startPlayback), the play shortcut advances to the NEXT clip after a
-   * pause rather than re-targeting the paused one (_handlePlayShortcut), and
-   * the rewind shortcut/hint are dropped as redundant - restarting is what
-   * plain play already does.
-   */
-  _supportsResume() {
-    return true;
-  }
-
-  /**
    * Rewind the clip the listener is (or was most recently) listening to:
    * the currently playing clip if any, else the one last started via the
    * play cursor. A no-op before anything has been started on this trial -
@@ -375,49 +300,6 @@ export class PairedTrialTest {
   }
 
   // -- keyboard shortcuts ----------------------------------------------------
-
-  /**
-   * Shared document-level keydown handler: the play shortcut, then the
-   * type-specific choice keys (via _handleChoiceKey), then prev/next/confirm.
-   */
-  _handleKeydown(e) {
-    const tag = e.target.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    if (tag === 'BUTTON' && e.key === 'Enter') return;
-
-    const { shortcuts } = this;
-
-    // play shortcut toggles/advances audio playback regardless of which
-    // element has focus.
-    const playKey = shortcuts.play === 'Space' ? ' ' : shortcuts.play;
-    if (e.key === playKey) {
-      e.preventDefault();
-      this._handlePlayShortcut();
-      return;
-    }
-    if (e.key === shortcuts.rewind && this._supportsResume()) {
-      e.preventDefault();
-      this._handleRewindShortcut();
-      return;
-    }
-
-    if (this._handleChoiceKey(e)) return;
-
-    if (e.key === shortcuts.next) {
-      e.preventDefault();
-      this._navigate(1);
-      return;
-    }
-    if (e.key === shortcuts.prev) {
-      e.preventDefault();
-      this._navigate(-1);
-      return;
-    }
-    if (e.key === shortcuts.confirm) {
-      e.preventDefault();
-      this._nextOrSubmit();
-    }
-  }
 
   /** Apply a matched choice-shortcut key: consume it, record the choice if playback-gating allows. */
   _applyChoiceKey(e, value) {
@@ -436,31 +318,6 @@ export class PairedTrialTest {
     if (e.key === shortcuts.choose_a) return this._applyChoiceKey(e, 0);
     if (e.key === shortcuts.choose_b) return this._applyChoiceKey(e, 1);
     return false;
-  }
-
-  /**
-   * Build the shortcut hint from the live shortcuts config so the hint stays
-   * accurate when the YAML config overrides default key bindings; the
-   * type-specific middle segment comes from _choiceHintHtml().
-   *
-   * @param {boolean} isLast - Whether this is the final trial page.
-   * @returns {string} HTML string for the hint paragraph content.
-   */
-  _shortcutHintHtml(isLast) {
-    const { shortcuts } = this;
-    const playKey = escapeHtml(shortcuts.play);
-    const rewindKey = escapeHtml(shortcuts.rewind);
-    const prevKey = shortcuts.prev === 'ArrowLeft' ? '←' : escapeHtml(shortcuts.prev);
-    const nextKey = shortcuts.next === 'ArrowRight' ? '→' : escapeHtml(shortcuts.next);
-    const confirmKey = shortcuts.confirm === 'Enter' ? 'Enter' : escapeHtml(shortcuts.confirm);
-    const segments = [
-      `<kbd>${playKey}</kbd> play/pause`,
-      ...(this._supportsResume() ? [`<kbd>${rewindKey}</kbd> rewind`] : []),
-      this._choiceHintHtml(),
-      `<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate`,
-      `<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`,
-    ];
-    return segments.join(' &nbsp;·&nbsp;');
   }
 
   /** The type-specific middle segment of the shortcut hint; default matches _handleChoiceKey's choose-A/B keys. */

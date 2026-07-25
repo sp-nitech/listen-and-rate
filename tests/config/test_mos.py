@@ -74,12 +74,14 @@ def test_mos_practice_count_defaults_to_zero(tmp_path, test_audio_file):
     assert result.practice.count == 0
 
 
-def test_mos_practice_has_default_instructions(tmp_path, test_audio_file):
+def test_mos_practice_instructions_default_to_none(tmp_path, test_audio_file):
+    # Mirrors the required top-level `instructions`, which has no default
+    # either: wording the listener sees is always the researcher's to write.
     data = minimal_config(str(test_audio_file))
     data["practice"] = {"count": 1}
     result = load_config(write_config(tmp_path, data))
     assert result.practice.count == 1
-    assert "practice" in result.practice.instructions.lower()
+    assert result.practice.instructions is None
 
 
 def test_mos_practice_accepts_custom_instructions(tmp_path, test_audio_file):

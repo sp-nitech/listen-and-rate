@@ -185,10 +185,12 @@ def _practice_extras(
     if config.practice is None or config.practice.count == 0:
         return {}
     sampled = random.sample(pool, config.practice.count)
-    return {
-        key: to_response(sampled),
-        "practice_instructions": config.practice.instructions,
-    }
+    extras: dict[str, object] = {key: to_response(sampled)}
+    # Omitted rather than sent empty when unset, so the frontend can tell
+    # "no banner" from "an empty one"; mirrors config.php's practice_extras().
+    if config.practice.instructions is not None:
+        extras["practice_instructions"] = config.practice.instructions
+    return extras
 
 
 def _require_non_empty(values: list, name: str) -> None:

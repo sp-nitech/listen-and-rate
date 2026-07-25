@@ -253,8 +253,8 @@ def test_abx_submit_same_system_pair_returns_400(
                 "test_type": "abx",
                 "choices": [
                     {
-                        "stimulus_ids": ["sys_a__utt0", "sys_a__utt1"],
-                        "selected_stimulus_id": "sys_a__utt0",
+                        "stimulus_ids": ["A__utt0", "A__utt1"],
+                        "selected_stimulus_id": "A__utt0",
                         "x_token": "0" * 20,
                     }
                 ],

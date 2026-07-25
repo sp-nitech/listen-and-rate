@@ -112,6 +112,18 @@ def test_config_includes_practice_stimuli_and_instructions(
             assert s["id"] in pool_ids
 
 
+def test_config_omits_practice_instructions_when_unset(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # A practice stage without wording still yields practice_stimuli; only the
+    # banner text is absent, so the frontend renders no banner at all.
+    config = _mos_practice_config(tmp_path, test_audio_file, 4, {"count": 2})
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        data = tc.get("/api/config").json()
+        assert len(data["practice_stimuli"]) == 2
+        assert "practice_instructions" not in data
+
+
 def test_practice_sampling_is_independent_of_session_sampling(
     tmp_path, test_audio_file, monkeypatch
 ):

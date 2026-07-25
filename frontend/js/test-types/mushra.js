@@ -30,7 +30,6 @@
 
 import { PAUSE_SVG, PLAY_SVG } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
-import { finalButtonLabel, practiceCounterPrefix } from '../practice.js';
 import { submitPayload } from '../submit.js';
 import { PairedTrialTest } from './paired-trial-test.js';
 
@@ -202,9 +201,6 @@ export class MUSHRATest extends PairedTrialTest {
 
     this._pageSlot.innerHTML = `
       <div class="stimulus-page">
-        <div class="stimulus-meta">
-          <span class="page-counter"></span>
-        </div>
         ${stepsHtml}
         <div class="mushra-trial">
           ${axisColHtml}
@@ -220,7 +216,7 @@ export class MUSHRATest extends PairedTrialTest {
     `;
 
     this._el = {
-      counter: this._pageSlot.querySelector('.page-counter'),
+      counter: this.container.querySelector('.page-counter'),
       steps: this._pageSlot.querySelector('.listen-steps'),
       sliderCols: [...this._pageSlot.querySelectorAll('.mushra-slider-col')],
       referenceAudio: this._pageSlot.querySelector('.mushra-reference-col audio'),
@@ -380,13 +376,8 @@ export class MUSHRATest extends PairedTrialTest {
 
   _syncPage() {
     const trial = this.trials[this.currentIndex];
-    const total = this.trials.length;
-    const current = this.currentIndex + 1;
-    const isLast = this.currentIndex === total - 1;
     const played = this._playedSet(this.currentIndex);
     const rated = this.choices.get(this.currentIndex);
-
-    this._el.counter.textContent = `${practiceCounterPrefix(this.config)}${current} / ${total}`;
 
     if (this._el.referenceAudio) {
       const url = this._audioUrl(trial.reference);
@@ -426,12 +417,7 @@ export class MUSHRATest extends PairedTrialTest {
     this._setSystemPlayButtonsEnabled(!this._hasReference || played.has(0));
     this._el.steps?.classList.toggle('played', this._hasReference && played.has(0));
 
-    this._el.prev.disabled = this.currentIndex === 0;
-    this._el.next.textContent = isLast ? finalButtonLabel(this.config) : 'Next →';
-    this._el.hint.innerHTML = this._shortcutHintHtml(isLast);
-    this._updateNextButtonState();
-    this._updateProgressBar();
-    this._onChange?.();
+    this._syncChrome();
   }
 
   /**
@@ -517,78 +503,41 @@ export class MUSHRATest extends PairedTrialTest {
     return !!rated && sliderStimuli.every((s) => rated.has(s.id));
   }
 
-  _allTrialsComplete() {
-    return this.trials.every((_, i) => this._isTrialComplete(i));
-  }
-
   /**
    * Override PairedTrialTest's weaker "has any entry" gate: MUSHRA requires
-   * the whole trial to be complete (every slider moved at least once)
-   * before advancing, not just one slider touched.
+   * the whole trial to be complete (every slider moved at least once) before
+   * advancing, not just one slider touched. Navigation, the Next button, and
+   * the progress bar all follow from this one hook.
    */
-  _navigate(delta) {
-    if (delta > 0 && !this._isTrialComplete(this.currentIndex)) return;
-    const next = this.currentIndex + delta;
-    if (next < 0 || next >= this.trials.length) return;
-    this.currentIndex = next;
-    this._syncPage();
+  _isAnswered(index) {
+    return this._isTrialComplete(index);
   }
 
-  _nextOrSubmit() {
-    const isLast = this.currentIndex === this.trials.length - 1;
-    if (isLast) {
-      if (this._allTrialsComplete()) this._submit();
-    } else {
-      this._navigate(1);
-    }
+  _answeredCount() {
+    return this.trials.filter((_, i) => this._isTrialComplete(i)).length;
   }
 
   /** Record a slider's value without a full re-render (avoids flicker). */
   _setChoice(trialIndex, stimulusId, value) {
     if (!this.choices.has(trialIndex)) this.choices.set(trialIndex, new Map());
     this.choices.get(trialIndex).set(stimulusId, value);
-    this._updateNextButtonState();
+    this._syncNextEnabled();
     this._updateProgressBar();
     this._onChange?.();
   }
 
   /**
-   * Serialize progress for resume. Overrides PairedTrialTest because MUSHRA's
-   * choices are nested (trial -> Map<stimulus_id, value>); each inner Map is
-   * flattened to entries so the record is plain JSON.
+   * The answers half of the resume record. Overrides PairedTrialTest because
+   * MUSHRA's choices are nested (trial -> Map<stimulus_id, value>); each
+   * inner Map is flattened to entries so the record is plain JSON. The played
+   * half is the inherited per-trial one.
    */
-  getProgress() {
-    return {
-      currentIndex: this.currentIndex,
-      answers: [...this.choices].map(([index, valuesById]) => [index, [...valuesById]]),
-      played: [...this.played].map(([index, set]) => [index, [...set]]),
-    };
+  _serializeAnswers() {
+    return [...this.choices].map(([index, valuesById]) => [index, [...valuesById]]);
   }
 
-  /** Restore serialized progress (see getProgress) and re-sync the page. */
-  restoreProgress(saved) {
-    this.choices = new Map(
-      (saved.answers ?? []).map(([index, entries]) => [index, new Map(entries)])
-    );
-    this.played = new Map((saved.played ?? []).map(([index, arr]) => [index, new Set(arr)]));
-    this.currentIndex = Math.min(saved.currentIndex ?? 0, this.trials.length - 1);
-    this._syncPage();
-  }
-
-  /** Update the Next/Submit button once the current trial's completeness may have changed. */
-  _updateNextButtonState() {
-    const isLast = this.currentIndex === this.trials.length - 1;
-    this._el.next.disabled = isLast
-      ? !this._allTrialsComplete()
-      : !this._isTrialComplete(this.currentIndex);
-  }
-
-  /** Progress bar reflects how many trials are complete, not just visited. */
-  _updateProgressBar() {
-    const completeCount = this.trials.filter((_, i) => this._isTrialComplete(i)).length;
-    const pct = (completeCount / this.trials.length) * 100;
-    const bar = document.getElementById('progress-bar');
-    if (bar) bar.style.width = `${pct}%`;
+  _restoreAnswers(saved) {
+    this.choices = new Map(saved.map(([index, entries]) => [index, new Map(entries)]));
   }
 
   /**

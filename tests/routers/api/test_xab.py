@@ -13,8 +13,8 @@ from ._helpers import (
 
 
 def _closer_token(stimulus_id: str) -> str:
-    """Map an id like sys_a__utt0 to its positional closer token (a/b)."""
-    return "a" if stimulus_id.startswith("sys_a__") else "b"
+    """Map an id like A__utt0 to its positional closer token (a/b)."""
+    return "a" if stimulus_id.startswith("A__") else "b"
 
 
 def test_xab_config_returns_trials_with_reference_and_pair(
@@ -26,7 +26,7 @@ def test_xab_config_returns_trials_with_reference_and_pair(
         assert "stimuli" not in data
         assert "allow_tie" not in data
         for trial in data["trials"]:
-            assert trial["reference"]["id"].startswith("ref__")
+            assert trial["reference"]["id"].startswith("Ref__")
             assert len(trial["stimuli"]) == 2
             assert "x" not in trial  # no hidden-duplicate token machinery
 
@@ -198,5 +198,5 @@ def test_xab_config_includes_practice_trials(tmp_path, test_audio_file, monkeypa
         _assert_practice_common(data)
         trial = data["practice_trials"][0]
         assert set(trial) == {"reference", "stimuli"}
-        assert trial["reference"]["id"].startswith("ref__")
+        assert trial["reference"]["id"].startswith("Ref__")
         assert len(trial["stimuli"]) == 2

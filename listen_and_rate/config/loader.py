@@ -93,9 +93,15 @@ def _expand_stimuli_dirs(dirs_config: StimuliDirsConfig) -> list[StimulusConfig]
             )
 
     stimuli: list[StimulusConfig] = []
-    for dir_name, system, audio_files in dir_entries:
+    # Keyed on the system name, not the directory's basename: a stimulus IS the
+    # (system, item) intersection, and system names are already required to be
+    # unique above - so ids built from them are unique by construction. Basenames
+    # are only a stand-in for that, and they break wherever the two diverge: two
+    # entries sharing one directory (a deliberate repeat of the same clips under
+    # two names), or same-named directories under different parents.
+    for _dir_name, system, audio_files in dir_entries:
         for audio_file in audio_files:
-            sid = f"{_safe_id(dir_name)}__{_safe_id(audio_file.stem)}"
+            sid = f"{_safe_id(system)}__{_safe_id(audio_file.stem)}"
             stimuli.append(
                 StimulusConfig(
                     id=sid,
@@ -216,8 +222,17 @@ def load_config(config_path: str | Path) -> Config:
     if config.stimuli_dirs is not None:
         expanded = _expand_stimuli_dirs(config.stimuli_dirs)
         ids = [s.id for s in expanded]
-        if len(ids) != len(set(ids)):
-            raise ValueError("stimulus IDs must be unique across stimuli_dirs")
+        # Backstop for the one case unique system names cannot rule out: names
+        # that differ only in characters _safe_id rewrites (e.g. "A B" vs
+        # "A_B") collapse onto a single id.
+        duplicate_ids = _duplicates(ids)
+        if duplicate_ids:
+            raise ValueError(
+                f"stimulus IDs must be unique across stimuli_dirs: {duplicate_ids}. "
+                "IDs are built from each system's name and the audio filename, so "
+                "this means two system names differ only in characters that are "
+                "not URL-safe - rename one of them."
+            )
         n = config.stimuli_dirs.items_per_session
         if n is not None:
             unique_items = {s.item for s in expanded if s.item}

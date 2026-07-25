@@ -86,8 +86,8 @@ def test_cmos_submit_rating_sign_matches_canonical_system_order(
     with _cmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
         trial = tc.get("/api/config").json()["trials"][0]
         ids = [s["id"] for s in trial["stimuli"]]
-        id_a = next(i for i in ids if i.startswith("sys_a"))
-        id_b = next(i for i in ids if i.startswith("sys_b"))
+        id_a = next(i for i in ids if i.startswith("A__"))
+        id_b = next(i for i in ids if i.startswith("B__"))
         # Submitted as [B, A] with rating=2 ("A is 2 better than B"); stored
         # rows are always canonical system_a(=A)/system_b(=B), so the stored
         # rating must be flipped to -2 ("B is 2 worse than A").
@@ -166,9 +166,7 @@ def test_cmos_submit_same_system_pair_returns_400(
             json={
                 "session_id": "s1",
                 "test_type": "cmos",
-                "choices": [
-                    {"stimulus_ids": ["sys_a__utt0", "sys_a__utt1"], "rating": 1}
-                ],
+                "choices": [{"stimulus_ids": ["A__utt0", "A__utt1"], "rating": 1}],
             },
         )
         assert res.status_code == 400

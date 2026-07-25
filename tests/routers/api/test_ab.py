@@ -27,7 +27,7 @@ def test_ab_config_items_per_session_preserves_order_when_presentation_fixed(
     ) as tc:
         for _ in range(20):
             trials = tc.get("/api/config").json()["trials"]
-            # stimulus ids look like "sys_a__utt2"; extract the item index.
+            # stimulus ids look like "A__utt2"; extract the item index.
             utt_indices = [
                 int(trials[i]["stimuli"][0]["id"].split("utt")[1])
                 for i in range(len(trials))
@@ -165,8 +165,8 @@ def test_ab_submit_same_system_pair_returns_400(tmp_path, test_audio_file, monke
                 "test_type": "ab",
                 "choices": [
                     {
-                        "stimulus_ids": ["sys_a__utt0", "sys_a__utt1"],
-                        "selected_stimulus_id": "sys_a__utt0",
+                        "stimulus_ids": ["A__utt0", "A__utt1"],
+                        "selected_stimulus_id": "A__utt0",
                     }
                 ],
             },

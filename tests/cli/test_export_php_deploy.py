@@ -242,6 +242,25 @@ def test_export_php_deploy_config_data_includes_practice_params(
     assert "'practice_instructions' => 'Warm-up.'" in text
 
 
+def test_export_php_deploy_config_data_practice_instructions_null_when_unset(
+    tmp_path, test_audio_file, monkeypatch
+):
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "practice": {"count": 1},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    config_yaml = write_config(tmp_path, config)
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    assert "'practice_count' => 1" in text
+    assert "'practice_instructions' => null" in text
+
+
 def test_export_php_deploy_config_data_practice_defaults_when_unset(
     config_yaml, tmp_path, monkeypatch
 ):

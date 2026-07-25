@@ -17,16 +17,16 @@ export function practiceBadgeHtml(config) {
   return config.isPractice ? ' <span class="practice-badge">Practice</span>' : '';
 }
 
-/** The practice-instructions banner shown above the regular instructions; '' for the real test. */
+/**
+ * The practice-instructions banner shown above the regular instructions.
+ *
+ * '' for the real test, and also when the practice stage carries no wording:
+ * practice.instructions is optional, and an empty banner would still show as
+ * a bordered, padded, coloured box with nothing in it.
+ */
 export function practiceBannerHtml(config) {
-  return config.isPractice
-    ? `<div class="practice-banner">${escapeHtml(config.practice_instructions ?? '')}</div>`
-    : '';
-}
-
-/** "Practice " page-counter prefix; '' for the real test. */
-export function practiceCounterPrefix(config) {
-  return config.isPractice ? 'Practice ' : '';
+  if (!config.isPractice || !config.practice_instructions) return '';
+  return `<div class="practice-banner">${escapeHtml(config.practice_instructions)}</div>`;
 }
 
 /**

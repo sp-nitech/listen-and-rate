@@ -1,9 +1,12 @@
 /**
  * MOS (Mean Opinion Score) listening test UI.
  *
- * Displays one stimulus per page. Listeners must play each audio file to
- * completion before rating buttons become active (playback-gated rating).
- * All keyboard shortcuts are configurable via the server-side YAML config.
+ * Displays one stimulus per page - the only test type whose page holds a
+ * single clip, so it builds on ListeningTest directly rather than on
+ * PairedTrialTest's multi-clip machinery. Listeners must play each audio
+ * file to completion before rating buttons become active (playback-gated
+ * rating). All keyboard shortcuts are configurable via the server-side
+ * YAML config.
  */
 
 import {
@@ -14,29 +17,15 @@ import {
 } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
 import { ratingKeysHint } from '../hints.js';
-import {
-  finalButtonLabel,
-  finalConfirmHint,
-  practiceBadgeHtml,
-  practiceBannerHtml,
-  practiceCounterPrefix,
-} from '../practice.js';
 import { submitPayload } from '../submit.js';
+import { ListeningTest } from './listening-test.js';
 
 const MOS_LABELS_DEFAULT = { 1: 'Bad', 2: 'Poor', 3: 'Fair', 4: 'Good', 5: 'Excellent' };
 
-export class MOSTest {
-  /**
-   * @param {Object} config - Server config from /api/config.
-   * @param {string} sessionId - UUID identifying this listener's session.
-   * @param {Function} onSubmit - Async callback invoked with (sessionId, testType, ratings).
-   */
+export class MOSTest extends ListeningTest {
   constructor(config, sessionId, onSubmit) {
-    this.config = config;
-    this.sessionId = sessionId;
-    this.onSubmit = onSubmit;
+    super(config, sessionId, onSubmit);
     this.stimuli = config.stimuli;
-    this.currentIndex = 0;
     this.ratings = new Map(); // stimulus id → rating value
     this.played = new Set(); // stimulus ids played to completion (enables rating)
     this.shortcuts = config.shortcuts ?? {
@@ -48,30 +37,18 @@ export class MOSTest {
     this.mosLabels = config.rating_labels
       ? Object.fromEntries(Object.entries(config.rating_labels).map(([k, v]) => [Number(k), v]))
       : MOS_LABELS_DEFAULT;
-    this._boundKeydown = this._handleKeydown.bind(this);
   }
 
-  /** Mount the test header, build the stimulus page DOM once, then sync it. */
-  render(container) {
-    this.container = container;
-    this._renderHeader();
-    this._buildPage();
-    this._syncPage();
-    document.addEventListener('keydown', this._boundKeydown);
+  _trialCount() {
+    return this.stimuli.length;
   }
 
-  _renderHeader() {
-    const header = document.createElement('div');
-    header.className = 'test-header';
-    header.innerHTML = `
-      <h1>${escapeHtml(this.config.title)}${practiceBadgeHtml(this.config)}</h1>
-      ${practiceBannerHtml(this.config)}
-      <p class="instructions">${escapeHtml(this.config.instructions)}</p>
-    `;
-    this.container.appendChild(header);
-    this._pageSlot = document.createElement('div');
-    this._pageSlot.className = 'page-slot';
-    this.container.appendChild(this._pageSlot);
+  _isAnswered(index) {
+    return this.ratings.has(this.stimuli[index].id);
+  }
+
+  _answeredCount() {
+    return this.ratings.size;
   }
 
   /**
@@ -94,10 +71,7 @@ export class MOSTest {
 
     this._pageSlot.innerHTML = `
       <div class="stimulus-page">
-        <div class="stimulus-meta">
-          <span class="page-counter"></span>
-          <span class="stimulus-label"></span>
-        </div>
+        <span class="stimulus-label"></span>
         <div class="audio-card">
           ${audioPlayerHtml(0, this.config.audio_preload)}
           <p class="audio-error" hidden>⚠ Audio file could not be loaded. Please contact the administrator.</p>
@@ -119,7 +93,7 @@ export class MOSTest {
     `;
 
     this._el = {
-      counter: this._pageSlot.querySelector('.page-counter'),
+      counter: this.container.querySelector('.page-counter'),
       label: this._pageSlot.querySelector('.stimulus-label'),
       audio: this._pageSlot.querySelector('audio'),
       player: this._pageSlot.querySelector('.audio-player'),
@@ -174,12 +148,7 @@ export class MOSTest {
   /** Update the persistent page elements to reflect the current stimulus. */
   _syncPage() {
     const s = this.stimuli[this.currentIndex];
-    const total = this.stimuli.length;
-    const current = this.currentIndex + 1;
-    const isFirst = this.currentIndex === 0;
-    const isLast = this.currentIndex === total - 1;
 
-    this._el.counter.textContent = `${practiceCounterPrefix(this.config)}${current} / ${total}`;
     this._el.label.textContent = s.label ?? '';
 
     // Swap only the src on the persistent <audio>, rewound to the start, and
@@ -199,14 +168,7 @@ export class MOSTest {
     this._el.audioError.hidden = true;
 
     this._syncRatingState();
-
-    this._el.prev.disabled = isFirst;
-    this._el.next.textContent = isLast ? finalButtonLabel(this.config) : 'Next →';
-    this._el.hint.innerHTML = this._shortcutHintHtml(isLast);
-    this._syncNextEnabled();
-
-    this._updateProgressBar();
-    this._onChange?.();
+    this._syncChrome();
   }
 
   /** Sync the rating buttons' selected/enabled state to the current stimulus. */
@@ -219,14 +181,6 @@ export class MOSTest {
       btn.disabled = !canRate;
     }
     this._el.ratingSection.classList.toggle('played', canRate);
-  }
-
-  /** Enable Next/Submit per the gating rule (current rated, or all rated on the last page). */
-  _syncNextEnabled() {
-    const s = this.stimuli[this.currentIndex];
-    const isLast = this.currentIndex === this.stimuli.length - 1;
-    const allRated = this.ratings.size === this.stimuli.length;
-    this._el.next.disabled = isLast ? !allRated : !this.ratings.has(s.id);
   }
 
   _canRate(stimulusId) {
@@ -246,111 +200,50 @@ export class MOSTest {
     this._onChange?.();
   }
 
-  /** Serialize progress for resume: current page, ratings, and heard stimuli. */
-  getProgress() {
-    return {
-      currentIndex: this.currentIndex,
-      answers: [...this.ratings],
-      played: [...this.played],
-    };
+  /** The resume record's two halves: ratings by stimulus id, and heard ids. */
+  _serializeAnswers() {
+    return [...this.ratings];
   }
 
-  /** Restore serialized progress (see getProgress) and re-sync the page. */
-  restoreProgress(saved) {
-    this.ratings = new Map(saved.answers ?? []);
-    this.played = new Set(saved.played ?? []);
-    this.currentIndex = Math.min(saved.currentIndex ?? 0, this.stimuli.length - 1);
-    this._syncPage();
+  _restoreAnswers(saved) {
+    this.ratings = new Map(saved);
   }
 
-  /** Move to an adjacent page; forward navigation is blocked without a rating. */
-  _navigate(delta) {
-    if (delta > 0 && !this.ratings.has(this.stimuli[this.currentIndex].id)) return;
-    const next = this.currentIndex + delta;
-    if (next < 0 || next >= this.stimuli.length) return;
-    this.currentIndex = next;
-    this._syncPage();
+  _serializePlayed() {
+    return [...this.played];
   }
 
-  _nextOrSubmit() {
-    const isLast = this.currentIndex === this.stimuli.length - 1;
-    if (isLast) {
-      if (this.ratings.size === this.stimuli.length) this._submit();
-    } else {
-      this._navigate(1);
-    }
+  _restorePlayed(saved) {
+    this.played = new Set(saved);
   }
 
-  _handleKeydown(e) {
-    const tag = e.target.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    // Let buttons handle their own Enter activation; Space is reserved for audio below.
-    if (tag === 'BUTTON' && e.key === 'Enter') return;
+  // -- keyboard shortcuts ----------------------------------------------------
 
+  /** The page holds a single clip, so the play shortcut just toggles it. */
+  _handlePlayShortcut() {
+    const audio = this._el?.audio;
+    if (!audio) return;
+    audio.paused ? audio.play() : audio.pause();
+  }
+
+  _handleRewindShortcut() {
+    const audio = this._el?.audio;
+    if (audio) rewindAudio(audio);
+  }
+
+  /** Rating keys: record the current stimulus's rating when playback-gating allows. */
+  _handleChoiceKey(e) {
     const { shortcuts } = this;
-
-    // play shortcut toggles audio play/pause regardless of which element has focus.
-    const playKey = shortcuts.play === 'Space' ? ' ' : shortcuts.play;
-    if (e.key === playKey) {
-      e.preventDefault();
-      const audio = this._el?.audio;
-      if (audio) {
-        audio.paused ? audio.play() : audio.pause();
-      }
-      return;
-    }
-    if (e.key === shortcuts.rewind) {
-      e.preventDefault();
-      const audio = this._el?.audio;
-      if (audio) rewindAudio(audio);
-      return;
-    }
-
+    if (!Object.hasOwn(shortcuts.rating, e.key)) return false;
+    e.preventDefault();
     const s = this.stimuli[this.currentIndex];
-
-    if (Object.hasOwn(shortcuts.rating, e.key)) {
-      e.preventDefault();
-      if (this._canRate(s.id)) this._setRating(s.id, shortcuts.rating[e.key]);
-      return;
-    }
-    if (e.key === shortcuts.next) {
-      e.preventDefault();
-      this._navigate(1);
-      return;
-    }
-    if (e.key === shortcuts.prev) {
-      e.preventDefault();
-      this._navigate(-1);
-      return;
-    }
-    if (e.key === shortcuts.confirm) {
-      e.preventDefault();
-      this._nextOrSubmit();
-    }
+    if (this._canRate(s.id)) this._setRating(s.id, shortcuts.rating[e.key]);
+    return true;
   }
 
-  /**
-   * Build the shortcut hint text from the live shortcuts config so the hint
-   * stays accurate when the YAML config overrides default key bindings.
-   *
-   * @param {boolean} isLast - Whether this is the final stimulus page.
-   * @returns {string} HTML string for the hint paragraph content.
-   */
-  _shortcutHintHtml(isLast) {
-    const { shortcuts } = this;
-    const ratingHint = ratingKeysHint(shortcuts.rating);
-    const prevKey = shortcuts.prev === 'ArrowLeft' ? '←' : escapeHtml(shortcuts.prev);
-    const nextKey = shortcuts.next === 'ArrowRight' ? '→' : escapeHtml(shortcuts.next);
-    const confirmKey = shortcuts.confirm === 'Enter' ? 'Enter' : escapeHtml(shortcuts.confirm);
-    const playKey = escapeHtml(shortcuts.play);
-    const rewindKey = escapeHtml(shortcuts.rewind);
-    return `<kbd>${playKey}</kbd> play/pause &nbsp;·&nbsp;<kbd>${rewindKey}</kbd> rewind &nbsp;·&nbsp;${ratingHint} rate &nbsp;·&nbsp;<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate &nbsp;·&nbsp;<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`;
-  }
-
-  _updateProgressBar() {
-    const pct = (this.ratings.size / this.stimuli.length) * 100;
-    const bar = document.getElementById('progress-bar');
-    if (bar) bar.style.width = `${pct}%`;
+  /** The rating-key segment of ListeningTest's shortcut hint. */
+  _choiceHintHtml() {
+    return `${ratingKeysHint(this.shortcuts.rating)} rate`;
   }
 
   async _submit() {

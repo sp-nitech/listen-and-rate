@@ -131,10 +131,15 @@ class PracticeConfig(_StrictModel):
     are sampled from the full pool independently of the real session's
     sampling (overlap with the real session is allowed); practice ratings
     are never submitted or saved.
+
+    `instructions` has no default, matching the required top-level one: any
+    wording the listener reads is the researcher's to write. Left unset, no
+    banner is shown at all - the PRACTICE badge beside the title already says
+    which stage this is.
     """
 
     count: int = Field(default=0, ge=0)
-    instructions: str = "This is a practice session. Your ratings will not be recorded."
+    instructions: str | None = None
 
 
 class LoudnessCriterion(_StrictModel):

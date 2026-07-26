@@ -33,6 +33,21 @@ function shuffle_stimuli(array $arr): array
     return $result;
 }
 
+/**
+ * Pick one element of $arr at random.
+ *
+ * Not array_rand(), which draws from PHP's Mersenne Twister: this file draws
+ * only through random_int(), because one of its callers picks the stimulus
+ * the hidden ABX X duplicates, and x_token.php's HMAC blinding buys nothing
+ * if that choice comes from a reconstructible stream. Mirrors
+ * listen_and_rate/rng.py.
+ */
+function pick_one(array $arr)
+{
+    $values = array_values($arr);
+    return $values[random_int(0, count($values) - 1)];
+}
+
 /** Randomly choose n distinct elements from arr, preserving their original relative order. */
 function sample_keep_order(array $arr, int $n): array
 {
@@ -408,7 +423,7 @@ function abx_trials_to_public(array $trials, string $secret): array
         $stimuli = shuffle_stimuli($t['stimuli']);
         $idA = $stimuli[0]['id'];
         $idB = $stimuli[1]['id'];
-        $matchedId = $stimuli[array_rand($stimuli)]['id'];
+        $matchedId = pick_one($stimuli)['id'];
         return [
             'stimuli' => array_map('stimulus_to_public', $stimuli),
             'x' => ['token' => commit_x($idA, $idB, $matchedId, $secret)],

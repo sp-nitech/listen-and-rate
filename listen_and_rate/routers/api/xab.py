@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import random
-
 from fastapi import HTTPException
 
 from ...config import StimulusConfig, XABConfig, XABTrial, build_xab_trials
 from ...models import SubmitRequest
+from ...rng import rng
 from ...storage import OUTCOME_A, OUTCOME_B, ResultSaver
 from ._shared import (
     _all_stimuli,
@@ -33,7 +32,7 @@ def _build_xab_response_trials(
     if n is not None:
         trials = _sample_keep_order(trials, n)
     if config.shuffle_order:
-        trials = random.sample(trials, len(trials))
+        trials = rng.sample(trials, len(trials))
     return trials
 
 
@@ -44,7 +43,7 @@ def _xab_trials_to_response(
     response_trials = []
     for t in trials:
         ids = list(t.stimulus_ids)
-        random.shuffle(ids)  # blind position: don't always show system A first
+        rng.shuffle(ids)  # blind position: don't always show system A first
         response_trials.append(
             {
                 "reference": {

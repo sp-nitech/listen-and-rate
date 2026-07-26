@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import random
-
 from fastapi import HTTPException
 
 from ...config import DMOSConfig, DMOSTrial, StimulusConfig, build_dmos_trials
 from ...models import SubmitRequest
+from ...rng import rng
 from ...storage import ResultSaver
 from ._shared import (
     _all_stimuli,
@@ -37,7 +36,7 @@ def _build_dmos_response_trials(
     if n is not None:
         trials = _sample_trials_by_item(trials, n)
     if config.shuffle_order:
-        trials = random.sample(trials, len(trials))
+        trials = rng.sample(trials, len(trials))
     return trials
 
 

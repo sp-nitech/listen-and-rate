@@ -770,6 +770,28 @@ final class ConfigTest extends TestCase
         }
     }
 
+    public function testBuildAbxConfigResponseSplitsTheHiddenXBetweenBothStimuli(): void
+    {
+        // The X is committed behind an HMAC, so ask the token which stimulus it
+        // names rather than reading the choice directly.
+        $data   = $this->fakeAbxConfigData();
+        $secret = hex2bin($data['x_secret']);
+        $first  = 0;
+        $draws  = 200;
+        for ($i = 0; $i < $draws; $i++) {
+            $response = build_abx_config_response($data);
+            $trial    = $response['trials'][0];
+            $ids      = array_column($trial['stimuli'], 'id');
+            if (resolve_x($ids[0], $ids[1], $trial['x']['token'], $secret) === $ids[0]) {
+                $first++;
+            }
+        }
+        // Both sides must come up; a stuck or degenerate draw would expose the
+        // answer. The bound is loose enough not to flake (p < 1e-9 when fair).
+        $this->assertGreaterThan($draws * 0.25, $first);
+        $this->assertLessThan($draws * 0.75, $first);
+    }
+
     public function testBuildAbxConfigResponseHasNoAllowTie(): void
     {
         $response = build_abx_config_response($this->fakeAbxConfigData());

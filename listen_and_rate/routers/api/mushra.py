@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import random
-
 from fastapi import HTTPException
 
 from ...config import MUSHRAConfig, MUSHRATrial, StimulusConfig, build_mushra_trials
 from ...models import SubmitRequest
+from ...rng import rng
 from ...storage import ResultSaver
 from ._shared import (
     _all_stimuli,
@@ -44,7 +43,7 @@ def _build_mushra_response_trials(
     if n is not None:
         trials = _sample_trials_by_item(trials, n)
     if config.shuffle_order:
-        trials = random.sample(trials, len(trials))
+        trials = rng.sample(trials, len(trials))
     return trials
 
 
@@ -58,7 +57,7 @@ def _mushra_trials_to_response(
     for t in trials:
         anchor_entry = next((e for e in t.system_ids if e[0] == anchor_system), None)
         blind_entries = [e for e in t.system_ids if e is not anchor_entry]
-        random.shuffle(
+        rng.shuffle(
             blind_entries
         )  # blind position: don't leak system identity via order
         response_trials.append(

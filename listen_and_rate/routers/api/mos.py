@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import random
-
 from fastapi import HTTPException
 
 from ...config import MOSConfig, StimulusConfig
 from ...models import SubmitRequest
+from ...rng import rng
 from ...storage import ResultSaver
 from ._shared import (
     _all_stimuli,
@@ -34,7 +33,7 @@ def _get_mos_test_config(config: MOSConfig) -> dict:
     if config.stimuli_dirs and config.stimuli_dirs.items_per_session is not None:
         n = config.stimuli_dirs.items_per_session
         items = list({s.item for s in all_stimuli if s.item})
-        selected = set(random.sample(items, n))
+        selected = set(rng.sample(items, n))
         selected_stimuli = [s for s in all_stimuli if s.item in selected]
     elif config.stimuli_list and config.stimuli_list.stimuli_per_session is not None:
         n = config.stimuli_list.stimuli_per_session
@@ -43,7 +42,7 @@ def _get_mos_test_config(config: MOSConfig) -> dict:
         selected_stimuli = list(all_stimuli)
 
     if config.shuffle_order:
-        selected_stimuli = random.sample(selected_stimuli, len(selected_stimuli))
+        selected_stimuli = rng.sample(selected_stimuli, len(selected_stimuli))
 
     stimuli = _stimuli_to_response(selected_stimuli)
 

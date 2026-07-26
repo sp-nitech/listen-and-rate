@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import random
 import re
 from collections.abc import Callable
 from typing import Protocol, TypeVar
@@ -28,6 +27,7 @@ from ...config import (
 )
 from ...config._utils import _duplicates
 from ...models import SubmitRequest
+from ...rng import rng
 from ...storage import METRIC_DECIMALS, ResultSaver
 
 T = TypeVar("T")
@@ -90,13 +90,13 @@ def _id_to_meta(all_stimuli: list[StimulusConfig]) -> dict[str, dict[str, str]]:
 def _sample_keep_order(values: list[T], n: int) -> list[T]:
     """Randomly select n values, preserving their original relative order.
 
-    random.sample() alone returns values in random order, which would ignore
+    rng.sample() alone returns values in random order, which would ignore
     presentation_order="fixed"'s "keep the configured order" contract (the
     later shuffle applies it for "random"); mirrors frontend/config.php's
     sample_keep_order().
     """
     n = min(n, len(values))
-    indices = sorted(random.sample(range(len(values)), n))
+    indices = sorted(rng.sample(range(len(values)), n))
     return [values[i] for i in indices]
 
 
@@ -199,13 +199,13 @@ def _practice_extras(
 
     Practice pages are drawn from the full `pool` (all stimuli/trials)
     independently of the session sampling, so overlap with the real session
-    is allowed; random.sample also randomizes their order. Returns {} when no
+    is allowed; rng.sample also randomizes their order. Returns {} when no
     practice stage is configured, keeping the response unchanged.
     load_config guarantees practice.count <= len(pool).
     """
     if config.practice is None or config.practice.count == 0:
         return {}
-    sampled = random.sample(pool, config.practice.count)
+    sampled = rng.sample(pool, config.practice.count)
     extras: dict[str, object] = {key: to_response(sampled)}
     # Omitted rather than sent empty when unset, so the frontend can tell
     # "no banner" from "an empty one"; mirrors config.php's practice_extras().
@@ -319,7 +319,7 @@ def _build_response_trials(
     if n is not None:
         trials = _sample_keep_order(trials, n)
     if config.shuffle_order:
-        trials = random.sample(trials, len(trials))
+        trials = rng.sample(trials, len(trials))
     return trials
 
 
@@ -334,7 +334,7 @@ def _pair_trials_to_response(
     response_trials = []
     for t in trials:
         ids = list(t.stimulus_ids)
-        random.shuffle(ids)  # blind position: don't always show system A first
+        rng.shuffle(ids)  # blind position: don't always show system A first
         response_trials.append(
             {"stimuli": [{"id": i, "label": id_to_label.get(i)} for i in ids]}
         )

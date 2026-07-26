@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import random
-
 from fastapi import HTTPException
 
 from ...config import ABTrial, ABXConfig, build_ab_trials
 from ...models import SubmitRequest
+from ...rng import rng
 from ...storage import ResultSaver
 from ...x_token import commit, resolve
 from ._shared import (
@@ -31,9 +30,9 @@ def _abx_trials_to_response(
     response_trials = []
     for t in trials:
         ids = list(t.stimulus_ids)
-        random.shuffle(ids)  # blind position: don't always show system A first
+        rng.shuffle(ids)  # blind position: don't always show system A first
         id_a, id_b = ids
-        matched_id = random.choice(ids)  # ground truth: which stimulus X duplicates
+        matched_id = rng.choice(ids)  # ground truth: which stimulus X duplicates
         x_token = commit(id_a, id_b, matched_id, x_secret)
         response_trials.append(
             {

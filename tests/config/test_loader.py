@@ -69,14 +69,17 @@ def test_experiment_id_is_derived_from_config_filename(tmp_path, test_audio_file
     assert load_config(p).experiment_id == "myexperiment"
 
 
-def test_experiment_id_in_yaml_is_rejected(tmp_path, test_audio_file):
-    """experiment_id is always derived from the config filename, never
-    user-settable - it's not a real model field, so (like any other unknown
-    key) putting it in the YAML must be rejected, not silently ignored."""
+def test_experiment_id_in_yaml_overrides_the_filename(tmp_path, test_audio_file):
+    """The filename is only the default; an explicit key wins.
+
+    This is the escape hatch for a filename that cannot name a directory,
+    and it also lets several configs deliberately share one results
+    directory.
+    """
     data = minimal_config(str(test_audio_file))
-    data["experiment_id"] = "should-be-rejected"
-    with pytest.raises(ValidationError, match="experiment_id"):
-        load_config(write_config(tmp_path, data))
+    data["experiment_id"] = "chosen-name"
+    result = load_config(write_config(tmp_path, data, name="myexperiment.yaml"))
+    assert result.experiment_id == "chosen-name"
 
 
 def test_duplicate_stimulus_ids_raise_error(tmp_path, test_audio_file):

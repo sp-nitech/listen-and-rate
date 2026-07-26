@@ -60,10 +60,39 @@ class SaveRequestError extends RuntimeException
     }
 }
 
-/** Replace characters that are not URL/filesystem-safe with underscores. */
-function sanitize_id(string $s): string
+/**
+ * Whether $s may be used as a results path component.
+ *
+ * Mirrors listen_and_rate/ids.py's ID_PATTERN/is_valid_id, including its
+ * reason for rejecting rather than rewriting: rewriting is not injective (two
+ * differently-named experiments could sanitize onto one directory), and it
+ * would have to agree character for character with the FastAPI server or the
+ * same experiment would write to two different directories depending on how
+ * it was deployed. The /u modifier matters - without it the class is applied
+ * per BYTE, so one multi-byte character would rewrite to several underscores
+ * while Python rewrote it to one.
+ *
+ * '.' and '..' are excluded separately: the dot is allowed so an id like
+ * "config.mos" works, and those two are directory references, not names.
+ */
+function is_valid_id(string $s): bool
 {
-    return preg_replace('/[^a-zA-Z0-9_\-.]/', '_', $s);
+    if ($s === '.' || $s === '..') {
+        return false;
+    }
+    return preg_match('/^[A-Za-z0-9._-]+$/u', $s) === 1;
+}
+
+/** @throws SaveRequestError (400) if $s cannot be used as a path component. */
+function assert_valid_id(string $s, string $field): void
+{
+    if (!is_valid_id($s)) {
+        throw new SaveRequestError(
+            400,
+            "{$field} must contain only letters, digits, '.', '-', or '_' "
+            . "(and cannot be '.' or '..')"
+        );
+    }
 }
 
 /**
@@ -208,8 +237,8 @@ function validate_metadata(array $fields, array $submitted): array
  */
 function resolve_experiment_dir(string $resultsDir, string $rawExperimentId): string
 {
-    $experimentId = sanitize_id($rawExperimentId);
-    $experimentId = ($experimentId !== '') ? $experimentId : 'results';
+    $experimentId = ($rawExperimentId !== '') ? $rawExperimentId : 'results';
+    assert_valid_id($experimentId, 'experiment_id');
 
     if (!is_dir($resultsDir)) {
         mkdir($resultsDir, 0777, true);
@@ -953,7 +982,8 @@ function handle_save_request(): void
         );
 
         $experiment_dir  = resolve_experiment_dir($results_dir, $data['experiment_id'] ?? '');
-        $session_id_safe = sanitize_id($data['session_id']);
+        assert_valid_id((string) $data['session_id'], 'session_id');
+        $session_id_safe = $data['session_id'];
         // CSV columns are namespaced (metadata_*/survey_*, see prefix_keys);
         // the builders just lay out whatever keys they are handed, so the
         // merged prefixed map flows through them unchanged. JSON keeps the

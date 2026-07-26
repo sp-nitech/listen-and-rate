@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from ._trials import _group_by_item, _system_of
 from .base import StimulusConfig
 from .two_system import TwoSystemComparisonConfig
 
@@ -36,16 +37,11 @@ def build_ab_trials(stimuli: list[StimulusConfig]) -> list[ABTrial]:
     where the "drop unpaired items" behavior lives; the UserWarning about
     them was already emitted by `_expand_stimuli_dirs`.
     """
-    by_item: dict[str, list[StimulusConfig]] = {}
-    for s in stimuli:
-        if s.item:
-            by_item.setdefault(s.item, []).append(s)
-
     trials = []
-    for item, group in sorted(by_item.items()):
+    for item, group in _group_by_item(stimuli):
         if len(group) != 2:
             continue
-        pair = sorted(group, key=lambda s: s.system or "")
+        pair = sorted(group, key=_system_of)
         trials.append(
             ABTrial(
                 item=item,

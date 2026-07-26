@@ -8,6 +8,7 @@ import sys
 
 import pytest
 
+from listen_and_rate import loudness
 from listen_and_rate.loudness import (
     per_item_spreads,
     per_system_stats,
@@ -385,3 +386,30 @@ def test_normalize_noop_returns_empty_when_not_configured(tmp_path):
         run_configured_loudness_normalization(load_config(p), lambda item: tmp_path)
         == {}
     )
+
+
+def test_measure_stimuli_reads_each_file_once(monkeypatch):
+    """Ids sharing one file are measured once, not once per id.
+
+    Several systems may point at the same directory (a deliberate repeat of
+    the same clips under two names), which gives distinct ids the same path.
+    """
+    from listen_and_rate.config.base import StimulusConfig
+
+    calls: list[str] = []
+
+    def _fake_measure(path):
+        calls.append(str(path))
+        return -20.0
+
+    monkeypatch.setattr(loudness, "measure_loudness", _fake_measure)
+    stimuli = [
+        StimulusConfig(id="A__u1", path="/x/u1.wav", system="A", item="u1"),
+        StimulusConfig(id="B__u1", path="/x/u1.wav", system="B", item="u1"),
+        StimulusConfig(id="A__u2", path="/x/u2.wav", system="A", item="u2"),
+    ]
+    result = loudness._measure_stimuli(stimuli, desc="t")
+
+    assert sorted(calls) == ["/x/u1.wav", "/x/u2.wav"]
+    # Every id still gets its own entry, whatever the file was shared with.
+    assert result == {"A__u1": -20.0, "B__u1": -20.0, "A__u2": -20.0}

@@ -642,3 +642,38 @@ def test_unknown_output_field_rejected(tmp_path, test_audio_file):
     data["output"] = {"format": "csv", "directory": "./out/"}
     with pytest.raises(ValidationError, match="directory"):
         load_config(write_config(tmp_path, data))
+
+
+# -- experiment_id ----------------------------------------------------------
+
+
+def test_experiment_id_defaults_to_the_config_filename(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    result = load_config(write_config(tmp_path, data, name="study-a.yaml"))
+    assert result.experiment_id == "study-a"
+
+
+def test_experiment_id_can_be_set_explicitly(tmp_path, test_audio_file):
+    # The escape hatch for a filename that is not path-safe: the results
+    # subdirectory is named by this instead.
+    data = minimal_config(str(test_audio_file))
+    data["experiment_id"] = "my-study"
+    result = load_config(write_config(tmp_path, data, name="実験1.yaml"))
+    assert result.experiment_id == "my-study"
+
+
+def test_experiment_id_rejects_a_path_unsafe_value(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["experiment_id"] = "../escape"
+    with pytest.raises(ValidationError, match="experiment_id"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_path_unsafe_config_filename_is_rejected_naming_the_escape_hatch(
+    tmp_path, test_audio_file
+):
+    # Silently rewriting it would let two differently-named experiments pool
+    # their results, so the load fails and points at the explicit key.
+    data = minimal_config(str(test_audio_file))
+    with pytest.raises(ValueError, match="experiment_id"):
+        load_config(write_config(tmp_path, data, name="実験1.yaml"))

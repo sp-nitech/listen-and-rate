@@ -92,8 +92,14 @@ def create_app() -> FastAPI:
     # "config.php" and "save.php" as relative URLs) works with both FastAPI and
     # a static PHP deployment. Must be registered before StaticFiles so FastAPI
     # handles them rather than serving the raw .php source or returning 404.
+    # HEAD is listed alongside GET for the same reason it is in routers/audio.py:
+    # a GET-only route does not answer HEAD, so the request would fall through
+    # to the StaticFiles catch-all and describe the raw .php source instead.
     app.add_api_route(
-        "/config.php", get_test_config, methods=["GET"], include_in_schema=False
+        "/config.php",
+        get_test_config,
+        methods=["GET", "HEAD"],
+        include_in_schema=False,
     )
     app.add_api_route("/save.php", submit, methods=["POST"], include_in_schema=False)
 
@@ -102,7 +108,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.add_api_route(
-        "/save.php", _save_php_check, methods=["GET"], include_in_schema=False
+        "/save.php", _save_php_check, methods=["GET", "HEAD"], include_in_schema=False
     )
     app.add_api_route(
         "/audio_x.php",

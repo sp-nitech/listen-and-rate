@@ -9,6 +9,7 @@ from typing import Annotated
 import yaml
 from pydantic import Field, TypeAdapter, ValidationError
 
+from ..ids import is_valid_id
 from ._utils import _AUDIO_EXTENSIONS, _duplicates, _normalize, _safe_id
 from .ab import ABConfig, build_ab_trials
 from .abx import ABXConfig
@@ -217,7 +218,21 @@ def load_config(config_path: str | Path) -> Config:
             entry["path"] = str(_normalize(Path(entry["path"])))
 
     config = TypeAdapter(Config).validate_python(data)
-    config._experiment_id = path.stem
+
+    # The config file's name is only the DEFAULT experiment_id, and it is
+    # validated exactly like an explicit one: rewriting it to fit would let
+    # two differently-named configs pool their results into one directory
+    # (see listen_and_rate/ids.py), so an unusable name fails the load and
+    # says which key overrides it.
+    if not config.experiment_id:
+        if not is_valid_id(path.stem):
+            raise ValueError(
+                f"Config filename {path.stem!r} cannot name the results "
+                "directory: it must contain only letters, digits, '.', '-', "
+                "or '_'. Either rename the file, or set `experiment_id:` in "
+                "it to the name the results directory should have."
+            )
+        config = config.model_copy(update={"experiment_id": path.stem})
 
     if config.stimuli_dirs is not None:
         expanded = _expand_stimuli_dirs(config.stimuli_dirs)

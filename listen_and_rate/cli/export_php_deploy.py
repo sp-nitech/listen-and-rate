@@ -280,7 +280,6 @@ def _render_config_data_php(data: dict) -> str:
 
 def _build_config_data(
     config: Config,
-    experiment_id: str,
     all_stimuli: list[StimulusConfig],
     audio_urls: dict[str, str],
 ) -> dict:
@@ -317,7 +316,7 @@ def _build_config_data(
     practice = config.practice
 
     return {
-        "experiment_id": experiment_id,
+        "experiment_id": config.experiment_id,
         "test_type": config.test_type,
         "title": config.title,
         "instructions": config.instructions,
@@ -461,9 +460,11 @@ def main() -> None:
         )
         for s in all_stimuli
     }
-    config_data = _build_config_data(
-        config, Path(args.config).stem, all_stimuli, audio_urls
-    )
+    # config.experiment_id, not the filename: load_config already resolved
+    # one from the other, and recomputing it here would ignore an explicit
+    # `experiment_id:` and send the bundle to a different results directory
+    # than the FastAPI server uses.
+    config_data = _build_config_data(config, all_stimuli, audio_urls)
 
     outdir = Path(args.outdir)
     results_subpath = _bundle_results_subpath(config.output.path)

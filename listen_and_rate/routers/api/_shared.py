@@ -8,6 +8,7 @@ these; routes.py wires the actual endpoints.
 from __future__ import annotations
 
 import hashlib
+import json
 import random
 import re
 from collections.abc import Callable
@@ -129,8 +130,19 @@ def _config_version(config: Config) -> str:
     fresh per request, holding no server state. The PHP deployment computes its
     own fingerprint over config_data.php; the two need not agree, since a
     session only ever resumes against the same deployment that saved it.
+
+    durations is hashed alongside the model because it is a private attribute
+    and so absent from model_dump_json(), yet it is measured from the audio and
+    served to the browser: replacing a clip with one of a different length
+    without renaming it changes what the listener gets while leaving the model
+    byte-identical. config_data.php carries durations inline, so the PHP
+    fingerprint already covers this; including it here keeps the two backends
+    invalidating a saved session under the same circumstances.
     """
-    return hashlib.sha256(config.model_dump_json().encode()).hexdigest()[:16]
+    fingerprinted = config.model_dump_json() + json.dumps(
+        config.durations, sort_keys=True
+    )
+    return hashlib.sha256(fingerprinted.encode()).hexdigest()[:16]
 
 
 def _test_config_response(config: Config, **extras: object) -> dict:

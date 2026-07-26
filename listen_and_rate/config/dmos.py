@@ -8,6 +8,7 @@ from typing import ClassVar, Literal
 from pydantic import model_validator
 from pydantic_core import PydanticCustomError
 
+from ._trials import _group_by_item, _split_reference
 from .base import (
     _DEFAULT_RATING_SHORTCUTS,
     BaseTestConfig,
@@ -92,20 +93,12 @@ def build_dmos_trials(
     that test system have a stimulus for that item; combinations
     missing either are silently skipped, mirroring build_ab_trials().
     """
-    by_item: dict[str, list[StimulusConfig]] = {}
-    for s in stimuli:
-        if s.item:
-            by_item.setdefault(s.item, []).append(s)
-
     trials = []
-    for item, group in sorted(by_item.items()):
-        reference_stimulus = next(
-            (s for s in group if (s.system or "") == reference_system), None
-        )
+    for item, group in _group_by_item(stimuli):
+        reference_stimulus, test_stimuli = _split_reference(group, reference_system)
         if reference_stimulus is None:
             continue
-        test_stimuli = [s for s in group if (s.system or "") != reference_system]
-        for test_stimulus in sorted(test_stimuli, key=lambda s: s.system or ""):
+        for test_stimulus in test_stimuli:
             trials.append(
                 DMOSTrial(
                     item=item,

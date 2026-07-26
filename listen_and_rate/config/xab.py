@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import model_validator
 from pydantic_core import PydanticCustomError
 
+from ._trials import _group_by_item, _split_reference
 from .base import BaseTestConfig, StimulusConfig
 
 
@@ -82,22 +83,11 @@ def build_xab_trials(
     mirroring build_ab_trials()/build_dmos_trials(). Test stimuli are ordered
     by system name, matching build_ab_trials()'s canonical pair order.
     """
-    by_item: dict[str, list[StimulusConfig]] = {}
-    for s in stimuli:
-        if s.item:
-            by_item.setdefault(s.item, []).append(s)
-
     trials = []
-    for item, group in sorted(by_item.items()):
-        reference_stimulus = next(
-            (s for s in group if (s.system or "") == reference_system), None
-        )
+    for item, group in _group_by_item(stimuli):
+        reference_stimulus, test_stimuli = _split_reference(group, reference_system)
         if reference_stimulus is None:
             continue
-        test_stimuli = sorted(
-            (s for s in group if (s.system or "") != reference_system),
-            key=lambda s: s.system or "",
-        )
         if len(test_stimuli) != 2:
             continue
         trials.append(

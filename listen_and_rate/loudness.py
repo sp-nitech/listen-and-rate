@@ -93,13 +93,18 @@ def _measure_stimuli(
     with disable=None, shows only on an interactive terminal - silent in
     pipes/tests. Unmeasurable clips (silent / < 1s, see measure_loudness)
     map to None.
+
+    Measured per FILE, reported per id: several systems may be backed by the
+    same directory, which gives distinct ids an identical path, and decoding
+    one clip several times would only produce the same number again.
     """
     from tqdm import tqdm
 
-    return {
-        s.id: measure_loudness(s.path)
-        for s in tqdm(stimuli, desc=desc, unit="clip", disable=None)
-    }
+    by_path: dict[str, float | None] = {}
+    for s in tqdm(stimuli, desc=desc, unit="clip", disable=None):
+        if s.path not in by_path:
+            by_path[s.path] = measure_loudness(s.path)
+    return {s.id: by_path[s.path] for s in stimuli}
 
 
 def _measured_rows(

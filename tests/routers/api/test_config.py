@@ -162,3 +162,39 @@ def test_config_version_changes_when_config_changes(
         v2 = tc.get("/api/config").json()["config_version"]
 
     assert v1 != v2
+
+
+def test_config_version_changes_when_only_the_clip_durations_do(client, config_yaml):
+    """Swapping the audio behind unchanged paths must invalidate a resume.
+
+    durations is measured at load time, not written in the YAML, so replacing
+    a clip with one of a different length leaves the config model identical.
+    It still reaches the browser (the time bar shows it), so a session frozen
+    against the old lengths no longer matches. The PHP deployment hashes its
+    whole config_data.php, durations included, so this keeps the two agreeing.
+    """
+    from listen_and_rate.config import load_config
+    from listen_and_rate.routers.api._shared import _config_version
+
+    config = load_config(config_yaml)
+    before = _config_version(config)
+    config._durations = {k: v + 1.0 for k, v in config.durations.items()}
+    assert _config_version(config) != before
+
+
+def test_head_config_php_does_not_fall_through_to_the_php_source(client):
+    """HEAD must hit the alias, not the StaticFiles mount behind it.
+
+    FastAPI's methods=["GET"] does not cover HEAD, so without it registered
+    the request reaches the catch-all that serves frontend/ and returns the
+    raw config.php source instead of the JSON route's headers.
+    """
+    res = client.head("/config.php")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("application/json")
+
+
+def test_head_save_php_does_not_fall_through_to_the_php_source(client):
+    res = client.head("/save.php")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("application/json")

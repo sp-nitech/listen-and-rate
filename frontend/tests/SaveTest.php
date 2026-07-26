@@ -36,16 +36,34 @@ final class SaveTest extends TestCase
         rmdir($dir);
     }
 
-    // -- sanitize_id ------------------------------------------------------
+    // -- is_valid_id ------------------------------------------------------
 
-    public function testSanitizeIdReplacesUnsafeCharacters(): void
+    public function testIsValidIdAcceptsDotsHyphensUnderscores(): void
     {
-        $this->assertSame('a_b_c', sanitize_id('a/b/c'));
+        $this->assertTrue(is_valid_id('a.b-c_d'));
+        $this->assertTrue(is_valid_id('config.mos'));
     }
 
-    public function testSanitizeIdKeepsDotsHyphensUnderscores(): void
+    public function testIsValidIdRejectsPathSeparatorsAndSpaces(): void
     {
-        $this->assertSame('a.b-c_d', sanitize_id('a.b-c_d'));
+        $this->assertFalse(is_valid_id('a/b/c'));
+        $this->assertFalse(is_valid_id('a\\b'));
+        $this->assertFalse(is_valid_id('my config'));
+        $this->assertFalse(is_valid_id(''));
+    }
+
+    public function testIsValidIdRejectsDirectoryReferences(): void
+    {
+        // The dot is allowed, so these two need excluding by name.
+        $this->assertFalse(is_valid_id('.'));
+        $this->assertFalse(is_valid_id('..'));
+    }
+
+    public function testIsValidIdRejectsNonAsciiPerCharacterNotPerByte(): void
+    {
+        // Without the /u modifier the class would be applied per byte; this
+        // must agree with listen_and_rate/ids.py, which works per character.
+        $this->assertFalse(is_valid_id("\u{5b9f}\u{9a13}1"));
     }
 
     // -- detect_server_timezone -------------------------------------------
@@ -342,9 +360,19 @@ final class SaveTest extends TestCase
         $this->assertStringEndsWith('/my-experiment', $dir);
     }
 
-    public function testResolveExperimentDirCannotEscapeResultsDir(): void
+    public function testResolveExperimentDirRejectsAnEscapeAttempt(): void
     {
-        $dir = resolve_experiment_dir($this->tmpDir, '../../evil');
+        // Rejected outright by the id rule now, rather than rewritten and
+        // then caught by the containment check below.
+        $this->expectException(SaveRequestError::class);
+        resolve_experiment_dir($this->tmpDir, '../../evil');
+    }
+
+    public function testResolveExperimentDirStaysInsideResultsDir(): void
+    {
+        // The containment check is kept as defence in depth behind the id
+        // rule: it is what guarantees the property the rule is meant to give.
+        $dir = resolve_experiment_dir($this->tmpDir, 'nested.exp-1');
         $realResults = realpath($this->tmpDir);
         $this->assertStringStartsWith($realResults . '/', $dir . '/');
     }

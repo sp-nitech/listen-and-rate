@@ -331,3 +331,35 @@ def test_submit_strips_unknown_metadata_keys(tmp_path, test_audio_file, monkeypa
             (tmp_path / "results" / "config" / "s.json").read_text(encoding="utf-8")
         )
         assert data["metadata"] == {}
+
+
+def test_submit_rejects_a_session_id_that_is_not_path_safe(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """session_id names the result file, so it is validated, not sanitized.
+
+    Rejecting keeps the FastAPI server and the PHP deployment in agreement
+    (frontend/save.php applies the same rule) and keeps a crafted id from
+    writing outside the results directory.
+    """
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        res = tc.post(
+            "/api/submit",
+            json={
+                "session_id": "../outside/escaped",
+                "test_type": "mos",
+                "ratings": [{"stimulus_id": "s001", "rating": 4}],
+            },
+        )
+        assert res.status_code == 422
+    assert not (outside / "escaped.csv").exists()
+    assert list(outside.iterdir()) == []

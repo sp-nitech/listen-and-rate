@@ -7,7 +7,14 @@ import { fetchConfig, submitRatings } from './api.js';
 import { escapeHtml } from './dom.js';
 import { MetadataPage } from './metadata.js';
 import { runPracticeStage } from './practice.js';
-import { clearRecord, isResumable, loadRecord, recordKey, saveRecord } from './resume.js';
+import {
+  clearRecord,
+  isResumable,
+  loadRecord,
+  pruneExpiredRecords,
+  recordKey,
+  saveRecord,
+} from './resume.js';
 import { generateSessionId } from './session.js';
 import { ABTest } from './test-types/ab.js';
 import { ABXTest } from './test-types/abx.js';
@@ -151,6 +158,10 @@ function promptRetry(container, err) {
 async function main() {
   const freshConfig = await fetchConfig();
   const container = document.getElementById('app');
+  // Records from experiments this browser saw earlier are dropped once they
+  // are too old to be offered, so they cannot fill the quota this session
+  // needs (see resume.js).
+  pruneExpiredRecords(Date.now());
   const key = recordKey(freshConfig.experiment_id);
 
   // Offer resume only when a saved session still matches the current config

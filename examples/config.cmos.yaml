@@ -15,6 +15,12 @@ output:
   format: csv # "csv" or "json" - each session is saved as a separate file
   path: ./results/
 
+# Identifies this experiment. Used as the results subdirectory under
+# output.path. Defaults to the config file's name. Set this only if the
+# filename is not a valid directory name; otherwise an error is raised
+# instead of silently modifying the name.
+# experiment_id: test-a
+
 # How much of each page's audio to fetch up front (default: auto).
 #   none - fetch nothing until the listener first presses play
 #   auto - fetch the whole clip on show so playback is instant (a hint;

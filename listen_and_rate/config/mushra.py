@@ -8,6 +8,7 @@ from typing import ClassVar, Literal
 from pydantic import model_validator
 from pydantic_core import PydanticCustomError
 
+from ._trials import _group_by_item, _system_of
 from .base import BaseTestConfig, RatingLabelsConfigMixin, StimulusConfig
 
 _MUSHRA_RATING_LABEL_KEYS = {"0", "20", "40", "60", "80"}
@@ -123,14 +124,9 @@ def build_mushra_trials(
     stimulus, if `reference_system` is set and present for that item,
     is attached as reference_id; its absence does not skip the trial.
     """
-    by_item: dict[str, list[StimulusConfig]] = {}
-    for s in stimuli:
-        if s.item:
-            by_item.setdefault(s.item, []).append(s)
-
     trials = []
-    for item, group in sorted(by_item.items()):
-        by_system = {s.system or "": s for s in group}
+    for item, group in _group_by_item(stimuli):
+        by_system = {_system_of(s): s for s in group}
         if not rateable_systems <= by_system.keys():
             continue
         reference_stimulus = (

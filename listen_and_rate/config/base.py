@@ -8,6 +8,7 @@ from typing import ClassVar, Literal, Self
 from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
+from ..ids import is_valid_id
 from ._utils import (
     _KEY_RE,
     _check_rating_labels_keys,
@@ -467,6 +468,16 @@ class BaseTestConfig(_StrictModel):
     title: str
     instructions: str
     output: OutputConfig = Field(default_factory=OutputConfig)
+    # Identifies this experiment: names the results subdirectory under
+    # output.path, and namespaces saved in-progress sessions in the browser
+    # (see frontend/js/resume.js) so two experiments served from one origin
+    # never see each other's. load_config() fills it from the config file's
+    # name when unset; set it explicitly when that name is not path-safe
+    # (see listen_and_rate/ids.py for the rule and why it is not rewritten).
+    # Empty is the "not set" sentinel rather than None so every consumer sees
+    # a plain str; the empty string is not a valid id, so it cannot collide
+    # with a real value.
+    experiment_id: str = ""
     # How the per-session stimuli/trials are ordered. "random" (default)
     # shuffles the presentation order per listener to cancel order effects;
     # "fixed" keeps the configured order (systems as listed, files by name).
@@ -495,18 +506,23 @@ class BaseTestConfig(_StrictModel):
     loudness_check: LoudnessCheckConfig | None = None
     loudness_normalization: LoudnessNormalizationConfig | None = None
 
-    # Not user-configurable: always derived from the config file's stem by
-    # load_config(). Kept as a private attribute so it cannot be set via YAML.
-    _experiment_id: str = PrivateAttr(default="")
     # {stimulus_id: duration_seconds}, measured from the audio headers by
     # load_config(); served to the browser so the time bar shows clip length
     # without a per-clip metadata fetch. Private so it can't be set via YAML.
     _durations: dict[str, float] = PrivateAttr(default_factory=dict)
 
-    @property
-    def experiment_id(self) -> str:
-        """Experiment identifier derived from the config file's stem."""
-        return self._experiment_id
+    @field_validator("experiment_id")
+    @classmethod
+    def experiment_id_must_be_path_safe(cls, v: str) -> str:
+        """Reject an explicit experiment_id that cannot name a directory."""
+        if v and not is_valid_id(v):
+            raise PydanticCustomError(
+                "experiment_id_format",
+                "experiment_id must contain only letters, digits, '.', '-', or "
+                "'_' (and cannot be '.' or '..'); got: {value}",
+                {"value": repr(v)},
+            )
+        return v
 
     @property
     def durations(self) -> dict[str, float]:

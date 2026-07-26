@@ -13,9 +13,12 @@
 /** Two hours, measured from the last save (refreshed on every answer/navigation). */
 export const RESUME_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
+/** Shared prefix of every saved record's key, so they can be enumerated. */
+const RECORD_KEY_PREFIX = 'lar:session:';
+
 /** localStorage key, namespaced per experiment so distinct tests don't collide. */
 export function recordKey(experimentId) {
-  return `lar:session:${experimentId ?? ''}`;
+  return `${RECORD_KEY_PREFIX}${experimentId ?? ''}`;
 }
 
 /** Load and parse the saved record, or null if absent/corrupt. */
@@ -43,6 +46,38 @@ export function clearRecord(key) {
     localStorage.removeItem(key);
   } catch {
     // Ignore.
+  }
+}
+
+/**
+ * Drop every saved record past `maxAgeMs`, across all experiments.
+ *
+ * A record is otherwise only removed when the listener declines the prompt or
+ * finishes the test. One that merely expired - or whose config changed under
+ * it - is never offered again yet stays forever, and each record holds a whole
+ * delivered config, so an origin that has served several experiments keeps
+ * accumulating dead weight. saveRecord() swallows the resulting quota error,
+ * which would silently disable resume for the session actually running.
+ *
+ * Only the age is used: a fingerprint mismatch can be temporary (the config is
+ * edited back), so an unexpired record is left alone whether or not it matches
+ * the config being served right now.
+ */
+export function pruneExpiredRecords(now, maxAgeMs = RESUME_MAX_AGE_MS) {
+  try {
+    const stale = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(RECORD_KEY_PREFIX)) continue;
+      const record = loadRecord(key);
+      // A record with no usable savedAt can never become resumable either.
+      if (!record || typeof record.savedAt !== 'number' || now - record.savedAt >= maxAgeMs) {
+        stale.push(key);
+      }
+    }
+    for (const key of stale) localStorage.removeItem(key);
+  } catch {
+    // Ignore: pruning is housekeeping, never a correctness requirement.
   }
 }
 

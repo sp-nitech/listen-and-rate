@@ -846,3 +846,28 @@ def test_export_php_deploy_creates_outdir_if_missing(
     _run_export(config_yaml, outdir, monkeypatch)
     assert (outdir / "config_data.php").is_file()
     assert (outdir / "stimulus_map.php").is_file()
+
+
+def test_export_php_deploy_config_data_uses_the_configs_experiment_id(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """An explicit experiment_id must reach the bundle, not the filename.
+
+    The bundle names the results subdirectory after this value, so deriving
+    it from the config filename here would send the PHP deployment to a
+    different directory than the FastAPI server uses.
+    """
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "experiment_id": "chosen-name",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    config_yaml = write_config(tmp_path, config, name="some-filename.yaml")
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    assert "'experiment_id' => 'chosen-name'" in text
+    assert "some-filename" not in text

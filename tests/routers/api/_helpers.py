@@ -85,7 +85,7 @@ def _mos_practice_config(tmp_path, test_audio_file, n_items, practice):
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "practice": practice,
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": f"s{i:03d}", "path": str(test_audio_file)}
                 for i in range(n_items)

@@ -1,0 +1,29 @@
+header: "# Listen and Rate - Example XAB (similarity) Configuration"
+test_type: xab
+options: ""
+title: Audio Similarity Test
+instructions: |
+  You will hear a reference sample X, followed by two samples A and B.
+  Listen to all three completely, then decide which of A and B sounds
+  closer to the reference X.
+  You may replay each sample as many times as needed before choosing.
+stimuli: |
+  # XAB tests compare exactly 2 systems against a disclosed reference, defined
+  # via directories (each dir should contain the same filenames - explicit
+  # `stimuli:` lists are not supported for XAB tests). Exactly one system
+  # must be flagged `reference: true`; it provides the X clip and is never
+  # rated itself.
+  stimuli_dirs:
+    items_per_session: 2 # optional: present N randomly chosen trials per listener
+    systems:
+      - path: ./stimuli/examples/A
+        reference: true
+      - path: ./stimuli/examples/B
+        system: Baseline
+      - path: ./stimuli/examples/C
+        system: Proposed
+rating_labels: ""
+shortcut_keys: |
+  #   rewind: r
+  #   choose_a: 1
+  #   choose_b: 2

@@ -140,7 +140,7 @@ def test_mushra_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_
         "test_type": "mushra",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
@@ -210,7 +210,7 @@ def test_build_mushra_trials_pairs_reference_and_anchor_with_all_systems(
         test_type="mushra",
     )
     result = load_config(write_config(tmp_path, data))
-    stimuli = result.stimuli.entries
+    stimuli = result.stimuli_list.entries
     rateable = {"B", "Anchor"}
     trials = build_mushra_trials(stimuli, result.reference_system, rateable)
     assert len(trials) == 2
@@ -226,7 +226,7 @@ def test_build_mushra_trials_without_reference(tmp_path, test_audio_file):
         test_type="mushra",
     )
     result = load_config(write_config(tmp_path, data))
-    stimuli = result.stimuli.entries
+    stimuli = result.stimuli_list.entries
     trials = build_mushra_trials(stimuli, result.reference_system, {"A", "B"})
     assert len(trials) == 1
     assert trials[0].reference_id is None
@@ -256,7 +256,7 @@ def test_build_mushra_trials_skips_item_missing_from_a_system(
     )
     with pytest.warns(UserWarning, match="not present in all systems"):
         result = load_config(write_config(tmp_path, data))
-    stimuli = result.stimuli.entries
+    stimuli = result.stimuli_list.entries
     trials = build_mushra_trials(stimuli, result.reference_system, {"B", "C"})
     assert len(trials) == 1
     assert trials[0].item == "utt1"

@@ -1,0 +1,51 @@
+header: |
+  # Listen and Rate - Example SMOS (Speaker Similarity MOS) Configuration
+  #
+  # SMOS is not a separate test type - it's the same DMOS mechanism
+  # (test_type: dmos) applied to a speaker-similarity framing instead of a
+  # degradation framing: a Reference sample from the target speaker, compared
+  # against Test samples (e.g. from a voice conversion or TTS system), rated
+  # on how similar the speaker identity sounds rather than how degraded the
+  # audio quality is.
+test_type: dmos
+options: ""
+title: Speaker Similarity Evaluation
+instructions: |
+  You will hear a Reference sample from the target speaker, followed by a
+  Test sample of the same item.
+  Listen to both completely, then rate how similar the Test sample's speaker
+  identity sounds to the Reference, on a scale from 1 (Identical) to
+  5 (Very different).
+  Focus on the speaker's voice, not the audio quality.
+  You may replay each sample as many times as needed before rating.
+stimuli: |
+  # DMOS tests compare one reference system against one or more test systems,
+  # defined via directories (each dir should contain the same filenames -
+  # explicit `stimuli:` lists are not supported for DMOS tests). Exactly
+  # one system must be flagged `reference: true`.
+  stimuli_dirs:
+    items_per_session: 2 # optional: present N randomly chosen items per listener
+    systems:
+      - path: ./stimuli/examples/A
+        reference: true
+      - path: ./stimuli/examples/B
+        system: 1
+      - path: ./stimuli/examples/C
+        system: 2
+rating_labels: |
+  # -- Rating labels (optional, shown below each rating button) -----------------
+  # Overrides the default ITU-T degradation wording with similarity wording.
+  rating_labels:
+    "1": "Very different"
+    "2": "Different"
+    "3": "Slightly different"
+    "4": "Not different"
+    "5": "Identical"
+shortcut_keys: |
+  #   rewind: r
+  #   rating:
+  #     1: 1
+  #     2: 2
+  #     3: 3
+  #     4: 4
+  #     5: 5

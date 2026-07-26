@@ -36,8 +36,8 @@ def _get_mos_test_config(config: MOSConfig) -> dict:
         items = list({s.item for s in all_stimuli if s.item})
         selected = set(random.sample(items, n))
         selected_stimuli = [s for s in all_stimuli if s.item in selected]
-    elif config.stimuli and config.stimuli.stimuli_per_session is not None:
-        n = config.stimuli.stimuli_per_session
+    elif config.stimuli_list and config.stimuli_list.stimuli_per_session is not None:
+        n = config.stimuli_list.stimuli_per_session
         selected_stimuli = _sample_keep_order(all_stimuli, n)
     else:
         selected_stimuli = list(all_stimuli)

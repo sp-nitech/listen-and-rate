@@ -142,6 +142,11 @@ function promptResume(container, record) {
  * @param {Error} err
  * @returns {Promise<void>}
  */
+/** Whether a {title, description, fields} block has anything to display. */
+function hasFormPage(form) {
+  return !!form?.description || form?.fields?.length > 0;
+}
+
 function promptRetry(container, err) {
   container.innerHTML = `
     <div class="error-screen">
@@ -222,9 +227,12 @@ async function main() {
   container.innerHTML = '';
 
   let listenerMetadata = resume ? (saved.metadata ?? {}) : {};
-  if (!resume && config.metadata?.fields?.length > 0) {
+  // Prose alone is reason enough to show the page: a study may need to state
+  // what it collects without collecting anything on that page itself.
+  if (!resume && hasFormPage(config.metadata)) {
     const metaPage = new MetadataPage(config.metadata.fields, {
       title: config.metadata.title,
+      description: config.metadata.description,
     });
     listenerMetadata = await metaPage.collect(container);
     container.innerHTML = '';
@@ -256,11 +264,12 @@ async function main() {
   async function onSubmit(sid, testType, payload) {
     // Post-test survey: shown between the last trial ("Finish") and the
     // actual POST, so its answers ride along in the same submission.
-    const hasSurvey = config.survey?.fields?.length > 0;
+    const hasSurvey = hasFormPage(config.survey);
     let surveyAnswers = {};
     if (hasSurvey) {
       const surveyPage = new MetadataPage(config.survey.fields, {
         title: config.survey.title,
+        description: config.survey.description,
         submitLabel: 'Submit',
         // Same wording as the test page's own button (see submit.js): from
         // here the submission is what is in flight.

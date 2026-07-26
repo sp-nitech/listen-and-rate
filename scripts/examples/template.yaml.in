@@ -1,18 +1,16 @@
-# Listen and Rate - Example AB (paired preference) Configuration
+{{header}}
 
-test_type: ab
+test_type: {{test_type}}
 
-allow_tie: true # set to false to force a decision on every trial
+{{options}}
 
-title: "Audio Preference Comparison"
+title: "{{title}}"
 
 # Prose shown above every trial. The line breaks here are this file's own
 # wrapping and reflow when displayed; leave a blank line where the text should
 # break.
 instructions: |
-  You will hear two versions of the same sentence, one after the other.
-  Listen to both completely, then pick the one you prefer.
-  You may replay each sample as many times as needed before choosing.
+  {{instructions}}
 
 output:
   format: csv # "csv" or "json" - each session is saved as a separate file
@@ -38,16 +36,7 @@ output:
 # randomized.
 # presentation_order: random
 
-# AB tests compare exactly 2 systems, defined via directories (each dir
-# should contain the same filenames - explicit `stimuli:` lists are not
-# supported for AB tests).
-stimuli_dirs:
-  items_per_session: 2 # optional: present N randomly chosen trials per listener
-  systems:
-    - path: ./stimuli/examples/A
-      system: Clean
-    - path: ./stimuli/examples/B
-      system: Noisy
+{{stimuli}}
 
 # -- Practice stage (optional) ------------------------------------------------
 # When count > 0, a practice round is shown after the metadata form and before
@@ -81,15 +70,14 @@ stimuli_dirs:
 #   target: -23.0
 #   scope: stimulus
 
+{{rating_labels}}
+
 # -- Keyboard shortcuts (all fields optional, shown with defaults) ------------
 # Each key must be a single character (e.g. "a", "1") or a named key such as
 # Space, Enter, Tab, Escape, or Arrow{Left,Right,Up,Down} (case-sensitive).
 # shortcuts:
 #   play: Space
-#   rewind: r
-#   choose_a: 1
-#   choose_b: 2
-#   tie: 3
+{{shortcut_keys}}
 #   prev: ArrowLeft
 #   next: ArrowRight
 #   confirm: Enter # next on intermediate pages, submit on last page

@@ -41,7 +41,7 @@ def test_load_config_with_all_fields(tmp_path, test_audio_file):
         "instructions": "Listen carefully.",
         "presentation_order": "random",
         "output": {"format": "json", "path": "./out/"},
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "s001", "path": str(test_audio_file), "label": "A"},
                 {"id": "s002", "path": str(test_audio_file), "label": "B"},
@@ -51,15 +51,15 @@ def test_load_config_with_all_fields(tmp_path, test_audio_file):
     result = load_config(write_config(tmp_path, data))
     assert result.presentation_order == "random"
     assert result.output.format == "json"
-    assert len(result.stimuli.entries) == 2
-    assert result.stimuli.entries[0].label == "A"
+    assert len(result.stimuli_list.entries) == 2
+    assert result.stimuli_list.entries[0].label == "A"
 
 
 def test_relative_audio_path_resolved_to_absolute(tmp_path, test_audio_file):
     shutil.copy(test_audio_file, tmp_path / "sample.wav")
     result = load_config(write_config(tmp_path, minimal_config("./sample.wav")))
-    assert Path(result.stimuli.entries[0].path).is_absolute()
-    assert Path(result.stimuli.entries[0].path).exists()
+    assert Path(result.stimuli_list.entries[0].path).is_absolute()
+    assert Path(result.stimuli_list.entries[0].path).exists()
 
 
 def test_experiment_id_is_derived_from_config_filename(tmp_path, test_audio_file):
@@ -87,7 +87,7 @@ def test_duplicate_stimulus_ids_raise_error(tmp_path, test_audio_file):
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "dup", "path": str(test_audio_file)},
                 {"id": "dup", "path": str(test_audio_file)},
@@ -136,7 +136,7 @@ def test_same_dir_same_stem_stimuli_rejected(tmp_path, test_audio_file):
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "original", "path": str(d / "utt1.wav")},
                 {"id": "coded", "path": str(d / "utt1.flac")},
@@ -155,7 +155,7 @@ def test_same_file_referenced_by_multiple_stimuli_allowed(tmp_path, test_audio_f
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "first", "path": str(test_audio_file)},
                 {"id": "repeat", "path": str(test_audio_file)},
@@ -175,7 +175,7 @@ def test_same_stem_in_different_dirs_allowed(tmp_path, test_audio_file):
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "a", "path": str(da / "utt1.wav")},
                 {"id": "b", "path": str(db / "utt1.wav")},
@@ -192,10 +192,10 @@ def test_stimuli_dirs_expansion(tmp_path, test_audio_file):
     shutil.copy(test_audio_file, d / "002.wav")
     data = stimuli_dirs_data([{"path": str(d)}])
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.entries) == 2
-    for s in result.stimuli.entries:
+    assert len(result.stimuli_list.entries) == 2
+    for s in result.stimuli_list.entries:
         assert re.match(r"^[a-zA-Z0-9_\-]+$", s.id), f"ID not URL-safe: {s.id}"
-    assert result.stimuli.entries[0].item in {"001", "002"}
+    assert result.stimuli_list.entries[0].item in {"001", "002"}
 
 
 def test_stimuli_dirs_system_field(tmp_path, test_audio_file):
@@ -206,12 +206,12 @@ def test_stimuli_dirs_system_field(tmp_path, test_audio_file):
     # Without system: directory name is used
     data = stimuli_dirs_data([{"path": str(d)}])
     result = load_config(write_config(tmp_path, data))
-    assert result.stimuli.entries[0].system == "system_a"
+    assert result.stimuli_list.entries[0].system == "system_a"
 
     # With system: overrides directory name
     data = stimuli_dirs_data([{"path": str(d), "system": "System A"}])
     result = load_config(write_config(tmp_path, data))
-    assert result.stimuli.entries[0].system == "System A"
+    assert result.stimuli_list.entries[0].system == "System A"
 
 
 def test_stimuli_dirs_multiple_systems(tmp_path, test_audio_file):
@@ -223,8 +223,8 @@ def test_stimuli_dirs_multiple_systems(tmp_path, test_audio_file):
     shutil.copy(test_audio_file, db / "001.wav")
     data = stimuli_dirs_data([{"path": str(da)}, {"path": str(db)}])
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.entries) == 2
-    systems = {s.system for s in result.stimuli.entries}
+    assert len(result.stimuli_list.entries) == 2
+    systems = {s.system for s in result.stimuli_list.entries}
     assert systems == {"sys_a", "sys_b"}
 
 
@@ -265,7 +265,7 @@ def test_stimuli_dirs_single_system_skips_cross_checks(tmp_path, test_audio_file
     shutil.copy(test_audio_file, da / "001.wav")
     data = stimuli_dirs_data([{"path": str(da)}])
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.entries) == 1
+    assert len(result.stimuli_list.entries) == 1
 
 
 def test_stimuli_dirs_same_path_under_distinct_system_names(tmp_path, test_audio_file):
@@ -285,10 +285,13 @@ def test_stimuli_dirs_same_path_under_distinct_system_names(tmp_path, test_audio
         ]
     )
     result = load_config(write_config(tmp_path, data))
-    assert [s.id for s in result.stimuli.entries] == ["First__utt1", "Second__utt1"]
-    assert [s.system for s in result.stimuli.entries] == ["First", "Second"]
+    assert [s.id for s in result.stimuli_list.entries] == [
+        "First__utt1",
+        "Second__utt1",
+    ]
+    assert [s.system for s in result.stimuli_list.entries] == ["First", "Second"]
     # Both ids resolve to the same file - that is the point of the repeat.
-    assert len({s.path for s in result.stimuli.entries}) == 1
+    assert len({s.path for s in result.stimuli_list.entries}) == 1
 
 
 def test_stimuli_dirs_same_basename_distinct_system_names(tmp_path, test_audio_file):
@@ -310,7 +313,7 @@ def test_stimuli_dirs_same_basename_distinct_system_names(tmp_path, test_audio_f
         ]
     )
     result = load_config(write_config(tmp_path, data))
-    assert [s.id for s in result.stimuli.entries] == ["A__001", "B__001"]
+    assert [s.id for s in result.stimuli_list.entries] == ["A__001", "B__001"]
 
 
 def test_stimuli_dirs_system_names_colliding_once_url_safe_raise_error(
@@ -413,7 +416,7 @@ def test_stimuli_per_session_validated_against_total(tmp_path, test_audio_file):
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {
+        "stimuli_list": {
             "stimuli_per_session": 10,
             "entries": [{"id": "s001", "path": str(test_audio_file)}],
         },
@@ -427,7 +430,7 @@ def test_stimuli_per_session_must_be_at_least_one(tmp_path, test_audio_file):
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {
+        "stimuli_list": {
             "stimuli_per_session": 0,
             "entries": [{"id": "s001", "path": str(test_audio_file)}],
         },
@@ -463,4 +466,4 @@ def test_symlink_within_project_is_allowed(tmp_path, test_audio_file, tmp_path_f
     link.symlink_to(external_dir)
     data = stimuli_dirs_data([{"path": str(link)}])
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.entries) == 1
+    assert len(result.stimuli_list.entries) == 1

@@ -42,10 +42,10 @@ class DMOSConfig(RatingLabelsConfigMixin, BaseTestConfig):
     @model_validator(mode="after")
     def check_requires_dirs_with_one_reference(self) -> DMOSConfig:
         """Require stimuli_dirs: exactly one reference and >=1 test system."""
-        if self.stimuli is not None:
+        if self.stimuli_list is not None:
             raise PydanticCustomError(
                 "dmos_requires_stimuli_dirs",
-                "dmos requires 'stimuli_dirs' (explicit 'stimuli' lists "
+                "dmos requires 'stimuli_dirs' (explicit 'stimuli_list' lists "
                 "are not supported)",
             )
         systems = self.stimuli_dirs.systems if self.stimuli_dirs else []

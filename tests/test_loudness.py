@@ -347,8 +347,8 @@ def test_normalize_scope_system_matches_means_and_preserves_within_system(tmp_pa
         {"target": -20.0, "scope": "system"},
         {"A": [("utt1", 0.1), ("utt2", 0.6)], "B": [("utt1", 0.3), ("utt2", 0.3)]},
     )
-    by_id = {s.id: s for s in config.stimuli.entries}
-    a_ids = [s.id for s in config.stimuli.entries if s.system == "A"]
+    by_id = {s.id: s for s in config.stimuli_list.entries}
+    a_ids = [s.id for s in config.stimuli_list.entries if s.system == "A"]
     orig = {sid: measure_loudness(by_id[sid].path) for sid in a_ids}
 
     out = tmp_path / "normalized"

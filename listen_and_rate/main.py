@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
         [f.key for f in config.survey.fields],
         config.metrics.enabled_keys(),
     )
-    all_stimuli = config.stimuli.entries if config.stimuli else []
+    all_stimuli = config.stimuli_list.entries if config.stimuli_list else []
     # With loudness_normalization configured, pre-normalize every clip into
     # a temp cache once at startup and serve from there; otherwise serve the
     # originals.

@@ -94,16 +94,29 @@ class MetadataFieldConfig(_StrictModel):
 
 
 class FormPageConfig(_StrictModel):
-    """One form page: a heading plus the fields shown on it.
+    """One form page: a heading, optional prose, and the fields shown on it.
 
     Two instances exist per experiment - the pre-test metadata form and the
     post-test survey (see the subclasses below) - sharing this schema and
-    differing only in their default title and collection timing. No fields
-    (the default) means the page is skipped entirely.
+    differing only in their default title and collection timing. A page with
+    neither fields nor a description (the default) is skipped entirely.
+
+    `description` is where a study states what the collected data is used for:
+    this tool records a listener's form answers, and optionally their response
+    times, and nothing else in the config is a place to say so - `instructions`
+    is how to perform the task and shows on every trial page. It is prose the
+    page displays, nothing more: obtaining and recording consent, and whatever
+    the study's ethics approval requires, stay the researcher's responsibility.
     """
 
     title: str
+    description: str | None = None
     fields: list[MetadataFieldConfig] = Field(default_factory=list)
+
+    @property
+    def is_shown(self) -> bool:
+        """Whether this page has anything to display."""
+        return bool(self.description) or bool(self.fields)
 
 
 class MetadataFormConfig(FormPageConfig):
@@ -253,7 +266,7 @@ class StimuliDirsConfig(_StrictModel):
     systems: list[SystemDirEntry]
 
 
-class StimuliConfig(_StrictModel):
+class StimuliListConfig(_StrictModel):
     """Explicit stimulus list."""
 
     stimuli_per_session: int | None = Field(default=None, ge=1)
@@ -517,7 +530,7 @@ class BaseTestConfig(_StrictModel):
     # connections). The clip duration is served directly (see the response's
     # `durations`), so the time bar shows length regardless of this setting.
     audio_preload: Literal["none", "auto"] = "auto"
-    stimuli: StimuliConfig | None = None
+    stimuli_list: StimuliListConfig | None = None
     stimuli_dirs: StimuliDirsConfig | None = None
     shortcuts: KeyboardShortcuts = Field(default_factory=KeyboardShortcuts)
     # Pre-test listener-information form ({title, fields}); no fields (the
@@ -579,17 +592,17 @@ class BaseTestConfig(_StrictModel):
     @model_validator(mode="after")
     def check_stimuli_source(self) -> BaseTestConfig:
         """Require exactly one stimulus source."""
-        has_stimuli = self.stimuli is not None
+        has_list = self.stimuli_list is not None
         has_dirs = self.stimuli_dirs is not None
-        if not has_stimuli and not has_dirs:
+        if not has_list and not has_dirs:
             raise PydanticCustomError(
                 "missing_stimuli_source",
-                "Either 'stimuli' or 'stimuli_dirs' must be specified",
+                "Either 'stimuli_list' or 'stimuli_dirs' must be specified",
             )
-        if has_stimuli and has_dirs:
+        if has_list and has_dirs:
             raise PydanticCustomError(
                 "stimuli_source_conflict",
-                "'stimuli' and 'stimuli_dirs' are mutually exclusive",
+                "'stimuli_list' and 'stimuli_dirs' are mutually exclusive",
             )
         return self
 

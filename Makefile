@@ -48,6 +48,10 @@ serve:
 report:
 	uv run --no-sync lar-report --config $(CONFIG) $(if $(REPORT_CONFIG),--report-config $(REPORT_CONFIG)) $(if $(DEPLOY),--root $(DEPLOY))
 
+.PHONY: examples
+examples:
+	uv run --no-sync python scripts/generate_examples.py
+
 .PHONY: screenshots
 screenshots:
 	uv run --no-sync playwright install chromium
@@ -55,15 +59,16 @@ screenshots:
 
 .PHONY: lint
 lint: tool
+	uv run --no-sync python scripts/generate_examples.py --check
 	uv run --no-sync ruff check $(PROJECT) scripts tests
 	uv run --no-sync ruff format --check $(PROJECT) scripts tests
 	uv run --no-sync pyright $(PROJECT) scripts
 	uv run --no-sync djlint --check frontend/*.html
 	uv run --no-sync mdformat --check *.md
 	(cd frontend && ../$(BIOME) check .)
-	$(PINACT) run --check .github/workflows/*.yaml
+	$(PINACT) run --check .github/*/*.yaml
 	$(TAPLO) format --check pyproject.toml
-	$(YAMLFMT) --lint examples .yamlfmt.yaml .github/workflows/*.yaml
+	$(YAMLFMT) --lint scripts/examples examples .yamlfmt.yaml .github/*/*.yaml
 	php $(PHP_CS_FIXER) check --config frontend/.php-cs-fixer.php --no-ansi
 
 .PHONY: format
@@ -73,9 +78,9 @@ format: tool
 	uv run --no-sync djlint --reformat frontend/*.html
 	uv run --no-sync mdformat *.md
 	(cd frontend && ../$(BIOME) format --write .)
-	$(PINACT) run -u --min-age 14 .github/workflows/*.yaml
+	$(PINACT) run -u --min-age 14 .github/*/*.yaml
 	$(TAPLO) format pyproject.toml
-	$(YAMLFMT) examples .yamlfmt.yaml .github/workflows/*.yaml
+	$(YAMLFMT) scripts/examples examples .yamlfmt.yaml .github/*/*.yaml
 	php $(PHP_CS_FIXER) fix --config frontend/.php-cs-fixer.php --no-ansi
 
 .PHONY: test

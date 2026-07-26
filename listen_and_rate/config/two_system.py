@@ -14,10 +14,10 @@ class TwoSystemComparisonConfig(BaseTestConfig):
     @model_validator(mode="after")
     def check_requires_two_system_dirs(self) -> TwoSystemComparisonConfig:
         """Require exactly 2 stimuli_dirs.systems entries and no explicit stimuli."""
-        if self.stimuli is not None:
+        if self.stimuli_list is not None:
             raise PydanticCustomError(
                 "two_system_requires_stimuli_dirs",
-                "this test type requires 'stimuli_dirs' (explicit 'stimuli' lists "
+                "this test type requires 'stimuli_dirs' (explicit 'stimuli_list' lists "
                 "are not supported)",
             )
         n = len(self.stimuli_dirs.systems) if self.stimuli_dirs else 0

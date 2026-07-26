@@ -36,7 +36,7 @@ def test_stimuli_per_session_samples_correctly(tmp_path, test_audio_file, monkey
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "stimuli": {
+        "stimuli_list": {
             "stimuli_per_session": 3,
             "entries": [
                 {"id": f"s{i:03d}", "path": str(test_audio_file)} for i in range(10)
@@ -65,7 +65,7 @@ def test_stimuli_per_session_keeps_order_when_presentation_fixed(
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "presentation_order": "fixed",
-        "stimuli": {
+        "stimuli_list": {
             "stimuli_per_session": 3,
             "entries": [
                 {"id": f"s{i:03d}", "path": str(test_audio_file)} for i in range(10)
@@ -129,7 +129,7 @@ def test_practice_sampling_is_independent_of_session_sampling(
 ):
     """Practice draws from the full pool, unaffected by stimuli_per_session."""
     config = _mos_practice_config(tmp_path, test_audio_file, 10, {"count": 3})
-    config["stimuli"]["stimuli_per_session"] = 2
+    config["stimuli_list"]["stimuli_per_session"] = 2
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         seen_practice_ids = set()
         for _ in range(30):

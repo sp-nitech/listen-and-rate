@@ -45,7 +45,7 @@ def test_xab_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_fil
         "test_type": "xab",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
@@ -109,7 +109,7 @@ def test_xab_rejects_three_test_systems(tmp_path, test_audio_file):
 def test_build_xab_trials_pairs_by_item(tmp_path, test_audio_file):
     dref, da, db = three_system_dirs(tmp_path, test_audio_file)
     result = load_config(write_config(tmp_path, _xab_dirs_data(dref, da, db)))
-    trials = build_xab_trials(result.stimuli.entries, result.reference_system)
+    trials = build_xab_trials(result.stimuli_list.entries, result.reference_system)
     assert len(trials) == 2  # utt1, utt2
     for t in trials:
         assert t.reference_id.startswith("sys_ref__")
@@ -123,7 +123,7 @@ def test_xab_item_missing_from_one_test_system_is_dropped(tmp_path, test_audio_f
     (db / "utt2.wav").unlink()
     with pytest.warns(UserWarning, match="not present in all systems"):
         result = load_config(write_config(tmp_path, _xab_dirs_data(dref, da, db)))
-    trials = build_xab_trials(result.stimuli.entries, result.reference_system)
+    trials = build_xab_trials(result.stimuli_list.entries, result.reference_system)
     assert len(trials) == 1
     assert trials[0].item == "utt1"
 
@@ -133,7 +133,7 @@ def test_xab_item_missing_reference_is_dropped(tmp_path, test_audio_file):
     (dref / "utt2.wav").unlink()
     with pytest.warns(UserWarning, match="not present in all systems"):
         result = load_config(write_config(tmp_path, _xab_dirs_data(dref, da, db)))
-    trials = build_xab_trials(result.stimuli.entries, result.reference_system)
+    trials = build_xab_trials(result.stimuli_list.entries, result.reference_system)
     assert len(trials) == 1
     assert trials[0].item == "utt1"
 

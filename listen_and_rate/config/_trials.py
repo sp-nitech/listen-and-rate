@@ -29,7 +29,7 @@ def _group_by_item(
 ) -> list[tuple[str, list[StimulusConfig]]]:
     """(item, its stimuli) pairs in item order, skipping stimuli with no item.
 
-    An explicit `stimuli:` list may leave `item` unset, and a stimulus with no
+    An explicit `stimuli_list:` list may leave `item` unset, and a stimulus with no
     item cannot be paired with anything, so it takes part in no trial.
     """
     by_item: dict[str, list[StimulusConfig]] = {}

@@ -40,12 +40,12 @@ def test_stimulus_config_system_bare_number_is_coerced_to_str(
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {
+        "stimuli_list": {
             "entries": [{"id": "s001", "path": str(test_audio_file), "system": 1}]
         },
     }
     result = load_config(write_config(tmp_path, data))
-    assert result.stimuli.entries[0].system == "1"
+    assert result.stimuli_list.entries[0].system == "1"
 
 
 def test_stimulus_config_label_bare_number_is_coerced_to_str(tmp_path, test_audio_file):
@@ -53,12 +53,12 @@ def test_stimulus_config_label_bare_number_is_coerced_to_str(tmp_path, test_audi
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {
+        "stimuli_list": {
             "entries": [{"id": "s001", "path": str(test_audio_file), "label": 2}]
         },
     }
     result = load_config(write_config(tmp_path, data))
-    assert result.stimuli.entries[0].label == "2"
+    assert result.stimuli_list.entries[0].label == "2"
 
 
 def test_stimuli_dirs_system_list_value_still_rejected(tmp_path, test_audio_file):
@@ -148,7 +148,7 @@ def test_stimuli_and_stimuli_dirs_mutually_exclusive(tmp_path, test_audio_file):
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         "stimuli_dirs": {"systems": [{"path": str(d)}]},
     }
     with pytest.raises(ValidationError, match="mutually exclusive"):
@@ -714,3 +714,41 @@ def test_metrics_rejects_an_unknown_key(tmp_path, test_audio_file):
     data["metrics"] = {"respones_time": True}  # typo
     with pytest.raises(ValidationError, match="Unknown field"):
         load_config(write_config(tmp_path, data))
+
+
+# -- form page description --------------------------------------------------
+
+
+def test_form_page_description_defaults_to_none(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.description is None
+    assert result.survey.description is None
+
+
+def test_form_page_description_is_configurable(tmp_path, test_audio_file):
+    """Somewhere to state what the collected data is used for.
+
+    Not `instructions`: that word is taken by how to perform the task (and by
+    practice's own stage-specific version of it), while this is prose on the
+    form page - typically a statement rather than a direction.
+    """
+    data = minimal_config(str(test_audio_file))
+    disclaimer = "Data collected here is used for research only."
+    data["metadata"] = {
+        "title": "About you",
+        "description": disclaimer,
+        "fields": [{"key": "listener", "label": "Name"}],
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.title == "About you"
+    assert result.metadata.description == disclaimer
+
+
+def test_form_page_may_carry_a_description_with_no_fields(tmp_path, test_audio_file):
+    """A disclaimer alone is a valid use of the page - nothing to collect."""
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {"description": "Research use only."}
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.description == "Research use only."
+    assert result.metadata.fields == []

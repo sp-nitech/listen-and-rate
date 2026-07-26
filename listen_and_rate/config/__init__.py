@@ -16,8 +16,8 @@ from .base import (
     KeyboardShortcuts,
     MetadataFieldConfig,
     OutputConfig,
-    StimuliConfig,
     StimuliDirsConfig,
+    StimuliListConfig,
     StimulusConfig,
     SystemDirEntry,
 )
@@ -49,7 +49,7 @@ __all__ = [
     "OutputConfig",
     "ReportConfig",
     "ScaleConfig",
-    "StimuliConfig",
+    "StimuliListConfig",
     "StimuliDirsConfig",
     "StimulusConfig",
     "SystemDirEntry",

@@ -72,7 +72,7 @@ def test_config_includes_audio_preload_level(tmp_path, test_audio_file, monkeypa
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "audio_preload": "none",
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         assert tc.get("/api/config").json()["audio_preload"] == "none"
@@ -94,7 +94,7 @@ def test_config_includes_survey_fields(tmp_path, test_audio_file, monkeypatch):
                 }
             ]
         },
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         survey = tc.get("/api/config").json()["survey"]
@@ -106,6 +106,7 @@ def test_config_includes_survey_fields(tmp_path, test_audio_file, monkeypatch):
 def test_config_survey_defaults_to_empty_form(client):
     assert client.get("/api/config").json()["survey"] == {
         "title": "Questionnaire",
+        "description": None,
         "fields": [],
     }
 
@@ -152,7 +153,7 @@ def test_config_version_changes_when_config_changes(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with _create_app_client(tmp_path, base, monkeypatch) as tc:
         v1 = tc.get("/api/config").json()["config_version"]
@@ -198,3 +199,22 @@ def test_head_save_php_does_not_fall_through_to_the_php_source(client):
     res = client.head("/save.php")
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("application/json")
+
+
+def test_config_carries_the_form_page_descriptions(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """The page's prose reaches the browser alongside its title and fields."""
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "metadata": {"description": "Research use only."},
+        "survey": {"description": "Thank you."},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        data = tc.get("/api/config").json()
+        assert data["metadata"]["description"] == "Research use only."
+        assert data["survey"]["description"] == "Thank you."

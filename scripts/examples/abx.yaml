@@ -1,0 +1,25 @@
+header: "# Listen and Rate - Example ABX (discrimination) Configuration"
+test_type: abx
+options: ""
+title: Audio Discrimination Test
+instructions: |
+  You will hear two reference samples, A and B, followed by a third sample X.
+  X is identical to either A or B.
+  Listen to all three completely, then decide which one X matches.
+  You may replay each sample as many times as needed before choosing.
+stimuli: |
+  # ABX tests compare exactly 2 systems, defined via directories (each dir
+  # should contain the same filenames - explicit `stimuli:` lists are not
+  # supported for ABX tests).
+  stimuli_dirs:
+    items_per_session: 2 # optional: present N randomly chosen trials per listener
+    systems:
+      - path: ./stimuli/examples/A
+        system: Original
+      - path: ./stimuli/examples/B
+        system: Degraded
+rating_labels: ""
+shortcut_keys: |
+  #   rewind: r
+  #   choose_a: 1
+  #   choose_b: 2

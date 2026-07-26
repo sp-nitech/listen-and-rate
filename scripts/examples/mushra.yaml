@@ -1,0 +1,46 @@
+header: "# Listen and Rate - Example MUSHRA Configuration"
+test_type: mushra
+options: ""
+title: Audio Quality Evaluation
+instructions: |
+  You will hear a Reference sample (if shown) followed by several Test
+  samples of the same item, in random order.
+  Rate each Test sample's quality relative to the Reference on a scale
+  from 0 (Bad) to 100 (Excellent) using the sliders.
+  You may replay any sample as many times as needed before submitting, but
+  every sample must be played at least once and every slider must be moved
+  at least once before you can continue.
+stimuli: |
+  # MUSHRA tests rate 2+ systems (test systems and/or a hidden/disclosed
+  # anchor) against an OPTIONAL shared reference, defined via directories.
+  # - At most one system may be flagged `reference: true` (non-rateable,
+  #   always shown first/leftmost as a plain playback clip, never a slider).
+  # - At most one system may be flagged `anchor: true`. Unlike reference, the
+  #   anchor IS rated - its slider is always shown rightmost and labeled
+  #   "Anchor" so listeners know it's the anchor. To use a traditional HIDDEN
+  #   anchor instead, simply omit `anchor: true` and treat it as a normal,
+  #   blind test system.
+  stimuli_dirs:
+    items_per_session: 2 # optional: present N randomly chosen items per listener
+    systems:
+      - path: ./stimuli/examples/A
+        reference: true
+      - path: ./stimuli/examples/B
+        system: My system
+      - path: ./stimuli/examples/C
+        system: Some anchor
+        anchor: true
+rating_labels: |
+  # -- Rating labels (optional, shown under each 20-point band) -----------------
+  # Defaults to the ITU-R BS.1534 5-band scale shown below. Ticks are always
+  # drawn at 0/20/40/60/80/100; each label is centered in the band starting at
+  # its key.
+  # rating_labels:
+  #   0: "Bad"
+  #   20: "Poor"
+  #   40: "Fair"
+  #   60: "Good"
+  #   80: "Excellent"
+shortcut_keys: |
+  #   rate_up: ArrowUp
+  #   rate_down: ArrowDown

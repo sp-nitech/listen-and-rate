@@ -35,7 +35,7 @@ def test_ab_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_file
         "test_type": "ab",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
@@ -73,7 +73,7 @@ def test_ab_unpaired_item_is_dropped_with_warning(tmp_path, test_audio_file):
     data = stimuli_dirs_data([{"path": str(da)}, {"path": str(db)}], test_type="ab")
     with pytest.warns(UserWarning, match="not present in all systems"):
         result = load_config(write_config(tmp_path, data))
-    trials = build_ab_trials(result.stimuli.entries)
+    trials = build_ab_trials(result.stimuli_list.entries)
     assert len(trials) == 1
     assert trials[0].item == "utt1"
 
@@ -87,7 +87,7 @@ def test_build_ab_trials_pairs_by_item_with_deterministic_system_order(
         test_type="ab",
     )
     result = load_config(write_config(tmp_path, data))
-    trials = build_ab_trials(result.stimuli.entries)
+    trials = build_ab_trials(result.stimuli_list.entries)
     assert len(trials) == 2
     assert [t.item for t in trials] == ["utt1", "utt2"]
     for t in trials:

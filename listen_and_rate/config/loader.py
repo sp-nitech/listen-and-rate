@@ -13,7 +13,7 @@ from ..ids import is_valid_id
 from ._utils import _AUDIO_EXTENSIONS, _duplicates, _normalize, _safe_id
 from .ab import ABConfig, build_ab_trials
 from .abx import ABXConfig
-from .base import StimuliConfig, StimuliDirsConfig, StimulusConfig
+from .base import StimuliDirsConfig, StimuliListConfig, StimulusConfig
 from .cmos import CMOSConfig
 from .dmos import DMOSConfig, build_dmos_trials
 from .errors import format_config_error
@@ -207,9 +207,9 @@ def load_config(config_path: str | Path) -> Config:
     if isinstance(data.get("output"), dict) and "format" in data["output"]:
         data["output"]["format"] = str(data["output"]["format"]).lower()
 
-    # Normalize paths in stimuli.entries[].path
-    if isinstance(data.get("stimuli"), dict):
-        for entry in data["stimuli"].get("entries") or []:
+    # Normalize paths in stimuli_list.entries[].path
+    if isinstance(data.get("stimuli_list"), dict):
+        for entry in data["stimuli_list"].get("entries") or []:
             entry["path"] = str(_normalize(Path(entry["path"])))
 
     # Normalize paths in stimuli_dirs.systems[].path
@@ -256,19 +256,24 @@ def load_config(config_path: str | Path) -> Config:
                     f"items_per_session ({n}) exceeds the total number of "
                     f"items ({len(unique_items)})"
                 )
-        config = config.model_copy(update={"stimuli": StimuliConfig(entries=expanded)})
+        config = config.model_copy(
+            update={"stimuli_list": StimuliListConfig(entries=expanded)}
+        )
 
-    if config.stimuli is None or not config.stimuli.entries:
+    if config.stimuli_list is None or not config.stimuli_list.entries:
         raise ValueError(
             "No audio stimuli found; check the paths and that files use a "
             "supported format (.wav, .mp3, .flac, .ogg)."
         )
 
-    _check_no_basename_conflicts(config.stimuli.entries)
+    _check_no_basename_conflicts(config.stimuli_list.entries)
 
-    if config.stimuli is not None and config.stimuli.stimuli_per_session is not None:
-        n = config.stimuli.stimuli_per_session
-        total = len(config.stimuli.entries)
+    if (
+        config.stimuli_list is not None
+        and config.stimuli_list.stimuli_per_session is not None
+    ):
+        n = config.stimuli_list.stimuli_per_session
+        total = len(config.stimuli_list.entries)
         if n > total:
             raise ValueError(
                 f"stimuli_per_session ({n}) exceeds the total number of "
@@ -286,16 +291,17 @@ def load_config(config_path: str | Path) -> Config:
 
     if isinstance(config, MOSConfig):
         _check_practice_count(
-            len(config.stimuli.entries) if config.stimuli else 0, "stimuli"
+            len(config.stimuli_list.entries) if config.stimuli_list else 0, "stimuli"
         )
 
     config._durations = _check_audio_and_measure_durations(
-        config.stimuli.entries if config.stimuli else []
+        config.stimuli_list.entries if config.stimuli_list else []
     )
 
     if isinstance(config, DMOSConfig):
         dmos_trials = build_dmos_trials(
-            config.stimuli.entries if config.stimuli else [], config.reference_system
+            config.stimuli_list.entries if config.stimuli_list else [],
+            config.reference_system,
         )
         if not dmos_trials:
             raise ValueError(
@@ -312,7 +318,9 @@ def load_config(config_path: str | Path) -> Config:
         _check_practice_count(len(dmos_trials), "trials")
 
     if isinstance(config, (CMOSConfig, ABConfig, ABXConfig)):
-        trials = build_ab_trials(config.stimuli.entries if config.stimuli else [])
+        trials = build_ab_trials(
+            config.stimuli_list.entries if config.stimuli_list else []
+        )
         if not trials:
             raise ValueError(
                 "No item is present in both systems; this test type requires "
@@ -328,7 +336,8 @@ def load_config(config_path: str | Path) -> Config:
 
     if isinstance(config, XABConfig):
         xab_trials = build_xab_trials(
-            config.stimuli.entries if config.stimuli else [], config.reference_system
+            config.stimuli_list.entries if config.stimuli_list else [],
+            config.reference_system,
         )
         if not xab_trials:
             raise ValueError(
@@ -351,7 +360,7 @@ def load_config(config_path: str | Path) -> Config:
             if not s.reference
         }
         mushra_trials = build_mushra_trials(
-            config.stimuli.entries if config.stimuli else [],
+            config.stimuli_list.entries if config.stimuli_list else [],
             config.reference_system,
             rateable_systems,
         )

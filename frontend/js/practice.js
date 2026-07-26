@@ -10,7 +10,7 @@
  * final Start (not Submit) button.
  */
 
-import { escapeHtml } from './dom.js';
+import { proseHtml } from './dom.js';
 
 /** " <span…>Practice</span>" to append inside the header's h1; '' for the real test. */
 export function practiceBadgeHtml(config) {
@@ -20,13 +20,14 @@ export function practiceBadgeHtml(config) {
 /**
  * The practice-instructions banner shown above the regular instructions.
  *
- * '' for the real test, and also when the practice stage carries no wording:
+ * '' for the real test, and also when the practice stage carries no wording -
  * practice.instructions is optional, and an empty banner would still show as
- * a bordered, padded, coloured box with nothing in it.
+ * a bordered, padded, coloured box with nothing in it. Prose, laid out like
+ * the instructions it sits above (see proseHtml).
  */
 export function practiceBannerHtml(config) {
-  if (!config.isPractice || !config.practice_instructions) return '';
-  return `<div class="practice-banner">${escapeHtml(config.practice_instructions)}</div>`;
+  if (!config.isPractice) return '';
+  return proseHtml(config.practice_instructions, 'practice-banner');
 }
 
 /**

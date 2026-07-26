@@ -381,14 +381,16 @@ def _build_config_data(
         # deployment's use of output.path - both layouts are <deployment
         # root>/<output.path>.
         "output_path": config.output.path,
-        # One {title, fields} block per form, the same shape as the YAML and
-        # the FastAPI response - a single shape across every layer.
+        # One {title, description, fields} block per form, the same shape as
+        # the YAML and the FastAPI response - one shape across every layer.
         "metadata": {
             "title": config.metadata.title,
+            "description": config.metadata.description,
             "fields": [f.model_dump() for f in config.metadata.fields],
         },
         "survey": {
             "title": config.survey.title,
+            "description": config.survey.description,
             "fields": [f.model_dump() for f in config.survey.fields],
         },
         "shortcuts": config.shortcuts.browser_dict(),
@@ -422,7 +424,7 @@ def _build_config_data(
         # so it stays the same across every request to this deployment.
         "x_secret": secrets.token_hex(32) if isinstance(config, ABXConfig) else None,
         "stimuli_per_session": (
-            config.stimuli.stimuli_per_session if config.stimuli else None
+            config.stimuli_list.stimuli_per_session if config.stimuli_list else None
         ),
         # Practice stage - config.php re-samples practice_count pages
         # (stimuli for MOS, trials otherwise) from the full pool on every
@@ -492,10 +494,10 @@ def main() -> None:
 
     config = load_config_or_exit(args.config)
     run_configured_loudness_check(config)
-    if config.stimuli is None:
-        raise RuntimeError("config.stimuli is None after loading")
+    if config.stimuli_list is None:
+        raise RuntimeError("config.stimuli_list is None after loading")
 
-    all_stimuli = config.stimuli.entries
+    all_stimuli = config.stimuli_list.entries
     # Normalized audio is always written out as WAV (see apply_gain_and_write),
     # so its URL carries a .wav suffix even when the source was e.g. .mp3.
     # The rewrite cannot collide two stimuli onto one output path: load_config

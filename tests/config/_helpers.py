@@ -12,7 +12,7 @@ def minimal_config(audio_path: str) -> dict:
         "test_type": "mos",
         "title": "Test",
         "instructions": "Rate the quality.",
-        "stimuli": {"entries": [{"id": "s001", "path": audio_path}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": audio_path}]},
     }
 
 

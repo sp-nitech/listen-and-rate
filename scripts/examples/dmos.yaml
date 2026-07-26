@@ -1,0 +1,39 @@
+header: "# Listen and Rate - Example DMOS (Degradation MOS) Configuration"
+test_type: dmos
+options: ""
+title: Audio Degradation Evaluation
+instructions: |
+  You will hear a Reference sample followed by a Test sample of the same item.
+  Listen to both completely, then rate how much the Test sample is degraded
+  relative to the Reference on a scale from 1 (Very annoying) to
+  5 (Imperceptible).
+  You may replay each sample as many times as needed before rating.
+stimuli: |
+  # DMOS tests compare one reference system against one or more test systems,
+  # defined via directories. Exactly one system must be flagged `reference: true`.
+  stimuli_dirs:
+    items_per_session: 2 # optional: present N randomly chosen items per listener
+    systems:
+      - path: ./stimuli/examples/A
+        reference: true
+      - path: ./stimuli/examples/B
+        system: SNR 20dB
+      - path: ./stimuli/examples/C
+        system: SNR 10dB
+rating_labels: |
+  # -- Rating labels (optional, shown below each rating button) -----------------
+  # Defaults to the ITU-T P.800 5-point degradation category scale shown below.
+  # rating_labels:
+  #   1: "Very annoying"
+  #   2: "Annoying"
+  #   3: "Slightly annoying"
+  #   4: "Not annoying"
+  #   5: "Imperceptible"
+shortcut_keys: |
+  #   rewind: r
+  #   rating:
+  #     1: 1
+  #     2: 2
+  #     3: 3
+  #     4: 4
+  #     5: 5

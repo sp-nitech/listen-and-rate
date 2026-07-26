@@ -50,7 +50,7 @@ def _config_with_systems(tmp_path, test_audio_file) -> Path:
             "test_type": "mos",
             "title": "T",
             "instructions": "I",
-            "stimuli": {
+            "stimuli_list": {
                 "entries": [
                     {
                         "id": "s001",
@@ -97,7 +97,7 @@ def test_export_invalid_config_exits_without_pydantic_url(
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"entries": [{"id": "s001", "path": "/tmp/nonexistent.wav"}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": "/tmp/nonexistent.wav"}]},
         **mutation,
     }
     config_yaml = write_config(tmp_path, config)
@@ -205,7 +205,7 @@ def test_export_php_deploy_config_data_includes_survey_fields(
                 }
             ]
         },
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
@@ -228,7 +228,7 @@ def test_export_php_deploy_config_data_includes_practice_params(
         "title": "T",
         "instructions": "I",
         "practice": {"count": 2, "instructions": "Warm-up."},
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": f"s{i:03d}", "path": str(test_audio_file)} for i in range(3)
             ]
@@ -251,7 +251,7 @@ def test_export_php_deploy_config_data_practice_instructions_null_when_unset(
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "practice": {"count": 1},
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
@@ -540,7 +540,7 @@ def _config_with_output_path(tmp_path, test_audio_file, output_path=None) -> Pat
         "test_type": "mos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     if output_path is not None:
         config["output"] = {"format": "csv", "path": output_path}
@@ -731,7 +731,7 @@ def test_export_normalizes_audio_into_bundle_as_real_wav(tmp_path, monkeypatch):
         "title": "T",
         "instructions": "I",
         "loudness_normalization": {"target": -20.0, "scope": "stimulus"},
-        "stimuli": {"entries": [{"id": "s001", "path": str(sine)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(sine)}]},
     }
     outdir = tmp_path / "deploy"
     _run_export(write_config(tmp_path, config), outdir, monkeypatch)
@@ -760,7 +760,9 @@ def test_export_normalize_converts_non_wav_input_to_wav(tmp_path, monkeypatch):
         "title": "T",
         "instructions": "I",
         "loudness_normalization": {"target": -20.0},
-        "stimuli": {"entries": [{"id": "s001", "path": str(tmp_path / "clip.mp3")}]},
+        "stimuli_list": {
+            "entries": [{"id": "s001", "path": str(tmp_path / "clip.mp3")}]
+        },
     }
     outdir = tmp_path / "deploy"
     _run_export(write_config(tmp_path, config), outdir, monkeypatch)
@@ -867,7 +869,7 @@ def test_export_php_deploy_config_data_uses_the_configs_experiment_id(
         "instructions": "I",
         "experiment_id": "chosen-name",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     config_yaml = write_config(tmp_path, config, name="some-filename.yaml")
     outdir = tmp_path / "deploy"
@@ -922,7 +924,7 @@ def test_export_refuses_to_overwrite_when_results_are_the_bundle_root(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": "./"},
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
@@ -941,7 +943,7 @@ def test_export_php_deploy_config_data_includes_metrics(
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "metrics": {"response_time": True},
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"

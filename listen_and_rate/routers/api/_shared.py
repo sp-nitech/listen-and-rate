@@ -77,7 +77,7 @@ def _validate_metadata(
 
 def _all_stimuli(config: Config) -> list[StimulusConfig]:
     """Return the config's full stimulus list ([] when none is resolved)."""
-    return config.stimuli.entries if config.stimuli else []
+    return config.stimuli_list.entries if config.stimuli_list else []
 
 
 def _id_to_meta(all_stimuli: list[StimulusConfig]) -> dict[str, dict[str, str]]:
@@ -169,14 +169,16 @@ def _test_config_response(config: Config, **extras: object) -> dict:
         # Deliberately covers EVERY stimulus, not just this session's sample:
         # practice clips are drawn from the full pool (_practice_extras).
         "durations": config.durations,
-        # Each form is one {title, fields} block, the same shape as the YAML,
-        # so the concept keeps a single shape across every layer.
+        # Each form is one {title, description, fields} block, the same shape
+        # as the YAML, so the concept keeps a single shape across every layer.
         "metadata": {
             "title": config.metadata.title,
+            "description": config.metadata.description,
             "fields": [f.model_dump() for f in config.metadata.fields],
         },
         "survey": {
             "title": config.survey.title,
+            "description": config.survey.description,
             "fields": [f.model_dump() for f in config.survey.fields],
         },
         # Which per-answer measurements to take; the frontend measures only

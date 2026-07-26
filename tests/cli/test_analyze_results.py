@@ -123,7 +123,7 @@ def test_analyze_results_derives_results_dir_from_config(
             "title": "T",
             "instructions": "I",
             "output": {"format": "csv", "path": str(tmp_path / "results")},
-            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     results_dir = tmp_path / "results" / config_yaml.stem
@@ -147,7 +147,7 @@ def test_analyze_results_derived_dir_without_files_raises(
             "title": "T",
             "instructions": "I",
             "output": {"format": "csv", "path": str(tmp_path / "results")},
-            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     with pytest.raises(FileNotFoundError):
@@ -180,7 +180,7 @@ def test_analyze_results_root_resolves_output_path_under_root(
             # A non-default relative output.path proves --root resolution
             # honors output.path rather than assuming a "results" name.
             "output": {"format": "csv", "path": "./collected/"},
-            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     deploy_root = tmp_path / "somewhere"
@@ -207,7 +207,7 @@ def test_analyze_results_root_with_absolute_output_path_exits_with_usage_error(
             "title": "T",
             "instructions": "I",
             "output": {"format": "csv", "path": str(tmp_path / "results")},
-            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     with pytest.raises(SystemExit) as excinfo:
@@ -233,7 +233,7 @@ def test_analyze_results_root_with_positional_results_exits_with_usage_error(
             "title": "T",
             "instructions": "I",
             "output": {"format": "csv", "path": str(tmp_path / "results")},
-            "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+            "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)

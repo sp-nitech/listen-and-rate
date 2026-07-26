@@ -4,6 +4,9 @@ test_type: abx
 
 title: "Audio Discrimination Test"
 
+# Prose shown above every trial. The line breaks here are this file's own
+# wrapping and reflow when displayed; leave a blank line where the text should
+# break.
 instructions: |
   You will hear two reference samples, A and B, followed by a third sample X.
   X is identical to either A or B.
@@ -94,6 +97,11 @@ stimuli_dirs:
 # information. Omit this section entirely to skip the form.
 # metadata:
 #   title: "Listener Information" # optional page heading
+#   description: | # optional prose under the heading
+#     Data collected in this test is used for research purposes only.
+#
+#     It is never shared with third parties, and nothing identifies you
+#     beyond what you enter below.
 #   fields:
 #     - key: listener
 #       label: "User name"

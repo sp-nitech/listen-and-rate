@@ -1,0 +1,25 @@
+header: "# Listen and Rate - Example AB (paired preference) Configuration"
+test_type: ab
+options: "allow_tie: true # set to false to force a decision on every trial"
+title: Audio Preference Comparison
+instructions: |
+  You will hear two versions of the same sentence, one after the other.
+  Listen to both completely, then pick the one you prefer.
+  You may replay each sample as many times as needed before choosing.
+stimuli: |
+  # AB tests compare exactly 2 systems, defined via directories (each dir
+  # should contain the same filenames - explicit `stimuli:` lists are not
+  # supported for AB tests).
+  stimuli_dirs:
+    items_per_session: 2 # optional: present N randomly chosen trials per listener
+    systems:
+      - path: ./stimuli/examples/A
+        system: Clean
+      - path: ./stimuli/examples/B
+        system: Noisy
+rating_labels: ""
+shortcut_keys: |
+  #   rewind: r
+  #   choose_a: 1
+  #   choose_b: 2
+  #   tie: 3

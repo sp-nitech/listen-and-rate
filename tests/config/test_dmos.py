@@ -85,7 +85,7 @@ def test_dmos_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_fi
         "test_type": "dmos",
         "title": "T",
         "instructions": "I",
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
@@ -129,7 +129,7 @@ def test_build_dmos_trials_pairs_reference_with_each_test_system(
         test_type="dmos",
     )
     result = load_config(write_config(tmp_path, data))
-    stimuli = result.stimuli.entries
+    stimuli = result.stimuli_list.entries
     trials = build_dmos_trials(stimuli, result.reference_system)
     # 2 items x 2 test systems = 4 trials
     assert len(trials) == 4
@@ -157,7 +157,7 @@ def test_build_dmos_trials_skips_item_missing_from_a_system(tmp_path, test_audio
     )
     with pytest.warns(UserWarning, match="not present in all systems"):
         result = load_config(write_config(tmp_path, data))
-    stimuli = result.stimuli.entries
+    stimuli = result.stimuli_list.entries
     trials = build_dmos_trials(stimuli, result.reference_system)
     assert len(trials) == 1
     assert trials[0].item == "utt1"

@@ -128,7 +128,7 @@ def run_configured_loudness_check(config: Config) -> None:
     if check is None:
         return
 
-    stimuli = config.stimuli.entries if config.stimuli else []
+    stimuli = config.stimuli_list.entries if config.stimuli_list else []
     loudness_by_id = _measure_stimuli(stimuli, desc="Measuring loudness")
     rows = _measured_rows(stimuli, loudness_by_id)
 
@@ -282,7 +282,7 @@ def run_configured_loudness_normalization(
     if norm is None:
         return {}
 
-    stimuli = config.stimuli.entries if config.stimuli else []
+    stimuli = config.stimuli_list.entries if config.stimuli_list else []
 
     # Phase 1: measure every clip's integrated loudness once.
     loudness_by_id = _measure_stimuli(stimuli, desc="Normalizing loudness")

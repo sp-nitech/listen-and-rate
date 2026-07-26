@@ -41,10 +41,10 @@ class MUSHRAConfig(RatingLabelsConfigMixin, BaseTestConfig):
     @model_validator(mode="after")
     def check_requires_dirs_with_optional_reference_and_anchor(self) -> MUSHRAConfig:
         """Require stimuli_dirs: 0/1 reference, 0/1 anchor, >=2 rateable systems."""
-        if self.stimuli is not None:
+        if self.stimuli_list is not None:
             raise PydanticCustomError(
                 "mushra_requires_stimuli_dirs",
-                "mushra requires 'stimuli_dirs' (explicit 'stimuli' lists "
+                "mushra requires 'stimuli_dirs' (explicit 'stimuli_list' lists "
                 "are not supported)",
             )
         systems = self.stimuli_dirs.systems if self.stimuli_dirs else []

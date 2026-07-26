@@ -19,7 +19,7 @@ def test_load_valid_mos_config(tmp_path, test_audio_file):
     assert isinstance(result, MOSConfig)
     assert result.test_type == "mos"
     assert result.title == "Test"
-    assert len(result.stimuli.entries) == 1
+    assert len(result.stimuli_list.entries) == 1
 
 
 def test_mos_config_with_three_systems_still_works(tmp_path, test_audio_file):
@@ -32,7 +32,7 @@ def test_mos_config_with_three_systems_still_works(tmp_path, test_audio_file):
         dirs.append({"path": str(d)})
     data = stimuli_dirs_data(dirs)
     result = load_config(write_config(tmp_path, data))
-    assert len(result.stimuli.entries) == 3
+    assert len(result.stimuli_list.entries) == 3
 
 
 # -- rating_labels validation ------------------------------------------------

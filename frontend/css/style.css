@@ -175,10 +175,14 @@ body {
   letter-spacing: -0.02em;
 }
 
+/* Config-authored prose. `pre-line` is what lets the author break a line at
+   all; the newlines that are merely the config file's own wrapping are
+   already collapsed away by dom.js's proseHtml. */
 .test-header .instructions {
   color: var(--color-text-muted);
   font-size: 0.95rem;
   line-height: 1.7;
+  white-space: pre-line;
 }
 
 /* -- Practice stage ----------------------------------------------------- */
@@ -197,6 +201,7 @@ body {
   margin-left: 10px;
 }
 
+/* Prose too (see .test-header .instructions for the `white-space`). */
 .practice-banner {
   color: var(--color-practice);
   background: var(--color-practice-light);
@@ -206,6 +211,7 @@ body {
   margin-bottom: 12px;
   font-size: 0.95rem;
   line-height: 1.7;
+  white-space: pre-line;
 }
 
 /* -- Stimulus page ------------------------------------------------------ */
@@ -1172,6 +1178,17 @@ audio {
   font-size: 1.4rem;
   font-weight: 700;
   margin-bottom: 32px;
+}
+
+/* The page's prose (config `description`), sitting under the heading. Styled
+   and laid out exactly like .test-header .instructions above - the other block
+   of config-authored prose - `white-space` included. */
+.metadata-description {
+  margin: -20px 0 28px;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  white-space: pre-line;
 }
 
 .metadata-field {

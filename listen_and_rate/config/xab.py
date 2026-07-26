@@ -28,10 +28,10 @@ class XABConfig(BaseTestConfig):
     @model_validator(mode="after")
     def check_requires_dirs_with_reference_and_two_systems(self) -> XABConfig:
         """Require stimuli_dirs: exactly one reference and two test systems."""
-        if self.stimuli is not None:
+        if self.stimuli_list is not None:
             raise PydanticCustomError(
                 "xab_requires_stimuli_dirs",
-                "xab requires 'stimuli_dirs' (explicit 'stimuli' lists "
+                "xab requires 'stimuli_dirs' (explicit 'stimuli_list' lists "
                 "are not supported)",
             )
         systems = self.stimuli_dirs.systems if self.stimuli_dirs else []

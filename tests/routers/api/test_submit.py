@@ -60,7 +60,7 @@ def test_submit_writes_json_when_format_is_json(tmp_path, test_audio_file, monke
         "title": "T",
         "instructions": "I",
         "output": {"format": "json", "path": str(tmp_path / "results")},
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
@@ -144,7 +144,7 @@ def _client_with_metadata_config(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
@@ -299,7 +299,7 @@ def test_submit_survey_saved_as_json_object(tmp_path, test_audio_file, monkeypat
         "title": "T",
         "instructions": "I",
         "output": {"format": "json", "path": str(tmp_path / "results")},
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
@@ -323,7 +323,7 @@ def test_submit_strips_unknown_metadata_keys(tmp_path, test_audio_file, monkeypa
         "title": "T",
         "instructions": "I",
         "output": {"format": "json", "path": str(tmp_path / "results")},
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
@@ -353,7 +353,7 @@ def test_submit_rejects_a_session_id_that_is_not_path_safe(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -386,7 +386,7 @@ def test_submit_rejects_a_metadata_value_with_a_trailing_newline(
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
         "metadata": {"fields": [{"key": "listener", "label": "L", "type": "text"}]},
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
         res = tc.post(
@@ -417,7 +417,7 @@ def _mos_config(tmp_path, test_audio_file):
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "stimuli": {
+        "stimuli_list": {
             "entries": [
                 {"id": "s001", "path": str(test_audio_file)},
                 {"id": "s002", "path": str(test_audio_file)},
@@ -544,7 +544,7 @@ def _metrics_config(tmp_path, test_audio_file, fmt="csv", **metrics):
         "instructions": "I",
         "output": {"format": fmt, "path": str(tmp_path / "results")},
         "metrics": metrics,
-        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
 
 

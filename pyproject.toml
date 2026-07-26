@@ -64,6 +64,8 @@ typeCheckingMode = "standard"
 [tool.pytest.ini_options]
 addopts = "-s -x"
 testpaths = ["tests"]
+# The example-config generator lives in scripts/, not in the package.
+pythonpath = ["scripts"]
 
 [dependency-groups]
 dev = [

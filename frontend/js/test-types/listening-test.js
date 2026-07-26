@@ -27,7 +27,7 @@
  *   _submit()                post the collected answers
  */
 
-import { escapeHtml } from '../dom.js';
+import { escapeHtml, proseHtml } from '../dom.js';
 import {
   finalButtonLabel,
   finalConfirmHint,
@@ -115,7 +115,7 @@ export class ListeningTest {
         <span class="page-counter"></span>
       </div>
       ${practiceBannerHtml(this.config)}
-      <p class="instructions">${escapeHtml(this.config.instructions)}</p>
+      ${proseHtml(this.config.instructions, 'instructions')}
     `;
     this.container.appendChild(header);
     this._pageSlot = document.createElement('div');

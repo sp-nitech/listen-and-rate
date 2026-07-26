@@ -4,6 +4,9 @@ test_type: mos
 
 title: "Audio Quality Evaluation"
 
+# Prose shown above every trial. The line breaks here are this file's own
+# wrapping and reflow when displayed; leave a blank line where the text should
+# break.
 instructions: |
   Please listen to each audio sample carefully and rate its overall quality
   on a scale from 1 (Bad) to 5 (Excellent).
@@ -36,7 +39,7 @@ output:
 # -- Stimuli (choose one method) ---------------------------------------------
 
 # Method 1: list individual files
-# stimuli:
+# stimuli_list:
 #   stimuli_per_session: 2 # optional: present N randomly chosen stimuli per listener
 #   entries:
 #     - id: A_item1
@@ -58,10 +61,10 @@ stimuli_dirs:
 
 # -- Practice stage (optional) ------------------------------------------------
 # When count > 0, a practice round is shown after the metadata form and before
-# the real test: count stimuli are drawn from the full pool independently of
-# the session's stimuli (overlap allowed), and practice ratings are discarded.
+# the real test: count trials are drawn from the full pool independently of
+# the session's trials (overlap allowed), and practice responses are discarded.
 # practice:
-#   count: 2 # number of practice stimuli (default: 0 = no practice)
+#   count: 1 # number of practice trials (default: 0 = no practice)
 #   instructions: | # shown in a banner above the regular instructions
 #     This is a practice session. Your ratings will not be recorded.
 
@@ -117,6 +120,11 @@ stimuli_dirs:
 # information. Omit this section entirely to skip the form.
 # metadata:
 #   title: "Listener Information" # optional page heading
+#   description: | # optional prose under the heading
+#     Data collected in this test is used for research purposes only.
+#
+#     It is never shared with third parties, and nothing identifies you
+#     beyond what you enter below.
 #   fields:
 #     - key: listener
 #       label: "User name"

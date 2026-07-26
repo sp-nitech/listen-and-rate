@@ -12,7 +12,7 @@
  *   select - radio button group from options[]
  */
 
-import { escapeHtml } from './dom.js';
+import { escapeHtml, proseHtml } from './dom.js';
 
 const _TEXT_PATTERN = /^[a-zA-Z0-9.-]+$/;
 
@@ -25,6 +25,7 @@ export class MetadataPage {
   constructor(fields, options = {}) {
     this.fields = fields;
     this.title = options.title ?? 'Listener Information';
+    this.description = options.description ?? null;
     this.submitLabel = options.submitLabel ?? 'Start Test';
     // Shown on the button while the caller is busy with what this page
     // collected; null leaves the label alone (the pre-test form's caller
@@ -57,6 +58,7 @@ export class MetadataPage {
       page.innerHTML = `
         <div class="metadata-form">
           <h2 class="metadata-title">${escapeHtml(this.title)}</h2>
+          ${proseHtml(this.description, 'metadata-description')}
           ${this.fields.map((f) => this._renderField(f)).join('')}
           <button class="btn btn-primary metadata-start" id="metadata-start" type="button" disabled>
             ${escapeHtml(this.submitLabel)}

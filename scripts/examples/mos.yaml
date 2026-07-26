@@ -1,0 +1,47 @@
+header: "# Listen and Rate - Example MOS (Naturalness MOS) Configuration"
+test_type: mos
+options: ""
+title: Audio Quality Evaluation
+instructions: |
+  Please listen to each audio sample carefully and rate its overall quality
+  on a scale from 1 (Bad) to 5 (Excellent).
+  You may replay each sample as many times as needed before rating.
+stimuli: |
+  # -- Stimuli (choose one method) ---------------------------------------------
+
+  # Method 1: list individual files
+  # stimuli_list:
+  #   stimuli_per_session: 2 # optional: present N randomly chosen stimuli per listener
+  #   entries:
+  #     - id: A_item1
+  #       path: ./stimuli/examples/A/item1.wav
+  #       system: A
+  #       label: "Sample 1" # optional: shown to listener
+  #     - id: A_item2
+  #       path: ./stimuli/examples/A/item2.wav
+  #       system: A
+
+  # Method 2: specify directories (each dir should contain the same filenames)
+  stimuli_dirs:
+    items_per_session: 2 # optional: present N randomly chosen items per listener
+    systems:
+      - path: ./stimuli/examples/A
+        system: A # Clean
+      - path: ./stimuli/examples/B
+        system: B # SNR 20 dB
+rating_labels: |
+  # -- Rating labels (optional, shown below each rating button) -----------------
+  # rating_labels:
+  #   1: "Bad"
+  #   2: "Poor"
+  #   3: "Fair"
+  #   4: "Good"
+  #   5: "Excellent"
+shortcut_keys: |
+  #   rewind: r
+  #   rating:
+  #     1: 1
+  #     2: 2
+  #     3: 3
+  #     4: 4
+  #     5: 5

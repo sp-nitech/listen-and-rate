@@ -26,6 +26,10 @@ export class MetadataPage {
     this.fields = fields;
     this.title = options.title ?? 'Listener Information';
     this.submitLabel = options.submitLabel ?? 'Start Test';
+    // Shown on the button while the caller is busy with what this page
+    // collected; null leaves the label alone (the pre-test form's caller
+    // replaces the page immediately, so there is nothing to report).
+    this.busyLabel = options.busyLabel ?? null;
     this._values = {};
     // Pre-select a value ONLY when the config explicitly declares a default.
     // Auto-selecting the first option would bias answers toward it (default
@@ -119,7 +123,16 @@ export class MetadataPage {
       });
     }
 
-    page.querySelector('#metadata-start')?.addEventListener('click', () => {
+    const start = page.querySelector('#metadata-start');
+    start?.addEventListener('click', () => {
+      // The caller may do async work before replacing this page - the survey
+      // POSTs the whole submission - and until it does, the form is still on
+      // screen with a live-looking button and editable fields. resolve() is
+      // already idempotent, so a second click was never a second submission;
+      // this is what makes that visible instead of looking frozen.
+      start.disabled = true;
+      if (this.busyLabel) start.textContent = this.busyLabel;
+      for (const field of page.querySelectorAll('input')) field.disabled = true;
       resolve({ ...this._values });
     });
 

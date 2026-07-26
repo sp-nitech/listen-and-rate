@@ -262,6 +262,9 @@ async function main() {
       const surveyPage = new MetadataPage(config.survey.fields, {
         title: config.survey.title,
         submitLabel: 'Submit',
+        // Same wording as the test page's own button (see submit.js): from
+        // here the submission is what is in flight.
+        busyLabel: 'Submitting\u2026',
       });
       container.innerHTML = '';
       surveyAnswers = await surveyPage.collect(container);

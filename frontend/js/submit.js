@@ -21,7 +21,7 @@ export async function submitPayload(test, buildPayload) {
   const btn = test._pageSlot.querySelector('#btn-next');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Submitting…';
+    btn.textContent = 'Submitting\u2026';
   }
   document.removeEventListener('keydown', test._boundKeydown);
 

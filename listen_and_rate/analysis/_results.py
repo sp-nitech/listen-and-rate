@@ -160,7 +160,7 @@ def _older_release_warning(by_file: dict) -> str | None:
         return None
     if UNKNOWN_VERSION in recorded:
         return (
-            "these results do not record which version of listen-and-rate "
+            "These results do not record which version of listen-and-rate "
             f"produced them, so they come from a release older than this one "
             f"({__version__}). Column meanings may have changed since. Check "
             "the release notes if the numbers look wrong."
@@ -168,7 +168,7 @@ def _older_release_warning(by_file: dict) -> str | None:
     if _release(recorded[0]) == _release(__version__):
         return None
     return (
-        f"these results were produced by listen-and-rate {', '.join(recorded)}, "
+        f"These results were produced by listen-and-rate {', '.join(recorded)}, "
         f"but this is {__version__}. Column meanings may have changed since. "
         "Check the release notes if the numbers look wrong."
     )

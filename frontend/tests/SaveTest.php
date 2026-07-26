@@ -506,10 +506,12 @@ final class SaveTest extends TestCase
         $this->assertStringStartsWith($realResults . '/', $dir . '/');
     }
 
-    public function testResolveExperimentDirFallsBackToResultsWhenEmpty(): void
+    public function testResolveExperimentDirRejectsAnEmptyName(): void
     {
-        $dir = resolve_experiment_dir($this->tmpDir, '');
-        $this->assertStringEndsWith('/results', $dir);
+        // The fallback moved to experiment_id_for, which is where the bundle's
+        // own id is read. By the time a name reaches here it must be usable.
+        $this->expectException(SaveRequestError::class);
+        resolve_experiment_dir($this->tmpDir, '');
     }
 
     // -- build_json_result / build_csv_rows -------------------------------
@@ -1361,14 +1363,34 @@ final class SaveTest extends TestCase
         $this->assertSame([['', 's1']], $rows);
     }
 
-    public function testPrependToolVersionPutsTheKeyFirstInJson(): void
+    public function testResultKeysComeOutInTheSameOrderAsTheFastapiSaver(): void
     {
-        $result = prepend_tool_version_json(
-            ['session_id' => 's1', 'records' => []],
+        // The survey is attached after the per-test-type builder returns, so
+        // without this it would land after records and a session collected on
+        // this backend would differ from the same session collected on the
+        // other one. Mirrors JSONResultSaver.save().
+        $result = order_result_keys(
+            [
+                'session_id' => 's1',
+                'timestamp' => 't',
+                'test_type' => 'mos',
+                'metadata' => [],
+                'records' => [],
+                'survey' => [],
+            ],
             '0.2.0'
         );
-        $this->assertSame(['tool_version', 'session_id', 'records'], array_keys($result));
+        $this->assertSame(
+            ['tool_version', 'session_id', 'timestamp', 'test_type', 'metadata', 'survey', 'records'],
+            array_keys($result)
+        );
         $this->assertSame('0.2.0', $result['tool_version']);
+    }
+
+    public function testResultKeysKeepAnUnexpectedKeyRatherThanDroppingIt(): void
+    {
+        $result = order_result_keys(['session_id' => 's1', 'extra' => 1], '0.2.0');
+        $this->assertSame(1, $result['extra']);
     }
     public function testEmptyFormObjectsEncodeAsObjectsNotLists(): void
     {
@@ -1391,5 +1413,20 @@ final class SaveTest extends TestCase
         $text = file_get_contents($path);
         unlink($path);
         $this->assertStringContainsString('"listener": "A"', $text);
+    }
+    // -- experiment_id_for --------------------------------------------------
+
+    public function testExperimentIdComesFromTheBundleNotTheRequest(): void
+    {
+        // Same reasoning as the test type just above it in save.php: the
+        // bundle knows which experiment it is, and a client that says
+        // otherwise would file its results under another study.
+        $this->assertSame('my-study', experiment_id_for(['experiment_id' => 'my-study']));
+    }
+
+    public function testExperimentIdFallsBackForABundleThatRecordsNone(): void
+    {
+        $this->assertSame('results', experiment_id_for([]));
+        $this->assertSame('results', experiment_id_for(['experiment_id' => '']));
     }
 }

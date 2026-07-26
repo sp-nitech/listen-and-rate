@@ -17,16 +17,19 @@
  * is served directly to the browser (config.php is, and deliberately omits
  * 'system' so listeners cannot see which system a stimulus belongs to
  * before rating it).
- * CSV:  <results dir>/{experiment_id}/{session_id}.csv  - one row per rating
+ * CSV:  <results dir>/{experiment_id}/{session_id}.csv  - one row per record
  * JSON: <results dir>/{experiment_id}/{session_id}.json - one object per session
+ *
+ * The experiment_id naming the directory comes from config_data.php, not from
+ * the body: this bundle serves one experiment (see experiment_id_for).
  *
  * Expected POST body:
  *   {
  *     "session_id": "uuid-string",
- *     "experiment_id": "config.mos",
  *     "test_type": "mos",
  *     "ratings": [{"stimulus_id": "...", "rating": 4}, ...],
- *     "metadata": {"listener": "Alice", ...}
+ *     "metadata": {"listener": "Alice", ...},
+ *     "survey": {"trial_count": "Appropriate", ...}
  *   }
  *
  * GET /save.php  - pre-flight check: verifies the results dir is writable.
@@ -200,7 +203,7 @@ function assert_answered_once(array $keys, string $name, string $unit): void
         sort($list);
         throw new SaveRequestError(
             400,
-            "{$name} must answer each {$unit} once; repeated: " . implode(', ', $list)
+            "{$name} must answer each {$unit} once. Repeated: " . implode(', ', $list)
         );
     }
 }
@@ -389,9 +392,21 @@ function append_metrics_json(array $entries, array $answers, array $keys): array
  * @throws SaveRequestError (500) if directories cannot be created/resolved,
  *         or (400) if the resolved path would escape $resultsDir.
  */
-function resolve_experiment_dir(string $resultsDir, string $rawExperimentId): string
+function experiment_id_for(array $configData): string
 {
-    $experimentId = ($rawExperimentId !== '') ? $rawExperimentId : 'results';
+    // From the bundle, never from the request. The same reasoning as the
+    // AUTHORITATIVE test type below: this bundle serves one experiment, and a
+    // client that names another one would file its results under that study.
+    // Mirrors the FastAPI backend, which passes config.experiment_id to the
+    // saver and ignores the field entirely.
+    $id = (string) ($configData['experiment_id'] ?? '');
+    return $id !== '' ? $id : 'results';
+}
+
+function resolve_experiment_dir(string $resultsDir, string $experimentId): string
+{
+    // Still checked: config_data.php is generated, but it is a plain file on
+    // the server and this name becomes a path component.
     assert_valid_id($experimentId, 'experiment_id');
 
     if (!is_dir($resultsDir)) {
@@ -585,10 +600,24 @@ function prepend_tool_version_columns(array $fields, array $rows, string $versio
     return [$fields, $rows];
 }
 
-/** Same for the JSON shape, where it becomes the first key. Mirrors JSONResultSaver. */
-function prepend_tool_version_json(array $result, string $version): array
+/**
+ * Lay the JSON result out in JSONResultSaver.save()'s key order.
+ *
+ * The version goes first for the reason above. The rest are ordered here
+ * rather than left as the builders happened to produce them, because the
+ * survey is attached afterwards and would otherwise land after the records -
+ * making the same session look different depending on which backend served
+ * it. An unexpected key keeps its value and follows at the end.
+ */
+function order_result_keys(array $result, string $version): array
 {
-    return ['tool_version' => $version] + $result;
+    $ordered = ['tool_version' => $version];
+    foreach (['session_id', 'timestamp', 'test_type', 'metadata', 'survey', 'records'] as $key) {
+        if (array_key_exists($key, $result)) {
+            $ordered[$key] = $result[$key];
+        }
+    }
+    return $ordered + $result;
 }
 
 /** Build [$fields, $rows] for CSV-format output. */
@@ -1176,7 +1205,7 @@ function handle_save_request(): void
             (is_array($data['survey'] ?? null)) ? $data['survey'] : []
         );
 
-        $experiment_dir  = resolve_experiment_dir($results_dir, $data['experiment_id'] ?? '');
+        $experiment_dir  = resolve_experiment_dir($results_dir, experiment_id_for($config_data));
         assert_valid_id((string) $data['session_id'], 'session_id');
         $session_id_safe = $data['session_id'];
         // CSV columns are namespaced (metadata_*/survey_*, see prefix_keys);
@@ -1211,7 +1240,7 @@ function handle_save_request(): void
                 submitted_answers($test_type, $data),
                 $metrics_keys
             );
-            $json_data = prepend_tool_version_json($json_data, $tool_version);
+            $json_data = order_result_keys($json_data, $tool_version);
             write_json_file($experiment_dir . '/' . $session_id_safe . '.json', $json_data);
         } else {
             [$fields, $rows] = match ($test_type) {

@@ -282,7 +282,6 @@ async function main() {
     const request = {
       session_id: sid,
       test_type: testType,
-      experiment_id: config.experiment_id ?? '',
       metadata: listenerMetadata,
       survey: surveyAnswers,
       ...payload,

@@ -613,3 +613,22 @@ def test_submit_rounds_response_time_to_two_decimals(
     path = next((tmp_path / "results").rglob("*.csv"))
     row = next(csv.DictReader(path.open(encoding="utf-8")))
     assert row["metrics_response_time"] == "2.50"
+
+
+def test_submit_ignores_an_experiment_id_from_the_client(client, tmp_path):
+    # The server knows which experiment it serves. A request that names
+    # another one must not file its results there. Mirrored by save.php's
+    # experiment_id_for().
+    res = client.post(
+        "/api/submit",
+        json={
+            "session_id": "s-owned",
+            "test_type": "mos",
+            "experiment_id": "somebody-elses-study",
+            "ratings": [{"stimulus_id": "s001", "rating": 4}],
+        },
+    )
+    assert res.status_code == 200
+    written = list((tmp_path / "results").rglob("s-owned.*"))
+    assert len(written) == 1
+    assert written[0].parent.name != "somebody-elses-study"

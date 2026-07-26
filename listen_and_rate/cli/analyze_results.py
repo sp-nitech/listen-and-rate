@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 
 from listen_and_rate.analysis import generate_report_html
-from listen_and_rate.analysis.report import (
+from listen_and_rate.analysis._results import (
     ResultVersionMismatch,
     version_difference_note,
 )

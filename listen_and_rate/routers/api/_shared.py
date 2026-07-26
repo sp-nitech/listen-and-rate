@@ -255,7 +255,10 @@ def _require_answered_once(keys: list[str], name: str, unit: str) -> None:
     if duplicated:
         raise HTTPException(
             status_code=400,
-            detail=f"{name} must answer each {unit} once. Repeated: {duplicated}",
+            detail=(
+                f"{name} must answer each {unit} once. "
+                f"Repeated: {', '.join(duplicated)}"
+            ),
         )
 
 

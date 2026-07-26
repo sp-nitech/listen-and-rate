@@ -7,8 +7,10 @@ import json
 import pytest
 
 from listen_and_rate import __version__
-from listen_and_rate.analysis.report import (
+from listen_and_rate.analysis._results import (
     ResultVersionMismatch,
+    _read_result_file,
+    _versions_in,
     version_difference_note,
 )
 
@@ -131,3 +133,10 @@ def test_the_mismatch_is_its_own_error_type(tmp_path):
     b = _write_csv(tmp_path / "b.csv", _rows("9.9.0"))
     with pytest.raises(ResultVersionMismatch):
         generate_report_html([a, b])
+
+
+def test_a_two_part_version_survives_the_csv_round_trip(tmp_path):
+    # Left to infer, pandas reads a bare "1.10" as the float 1.1 and the
+    # report would compare 1.1 against a release that never existed.
+    path = _write_csv(tmp_path / "a.csv", _rows("1.10"))
+    assert _versions_in(_read_result_file(path)) == {"1.10"}

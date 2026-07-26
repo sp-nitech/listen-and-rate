@@ -42,9 +42,9 @@ output:
 
 # Presentation order of the per-session stimuli/trials (default: random).
 # "random" shuffles the order per listener to cancel order effects, and
-# "fixed" keeps the configured order. This governs ordering ONLY - which subset each
-# listener is sampled, and the within-trial position blinding, are always
-# randomized.
+# "fixed" keeps the configured order. This governs ordering ONLY - which
+# subset each listener is sampled, and the within-trial position blinding,
+# are always randomized.
 # presentation_order: random
 
 # DMOS tests compare one reference system against one or more test systems,

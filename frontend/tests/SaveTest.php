@@ -222,6 +222,51 @@ final class SaveTest extends TestCase
         }
     }
 
+    // -- validate_submission_shape ----------------------------------------
+
+    public function testValidateSubmissionShapeRejectsTheSameStimulusTwice(): void
+    {
+        $this->expectException(SaveRequestError::class);
+        validate_submission_shape('mos', ['ratings' => [
+            ['stimulus_id' => 's1', 'rating' => 5],
+            ['stimulus_id' => 's1', 'rating' => 1],
+        ]]);
+    }
+
+    public function testValidateSubmissionShapeRejectsTheSamePairTwiceEitherOrder(): void
+    {
+        // The pair is the trial, so reversing the ids is the same answer.
+        $this->expectException(SaveRequestError::class);
+        validate_submission_shape('ab', ['choices' => [
+            ['stimulus_ids' => ['a', 'b'], 'selected_stimulus_id' => 'a'],
+            ['stimulus_ids' => ['b', 'a'], 'selected_stimulus_id' => 'b'],
+        ]]);
+    }
+
+    public function testValidateSubmissionShapeRejectsTheSameDmosTrialTwice(): void
+    {
+        $this->expectException(SaveRequestError::class);
+        validate_submission_shape('dmos', ['ratings' => [
+            ['stimulus_id' => 't1', 'reference_id' => 'r1', 'rating' => 4],
+            ['stimulus_id' => 't1', 'reference_id' => 'r1', 'rating' => 2],
+        ]]);
+    }
+
+    public function testValidateSubmissionShapeAcceptsDistinctAnswers(): void
+    {
+        validate_submission_shape('mos', ['ratings' => [
+            ['stimulus_id' => 's1', 'rating' => 5],
+            ['stimulus_id' => 's2', 'rating' => 1],
+        ]]);
+        // One test stimulus rated against two different references is not a
+        // repeat - only the whole (stimulus, reference) trial identifies it.
+        validate_submission_shape('dmos', ['ratings' => [
+            ['stimulus_id' => 't1', 'reference_id' => 'r1', 'rating' => 4],
+            ['stimulus_id' => 't1', 'reference_id' => 'r2', 'rating' => 2],
+        ]]);
+        $this->expectNotToPerformAssertions();
+    }
+
     // -- validate_metadata ------------------------------------------------
 
     public function testValidateMetadataRequiresRequiredField(): void
@@ -230,6 +275,17 @@ final class SaveTest extends TestCase
         validate_metadata(
             [['key' => 'listener', 'type' => 'text', 'required' => true]],
             []
+        );
+    }
+
+    public function testValidateMetadataRejectsATrailingNewline(): void
+    {
+        // PCRE's $ also matches before a trailing newline; the browser's JS
+        // regex does not, so the pattern is anchored with \z to agree.
+        $this->expectException(SaveRequestError::class);
+        validate_metadata(
+            [['key' => 'listener', 'type' => 'text', 'required' => true]],
+            ['listener' => "alice\n"]
         );
     }
 

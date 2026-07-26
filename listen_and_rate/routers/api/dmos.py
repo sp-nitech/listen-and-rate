@@ -13,6 +13,7 @@ from ._shared import (
     _all_stimuli,
     _id_to_meta,
     _practice_extras,
+    _require_answered_once,
     _require_non_empty,
     _sample_trials_by_item,
     _save_and_ok,
@@ -81,6 +82,11 @@ def _submit_dmos(body: SubmitRequest, config: DMOSConfig, saver: ResultSaver) ->
     400 if empty, a pair is invalid/unknown, or a rating is outside 1-5.
     """
     _require_non_empty(body.ratings, "ratings")
+    _require_answered_once(
+        [f"{r.stimulus_id}+{r.reference_id}" for r in body.ratings],
+        "ratings",
+        "trial",
+    )
     id_to_meta = _id_to_meta(_all_stimuli(config))
     reference_system = config.reference_system
 

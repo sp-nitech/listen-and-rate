@@ -172,9 +172,54 @@ function detect_server_timezone(
 }
 
 /**
+ * Throws SaveRequestError(400) if any of $keys is answered more than once.
+ *
+ * Mirrors listen_and_rate/routers/api/_shared.py's _require_answered_once():
+ * $keys identifies what each answer is about, so one listener cannot rate the
+ * same thing twice in a single submission. See that function for why a repeat
+ * is rejected rather than merged.
+ */
+function assert_answered_once(array $keys, string $name, string $unit): void
+{
+    $seen = [];
+    $duplicated = [];
+    foreach ($keys as $key) {
+        if (isset($seen[$key])) {
+            $duplicated[$key] = true;
+        }
+        $seen[$key] = true;
+    }
+    if ($duplicated !== []) {
+        $list = array_keys($duplicated);
+        sort($list);
+        throw new SaveRequestError(
+            400,
+            "{$name} must answer each {$unit} once; repeated: " . implode(', ', $list)
+        );
+    }
+}
+
+/** The key identifying what one submitted answer is about, per test type. */
+function answer_key(string $testType, array $answer): string
+{
+    if (in_array($testType, ['cmos', 'ab', 'abx', 'xab'], true)) {
+        // A trial is its pair, whichever order the client echoes the ids in.
+        $ids = is_array($answer['stimulus_ids'] ?? null) ? $answer['stimulus_ids'] : [];
+        $ids = array_map('strval', $ids);
+        sort($ids, SORT_STRING);
+        return implode('+', $ids);
+    }
+    if ($testType === 'dmos') {
+        return ($answer['stimulus_id'] ?? '') . '+' . ($answer['reference_id'] ?? '');
+    }
+    return (string) ($answer['stimulus_id'] ?? '');
+}
+
+/**
  * Throws SaveRequestError(400) if the submitted body is missing the
- * non-empty ratings/choices list its test_type requires, mirroring
- * listen_and_rate/routers/api/_shared.py's _require_non_empty() guards.
+ * non-empty ratings/choices list its test_type requires, or answers the same
+ * stimulus/trial twice. Mirrors listen_and_rate/routers/api/_shared.py's
+ * _require_non_empty()/_require_answered_once() guards.
  */
 function validate_submission_shape(string $testType, array $data): void
 {
@@ -182,9 +227,25 @@ function validate_submission_shape(string $testType, array $data): void
         if (empty($data['choices'])) {
             throw new SaveRequestError(400, 'choices must be a non-empty array');
         }
-    } elseif (empty($data['ratings'])) {
-        throw new SaveRequestError(400, 'ratings must be a non-empty array');
+        $answers = $data['choices'];
+        $name = 'choices';
+        $unit = 'trial';
+    } else {
+        if (empty($data['ratings'])) {
+            throw new SaveRequestError(400, 'ratings must be a non-empty array');
+        }
+        $answers = $data['ratings'];
+        $name = 'ratings';
+        $unit = $testType === 'dmos' ? 'trial' : 'stimulus';
     }
+    if (!is_array($answers)) {
+        throw new SaveRequestError(400, "{$name} must be a non-empty array");
+    }
+    $keys = [];
+    foreach ($answers as $answer) {
+        $keys[] = answer_key($testType, is_array($answer) ? $answer : []);
+    }
+    assert_answered_once($keys, $name, $unit);
 }
 
 /**
@@ -215,7 +276,10 @@ function validate_metadata(array $fields, array $submitted): array
             throw new SaveRequestError(400, "Metadata field {$key} must be a string");
         }
         $type = $field['type'] ?? 'text';
-        if ($type === 'text' && !preg_match('/^[a-zA-Z0-9.-]+$/', $value)) {
+        // \z, not $: PCRE's $ also matches before a trailing newline, which
+        // the browser's JS regex does not - see _METADATA_TEXT_RE in
+        // listen_and_rate/routers/api/_shared.py.
+        if ($type === 'text' && !preg_match('/^[a-zA-Z0-9.-]+\z/', $value)) {
             throw new SaveRequestError(400, "Metadata field {$key} contains invalid characters");
         }
         if ($type === 'select' && !empty($field['options']) && !in_array($value, $field['options'], true)) {
@@ -829,11 +893,12 @@ function validate_mushra_rating(array $stimulusMap, array $r, ?string $reference
 
 /**
  * Validate that submitted MUSHRA ratings, grouped by item, cover every
- * rateable system exactly once, mirroring listen_and_rate/routers/api/mushra.py's
- * _submit_mushra() completeness check.
+ * rateable system, mirroring listen_and_rate/routers/api/mushra.py's
+ * _submit_mushra() completeness check. Coverage only - a repeat collapses into
+ * the same set, so "exactly once" is assert_answered_once()'s half of the job.
  *
- * @throws SaveRequestError (400) if any item is missing a system's
- *         rating or has an unexpected duplicate.
+ * @throws SaveRequestError (400) if any item is missing a system's rating or
+ *         carries one for a system it should not.
  */
 function validate_mushra_ratings_complete(array $stimulusMap, array $ratings, ?string $referenceSystem): void
 {
@@ -858,7 +923,7 @@ function validate_mushra_ratings_complete(array $stimulusMap, array $ratings, ?s
         $seen = array_keys($systems);
         sort($seen);
         if ($seen !== $rateableSystems) {
-            throw new SaveRequestError(400, "Each item must rate every system exactly once: {$item}");
+            throw new SaveRequestError(400, "Each item must rate every rateable system: {$item}");
         }
     }
 }

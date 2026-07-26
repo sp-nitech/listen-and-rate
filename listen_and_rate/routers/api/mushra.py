@@ -13,6 +13,7 @@ from ._shared import (
     _all_stimuli,
     _id_to_meta,
     _practice_extras,
+    _require_answered_once,
     _require_non_empty,
     _sample_trials_by_item,
     _save_and_ok,
@@ -117,6 +118,9 @@ def _submit_mushra(
     item is incomplete.
     """
     _require_non_empty(body.ratings, "ratings")
+    # A set of covered systems cannot count, so the completeness check
+    # below cannot see a repeat; this is what makes it exactly once.
+    _require_answered_once([r.stimulus_id for r in body.ratings], "ratings", "stimulus")
     all_stimuli = _all_stimuli(config)
     id_to_meta = _id_to_meta(all_stimuli)
     rateable_systems = _mushra_rateable_systems(config, all_stimuli)
@@ -148,12 +152,13 @@ def _submit_mushra(
             }
         )
 
+    # Coverage only: this set cannot tell one rating from two, which is why
+    # the "exactly" half of the promise is _require_answered_once's above.
     incomplete = [u for u, systems in by_item.items() if systems != rateable_systems]
     if incomplete:
         raise HTTPException(
             status_code=400,
-            detail=f"Each item must rate every system exactly once: "
-            f"{sorted(incomplete)}",
+            detail=f"Each item must rate every rateable system: {sorted(incomplete)}",
         )
 
     return _save_and_ok(body, config, saver, rows)

@@ -26,14 +26,18 @@ from ...config import (
     StimulusConfig,
     build_ab_trials,
 )
+from ...config._utils import _duplicates
 from ...models import SubmitRequest
 from ...storage import ResultSaver
 
 T = TypeVar("T")
 
 # Text form values. Kept in sync with frontend/js/metadata.js and
-# frontend/save.php.
-_METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9.-]+$")
+# frontend/save.php. \Z, not $: both Python's and PCRE's $ also match before a
+# trailing newline, so "alice\n" would pass here and in save.php while the
+# browser's JS regex (whose $ does not) rejects it - letting a crafted request
+# store a value the form itself refuses, newline and all.
+_METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9.-]+\Z")
 
 
 def _validate_metadata(
@@ -209,6 +213,26 @@ def _require_non_empty(values: list, name: str) -> None:
     """Raise HTTPException(400) if the submitted ratings/choices list is empty."""
     if not values:
         raise HTTPException(status_code=400, detail=f"{name} must be a non-empty list")
+
+
+def _require_answered_once(keys: list[str], name: str, unit: str) -> None:
+    """Raise HTTPException(400) if any of `keys` appears more than once.
+
+    Each key names what one answer is about - the stimulus for the MOS-family
+    types, the trial for the pair-based ones - so a listener cannot answer the
+    same thing twice in a single submission. The frontend keys its answers by
+    exactly this, so it never produces a repeat; one therefore means a broken
+    client rather than a correction to merge. Storing both would double that
+    listener's weight in every mean and narrow the confidence interval with an
+    observation that is not independent, silently and with nothing in the
+    saved results to show for it.
+    """
+    duplicated = _duplicates(keys)
+    if duplicated:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{name} must answer each {unit} once; repeated: {duplicated}",
+        )
 
 
 def _save_and_ok(

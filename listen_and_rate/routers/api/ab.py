@@ -11,6 +11,7 @@ from ._shared import (
     _all_stimuli,
     _id_to_meta,
     _pair_config_response,
+    _require_answered_once,
     _require_non_empty,
     _save_and_ok,
     _validate_pair,
@@ -27,6 +28,10 @@ def _submit_ab(body: SubmitRequest, config: ABConfig, saver: ResultSaver) -> dic
     400 if empty, a pair is invalid/unknown, or a disallowed tie.
     """
     _require_non_empty(body.choices, "choices")
+    # A trial is its pair, whichever order the client echoes the ids back in.
+    _require_answered_once(
+        ["+".join(sorted(c.stimulus_ids)) for c in body.choices], "choices", "trial"
+    )
     id_to_meta = _id_to_meta(_all_stimuli(config))
 
     rows = []

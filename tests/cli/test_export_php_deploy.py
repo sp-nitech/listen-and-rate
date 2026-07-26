@@ -795,8 +795,10 @@ def test_export_php_deploy_does_not_overwrite_existing_outdir_by_default(
 def test_export_php_deploy_overwrite_flag_regenerates_existing_outdir(
     config_yaml, tmp_path, monkeypatch
 ):
+    # Exported for real first: --overwrite only clears a directory carrying
+    # this tool's marker, so a hand-made one would (rightly) be refused.
     outdir = tmp_path / "deploy"
-    outdir.mkdir()
+    _run_export(config_yaml, outdir, monkeypatch)
     (outdir / "stale.txt").write_text("leftover from a previous run", encoding="utf-8")
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
     assert not (outdir / "stale.txt").exists()
@@ -810,6 +812,7 @@ def test_export_php_deploy_overwrite_preserves_existing_results_directory(
     # data and must survive --overwrite.
     config_yaml = _config_with_output_path(tmp_path, test_audio_file)
     outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
     results_dir = outdir / "results" / "some-experiment"
     results_dir.mkdir(parents=True)
     collected = results_dir / "real-listener-session.csv"
@@ -832,6 +835,7 @@ def test_export_php_deploy_overwrite_clears_results_dir_when_output_path_absolut
     leftover results/ directory inside it is regenerable clutter - --overwrite
     clears it like everything else (no legacy-layout special case)."""
     outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
     stale = outdir / "results" / "old-layout" / "stale.csv"
     stale.parent.mkdir(parents=True)
     stale.write_text("stale", encoding="utf-8")
@@ -871,3 +875,57 @@ def test_export_php_deploy_config_data_uses_the_configs_experiment_id(
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
     assert "'experiment_id' => 'chosen-name'" in text
     assert "some-filename" not in text
+
+
+# -- destructive-overwrite guards -------------------------------------------
+
+
+def test_export_refuses_to_overwrite_a_directory_that_is_not_a_bundle(
+    config_yaml, tmp_path, monkeypatch
+):
+    """--overwrite clears --outdir, so it must be a directory we wrote.
+
+    A mistyped --outdir (a public_html holding other sites, say) would
+    otherwise have everything but results/ deleted out of it.
+    """
+    outdir = tmp_path / "not-a-bundle"
+    (outdir / "important").mkdir(parents=True)
+    (outdir / "important" / "data.txt").write_text("irreplaceable", encoding="utf-8")
+    with pytest.raises(FileExistsError, match="does not look like"):
+        _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
+    assert (outdir / "important" / "data.txt").read_text(encoding="utf-8") == (
+        "irreplaceable"
+    )
+
+
+def test_export_refuses_to_write_into_the_frontend_source(
+    config_yaml, tmp_path, monkeypatch
+):
+    """--outdir frontend/ would delete the very files the export copies from.
+
+    _FRONTEND_DIR is this package's own frontend directory, so clearing it
+    first leaves _copy_static_assets nothing to copy.
+    """
+    from listen_and_rate.cli.export_php_deploy import _FRONTEND_DIR
+
+    with pytest.raises(ValueError, match="frontend source"):
+        _run_export(config_yaml, _FRONTEND_DIR, monkeypatch, overwrite=True)
+    assert (_FRONTEND_DIR / "index.html").exists()
+
+
+def test_export_refuses_to_overwrite_when_results_are_the_bundle_root(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """output.path resolving to the bundle root leaves nothing safe to clear."""
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": "./"},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    config_yaml = write_config(tmp_path, config)
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    with pytest.raises(ValueError, match="bundle root"):
+        _run_export(config_yaml, outdir, monkeypatch, overwrite=True)

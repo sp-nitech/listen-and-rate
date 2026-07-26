@@ -13,6 +13,7 @@ from ._shared import (
     _all_stimuli,
     _id_to_meta,
     _practice_extras,
+    _require_answered_once,
     _require_non_empty,
     _sample_keep_order,
     _save_and_ok,
@@ -77,6 +78,10 @@ def _submit_xab(body: SubmitRequest, config: XABConfig, saver: ResultSaver) -> d
     a selection.
     """
     _require_non_empty(body.choices, "choices")
+    # A trial is its pair, whichever order the client echoes the ids back in.
+    _require_answered_once(
+        ["+".join(sorted(c.stimulus_ids)) for c in body.choices], "choices", "trial"
+    )
     id_to_meta = _id_to_meta(_all_stimuli(config))
     reference_system = config.reference_system
 

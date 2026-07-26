@@ -13,6 +13,7 @@ from ._shared import (
     _all_stimuli,
     _id_to_meta,
     _practice_extras,
+    _require_answered_once,
     _require_non_empty,
     _sample_keep_order,
     _save_and_ok,
@@ -59,6 +60,7 @@ def _submit_mos(body: SubmitRequest, config: MOSConfig, saver: ResultSaver) -> d
     400 if empty, a stimulus ID is unknown, or a rating is outside 1-5.
     """
     _require_non_empty(body.ratings, "ratings")
+    _require_answered_once([r.stimulus_id for r in body.ratings], "ratings", "stimulus")
     id_to_meta = _id_to_meta(_all_stimuli(config))
 
     unknown = {r.stimulus_id for r in body.ratings} - id_to_meta.keys()

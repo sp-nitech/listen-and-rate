@@ -8,7 +8,13 @@ import json
 import pytest
 
 from ._helpers import (
+    _ab_client,
+    _abx_client,
+    _cmos_client,
     _create_app_client,
+    _dmos_client,
+    _mushra_client,
+    _xab_client,
 )
 
 
@@ -363,3 +369,166 @@ def test_submit_rejects_a_session_id_that_is_not_path_safe(
         assert res.status_code == 422
     assert not (outside / "escaped.csv").exists()
     assert list(outside.iterdir()) == []
+
+
+def test_submit_rejects_a_metadata_value_with_a_trailing_newline(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """The text pattern must end at the value, not before a trailing newline.
+
+    Python's `$` and PCRE's `$` both allow one, while the browser's JS regex
+    does not - so a crafted request could store a value the form itself would
+    have refused, and land a newline inside a CSV field.
+    """
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "metadata": {"fields": [{"key": "listener", "label": "L", "type": "text"}]},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        res = tc.post(
+            "/api/submit",
+            json={
+                "session_id": "s1",
+                "test_type": "mos",
+                "ratings": [{"stimulus_id": "s001", "rating": 4}],
+                "metadata": {"listener": "alice\n"},
+            },
+        )
+        assert res.status_code == 400
+
+
+# -- one answer per thing rated ---------------------------------------------
+#
+# The shipped frontend keys its answers by stimulus id (MOS-family) or trial
+# index (the rest), so it cannot produce a duplicate. Nothing on the server
+# said so, though, and a second answer for the same thing is not a correction
+# to merge - it is a broken submission. Merging it would hide the break;
+# storing both would double that listener's weight in every mean, narrow the
+# confidence interval, and leave no trace that it happened.
+
+
+def _mos_config(tmp_path, test_audio_file):
+    return {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "stimuli": {
+            "entries": [
+                {"id": "s001", "path": str(test_audio_file)},
+                {"id": "s002", "path": str(test_audio_file)},
+            ]
+        },
+    }
+
+
+def test_submit_mos_rejects_the_same_stimulus_rated_twice(
+    tmp_path, test_audio_file, monkeypatch
+):
+    with _create_app_client(
+        tmp_path, _mos_config(tmp_path, test_audio_file), monkeypatch
+    ) as tc:
+        res = tc.post(
+            "/api/submit",
+            json={
+                "session_id": "s1",
+                "test_type": "mos",
+                "ratings": [
+                    {"stimulus_id": "s001", "rating": 5},
+                    {"stimulus_id": "s001", "rating": 1},
+                ],
+            },
+        )
+        assert res.status_code == 400
+        assert "must answer each stimulus once" in res.json()["detail"]
+    assert not list((tmp_path / "results").rglob("*.csv"))
+
+
+def test_submit_dmos_rejects_the_same_trial_rated_twice(
+    tmp_path, test_audio_file, monkeypatch
+):
+    with _dmos_client(tmp_path, test_audio_file, monkeypatch) as tc:
+        trial = tc.get("/api/config").json()["trials"][0]
+        entry = {
+            "stimulus_id": trial["test"]["id"],
+            "reference_id": trial["reference"]["id"],
+            "rating": 4,
+        }
+        res = tc.post(
+            "/api/submit",
+            json={
+                "session_id": "s1",
+                "test_type": "dmos",
+                "ratings": [entry, {**entry, "rating": 1}],
+            },
+        )
+        assert res.status_code == 400
+
+
+def test_submit_mushra_rejects_the_same_system_rated_twice(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """A set of covered systems cannot count, so this needs its own check.
+
+    The completeness error already promised "exactly once"; until now it only
+    verified that every rateable system appeared at least once.
+    """
+    with _mushra_client(tmp_path, test_audio_file, monkeypatch) as tc:
+        trials = tc.get("/api/config").json()["trials"]
+        ratings = [
+            {"stimulus_id": s["id"], "rating": 50}
+            for trial in trials
+            for s in trial["systems"]
+        ]
+        duplicated = trials[0]["systems"][0]["id"]
+        res = tc.post(
+            "/api/submit",
+            json={
+                "session_id": "s1",
+                "test_type": "mushra",
+                "ratings": [*ratings, {"stimulus_id": duplicated, "rating": 99}],
+            },
+        )
+        assert res.status_code == 400
+
+
+@pytest.mark.parametrize(
+    ("test_type", "client_factory", "extra"),
+    [
+        ("cmos", _cmos_client, {"rating": 1}),
+        ("ab", _ab_client, {}),
+        ("abx", _abx_client, {}),
+        ("xab", _xab_client, {}),
+    ],
+)
+def test_submit_pair_types_reject_the_same_pair_judged_twice(
+    test_type, client_factory, extra, tmp_path, test_audio_file, monkeypatch
+):
+    """Judging one pair twice - possibly oppositely - is a broken submission."""
+    with client_factory(tmp_path, test_audio_file, monkeypatch) as tc:
+        data = tc.get("/api/config").json()
+        trial = data["trials"][0]
+        ids = [s["id"] for s in trial["stimuli"]]
+        first = {"stimulus_ids": ids, "selected_stimulus_id": ids[0], **extra}
+        # Reversed ids and the opposite pick: still the same trial.
+        second = {
+            "stimulus_ids": list(reversed(ids)),
+            "selected_stimulus_id": ids[1],
+            **extra,
+        }
+        if test_type == "abx":
+            first["x_token"] = trial["x"]["token"]
+            second["x_token"] = trial["x"]["token"]
+        res = tc.post(
+            "/api/submit",
+            json={
+                "session_id": "s1",
+                "test_type": test_type,
+                "choices": [first, second],
+            },
+        )
+        assert res.status_code == 400

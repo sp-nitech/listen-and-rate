@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 # frontend/ lives at the repo root; this file is
 # listen_and_rate/cli/export_php_deploy.py.
 _FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+# Written by every export and by nothing else, so its presence marks a
+# directory as one this tool produced - see _clear_outdir_except_results.
+_BUNDLE_MARKER = "config_data.php"
+
 _STATIC_ASSETS = [
     "index.html",
     "css",
@@ -110,6 +114,23 @@ def _seed_results_dir(outdir: Path, results_subpath: Path | None) -> None:
         f.write(content)
 
 
+def _assert_not_the_frontend_source(outdir: Path) -> None:
+    """Refuse an --outdir at or inside this package's own frontend directory.
+
+    The bundle's static assets are copied out of _FRONTEND_DIR, so exporting
+    into it would delete the very files the next step reads - leaving neither
+    a working bundle nor the source it was built from.
+    """
+    resolved = outdir.resolve()
+    frontend = _FRONTEND_DIR.resolve()
+    if resolved == frontend or frontend in resolved.parents:
+        raise ValueError(
+            f"Refusing to export into {outdir}: that is the frontend source "
+            f"directory this bundle is built from ({frontend}). Choose a "
+            "separate output directory."
+        )
+
+
 def _clear_outdir_except_results(outdir: Path, results_subpath: Path | None) -> None:
     """Remove everything in outdir except the results directory.
 
@@ -121,9 +142,34 @@ def _clear_outdir_except_results(outdir: Path, results_subpath: Path | None) -> 
     is preserved unconditionally regardless of --overwrite. With an
     output.path outside the bundle (results_subpath None) nothing inside
     the bundle holds data, so everything is cleared.
+
+    Two shapes are refused rather than cleared, because in both this function
+    cannot tell reproducible files from collected data:
+
+    - a non-empty directory with no _BUNDLE_MARKER in it was not written by
+      this tool, so a mistyped --outdir (a public_html serving other things,
+      say) would have everything but results/ deleted out of it;
+    - results at the bundle root (output.path resolving to '.') puts the
+      collected data in the same directory as everything regenerated, so
+      "clear all but the results" has no meaning.
     """
+    if results_subpath is not None and not results_subpath.parts:
+        raise ValueError(
+            f"output.path ({results_subpath}) puts the results at the bundle "
+            "root, so regenerating the bundle cannot preserve them. Use a "
+            "subdirectory (the default is './results/'), or an absolute path "
+            "outside the bundle."
+        )
+    entries = list(outdir.iterdir())
+    if entries and not (outdir / _BUNDLE_MARKER).exists():
+        raise FileExistsError(
+            f"{outdir} is not empty and does not look like a bundle this tool "
+            f"wrote ({_BUNDLE_MARKER} is missing), so --overwrite will not "
+            "clear it. Point --outdir at a new or previously exported "
+            "directory, or empty this one yourself."
+        )
     preserve = results_subpath.parts[0] if results_subpath is not None else None
-    for entry in outdir.iterdir():
+    for entry in entries:
         if preserve is not None and entry.name == preserve:
             continue
         if entry.is_dir() and not entry.is_symlink():
@@ -467,6 +513,7 @@ def main() -> None:
     config_data = _build_config_data(config, all_stimuli, audio_urls)
 
     outdir = Path(args.outdir)
+    _assert_not_the_frontend_source(outdir)
     results_subpath = _bundle_results_subpath(config.output.path)
     if outdir.exists():
         if not args.overwrite:

@@ -15,6 +15,7 @@ from ._shared import (
     _build_response_trials,
     _id_to_meta,
     _practice_extras,
+    _require_answered_once,
     _require_non_empty,
     _save_and_ok,
     _test_config_response,
@@ -65,6 +66,10 @@ def _submit_abx(
     400 if empty, a pair is invalid/unknown, or the x_token doesn't verify.
     """
     _require_non_empty(body.choices, "choices")
+    # A trial is its pair, whichever order the client echoes the ids back in.
+    _require_answered_once(
+        ["+".join(sorted(c.stimulus_ids)) for c in body.choices], "choices", "trial"
+    )
     id_to_meta = _id_to_meta(_all_stimuli(config))
 
     rows = []

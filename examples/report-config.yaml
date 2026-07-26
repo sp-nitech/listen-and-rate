@@ -1,9 +1,9 @@
 # Listen and Rate - Example report (figure) configuration.
 
 # Rendering multipliers (not pixels). `width`/`height` scale the figures'
-# canvas; `bar_width` scales the bars' thickness within their slot (1.0 is
-# Plotly's default look; boxplots unaffected); `png` scales the resolution
-# of the toolbar's PNG download (on-screen display unaffected).
+# canvas. `bar_width` scales the bars' thickness within their slot (1.0 is
+# Plotly's default look, and boxplots are unaffected). `png` scales the
+# resolution of the toolbar's PNG download (on-screen display unaffected).
 scale:
   width: 1.0
   height: 1.0
@@ -34,8 +34,8 @@ confidence: 0.95
 # back to the experiment config's order.
 # order: [A, B]
 
-# Display labels for systems (charts/tables only); the stored data keeps its
-# raw names. Unlisted systems keep their raw name.
+# Display labels for systems (charts and tables only). The stored data keeps
+# its raw names, and unlisted systems keep their raw name.
 # labels:
 #   A: Proposed
 #   B: Baseline

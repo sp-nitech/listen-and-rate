@@ -69,7 +69,7 @@ class MetadataFieldConfig(_StrictModel):
             raise PydanticCustomError(
                 "metadata_key_format",
                 "metadata key must start with a letter and contain only letters, "
-                "digits, or underscores; got: {key}",
+                "digits, or underscores. Got: {key}",
                 {"key": repr(self.key)},
             )
         if self.type == "select" and not self.options:
@@ -394,7 +394,7 @@ class KeyboardShortcuts(_StrictModel):
         if not _is_valid_shortcut_key(v):
             raise PydanticCustomError(
                 "shortcuts_invalid_key",
-                "{value} is not a valid key; use a single character or one of {valid}",
+                "{value} is not a valid key. Use a single character or one of {valid}",
                 {"value": repr(v), "valid": sorted(_NAMED_KEYS)},
             )
         return v
@@ -413,7 +413,7 @@ class KeyboardShortcuts(_StrictModel):
         if invalid:
             raise PydanticCustomError(
                 "shortcuts_rating_invalid_key",
-                "{invalid} is not a valid key; use a single character "
+                "{invalid} is not a valid key. Use a single character "
                 "or one of {valid}",
                 {"invalid": invalid, "valid": sorted(_NAMED_KEYS)},
             )
@@ -574,7 +574,7 @@ class BaseTestConfig(_StrictModel):
             raise PydanticCustomError(
                 "experiment_id_format",
                 "experiment_id must contain only letters, digits, '.', '-', or "
-                "'_' (and cannot be '.' or '..'); got: {value}",
+                "'_' (and cannot be '.' or '..'). Got: {value}",
                 {"value": repr(v)},
             )
         return v
@@ -637,8 +637,8 @@ class BaseTestConfig(_StrictModel):
         if self.loudness_check is not None and self.loudness_normalization is not None:
             raise PydanticCustomError(
                 "loudness_check_normalization_conflict",
-                "set only one of 'loudness_check' / 'loudness_normalization'; "
-                "normalization makes the check redundant",
+                "set only one of 'loudness_check' / 'loudness_normalization'. "
+                "Normalization makes the check redundant",
             )
         return self
 
@@ -655,7 +655,7 @@ class BaseTestConfig(_StrictModel):
             if flagged:
                 raise PydanticCustomError(
                     "reference_flag_unsupported",
-                    "'reference: true' is not used by this test type; "
+                    "'reference: true' is not used by this test type. "
                     "found on: {flagged}",
                     {"flagged": flagged},
                 )
@@ -666,7 +666,7 @@ class BaseTestConfig(_StrictModel):
             if flagged:
                 raise PydanticCustomError(
                     "anchor_flag_unsupported",
-                    "'anchor: true' is not used by this test type; found on: {flagged}",
+                    "'anchor: true' is not used by this test type. Found on: {flagged}",
                     {"flagged": flagged},
                 )
         return self

@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from listen_and_rate import __version__
+
 from .._helpers import write_config
 
 
@@ -47,6 +49,31 @@ def _write_csv(path: Path, rows: list[dict]) -> Path:
         writer.writeheader()
         writer.writerows(rows)
     return path
+
+
+def test_analyze_failure_names_the_version_difference_as_a_possible_cause(
+    tmp_path, monkeypatch
+):
+    # A break on results from another release is exactly when the version is
+    # worth knowing, so the note rides along with whatever error was raised.
+    pytest.importorskip("plotly")
+    rows = [{"tool_version": "9.9.0", **r, "test_type": "nonsense"} for r in CSV_ROWS]
+    csv_path = _write_csv(tmp_path / "s1.csv", rows)
+    with pytest.raises(Exception) as excinfo:
+        _run_analyze(monkeypatch, str(csv_path), "--output", str(tmp_path / "r.html"))
+    notes = getattr(excinfo.value, "__notes__", [])
+    assert any("9.9.0" in n and __version__ in n for n in notes), notes
+
+
+def test_analyze_failure_on_matching_versions_adds_no_note(tmp_path, monkeypatch):
+    pytest.importorskip("plotly")
+    rows = [
+        {"tool_version": __version__, **r, "test_type": "nonsense"} for r in CSV_ROWS
+    ]
+    csv_path = _write_csv(tmp_path / "s1.csv", rows)
+    with pytest.raises(Exception) as excinfo:
+        _run_analyze(monkeypatch, str(csv_path), "--output", str(tmp_path / "r.html"))
+    assert getattr(excinfo.value, "__notes__", []) == []
 
 
 def test_analyze_results_writes_html(tmp_path, monkeypatch):

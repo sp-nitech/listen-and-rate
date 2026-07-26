@@ -94,6 +94,7 @@ def test_xab_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
             assert "winner" not in row
         # Column order matches MOS's system-first convention.
         assert list(rows[0].keys()) == [
+            "tool_version",
             "session_id",
             "timestamp",
             "test_type",

@@ -471,6 +471,14 @@ function open_result_file_exclusive(string $path, string $cannotWriteMessage)
 /** @throws SaveRequestError (409) if the file exists, (500) if it cannot be written. */
 function write_json_file(string $path, array $jsonData): void
 {
+    // PHP cannot tell an empty list from an empty map, so json_encode would
+    // write "metadata": [] where the Python saver writes {}. The report reads
+    // these as objects, so cast them and keep both backends' files identical.
+    foreach (['metadata', 'survey'] as $key) {
+        if (isset($jsonData[$key]) && is_array($jsonData[$key])) {
+            $jsonData[$key] = (object) $jsonData[$key];
+        }
+    }
     $fp = open_result_file_exclusive($path, "Cannot write {$path}");
     $written = @fwrite($fp, json_encode(
         $jsonData,
@@ -554,6 +562,33 @@ function build_json_result(array $data, array $meta, array $stimulusMap, string 
         'metadata'   => $meta,
         'records'    => $enriched,
     ];
+}
+
+/**
+ * Put the version of the tool that produced this bundle first in the columns.
+ *
+ * The version belongs to the software rather than to the session, so it goes
+ * before session_id. Analysis refuses to combine result files that disagree
+ * on it, because a rename or a changed column meaning would otherwise be
+ * averaged in silently. Mirrors CSVResultSaver._BASE_FIELDS.
+ *
+ * An older bundle carries no version. The column is still written, empty, so
+ * that "produced before this was recorded" stays distinguishable from
+ * "produced by a version we know".
+ */
+function prepend_tool_version_columns(array $fields, array $rows, string $version): array
+{
+    $fields = array_merge(['tool_version'], $fields);
+    foreach ($rows as $i => $row) {
+        $rows[$i] = array_merge([$version], $row);
+    }
+    return [$fields, $rows];
+}
+
+/** Same for the JSON shape, where it becomes the first key. Mirrors JSONResultSaver. */
+function prepend_tool_version_json(array $result, string $version): array
+{
+    return ['tool_version' => $version] + $result;
 }
 
 /** Build [$fields, $rows] for CSV-format output. */
@@ -1151,6 +1186,10 @@ function handle_save_request(): void
         $form      = array_merge(prefix_keys('metadata_', $meta), prefix_keys('survey_', $survey));
         $form_keys    = array_keys($form);
         $metrics_keys = enabled_metrics($config_data);
+        // Baked in by `lar-export`. PHP cannot read the Python package's
+        // version at request time, and the version that exported this bundle
+        // is the one whose behaviour produced these results anyway.
+        $tool_version = (string) ($config_data['tool_version'] ?? '');
         $ts        = date('c');
 
         if ($output_format === 'json') {
@@ -1172,6 +1211,7 @@ function handle_save_request(): void
                 submitted_answers($test_type, $data),
                 $metrics_keys
             );
+            $json_data = prepend_tool_version_json($json_data, $tool_version);
             write_json_file($experiment_dir . '/' . $session_id_safe . '.json', $json_data);
         } else {
             [$fields, $rows] = match ($test_type) {
@@ -1188,6 +1228,7 @@ function handle_save_request(): void
                 submitted_answers($test_type, $data),
                 $metrics_keys
             );
+            [$fields, $rows] = prepend_tool_version_columns($fields, $rows, $tool_version);
             write_csv_file($experiment_dir . '/' . $session_id_safe . '.csv', $fields, $rows, $experiment_dir);
         }
     } catch (SaveRequestError $e) {

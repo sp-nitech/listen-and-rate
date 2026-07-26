@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from listen_and_rate import __version__
+
 from .._helpers import write_config, write_sine
 
 _skip_without_symlinks = pytest.mark.skipif(
@@ -106,6 +108,18 @@ def test_export_invalid_config_exits_without_pydantic_url(
     message = str(excinfo.value)
     assert "errors.pydantic.dev" not in message
     assert expected_substring in message
+
+
+def test_export_php_deploy_bakes_in_the_version_that_exported_the_bundle(
+    config_yaml, tmp_path, monkeypatch
+):
+    # PHP cannot read the Python package's version at request time, so the
+    # bundle carries the version that wrote it. save.php stores that in every
+    # result file it writes.
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    assert f"'tool_version' => '{__version__}'" in text
 
 
 def test_export_php_deploy_writes_valid_config_data_php(

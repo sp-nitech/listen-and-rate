@@ -11,7 +11,7 @@ stimuli: |
   # XAB tests compare exactly 2 systems against a disclosed reference, defined
   # via directories (each dir should contain the same filenames - explicit
   # `stimuli:` lists are not supported for XAB tests). Exactly one system
-  # must be flagged `reference: true`; it provides the X clip and is never
+  # must be flagged `reference: true`. It provides the X clip and is never
   # rated itself.
   stimuli_dirs:
     items_per_session: 2 # optional: present N randomly chosen trials per listener

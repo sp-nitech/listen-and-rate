@@ -92,6 +92,7 @@ def test_ab_submit_happy_path_preference(tmp_path, test_audio_file, monkeypatch)
         assert rows[0]["item"] == "utt0"
         # Column order matches MOS's system-first convention.
         assert list(rows[0].keys()) == [
+            "tool_version",
             "session_id",
             "timestamp",
             "test_type",

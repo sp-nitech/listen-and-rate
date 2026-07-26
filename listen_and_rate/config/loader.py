@@ -262,7 +262,7 @@ def load_config(config_path: str | Path) -> Config:
 
     if config.stimuli_list is None or not config.stimuli_list.entries:
         raise ValueError(
-            "No audio stimuli found; check the paths and that files use a "
+            "No audio stimuli found. Check the paths and that files use a "
             "supported format (.wav, .mp3, .flac, .ogg)."
         )
 
@@ -306,7 +306,7 @@ def load_config(config_path: str | Path) -> Config:
         if not dmos_trials:
             raise ValueError(
                 "No item is present in both the reference and a test "
-                "system; this test type requires at least one paired item"
+                "system. This test type requires at least one paired item"
             )
         n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
         unique_items = {t.item for t in dmos_trials}
@@ -323,7 +323,7 @@ def load_config(config_path: str | Path) -> Config:
         )
         if not trials:
             raise ValueError(
-                "No item is present in both systems; this test type requires "
+                "No item is present in both systems. This test type requires "
                 "at least one paired item"
             )
         n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
@@ -342,7 +342,7 @@ def load_config(config_path: str | Path) -> Config:
         if not xab_trials:
             raise ValueError(
                 "No item is present in the reference and both test "
-                "systems; this test type requires at least one complete "
+                "systems. This test type requires at least one complete "
                 "item"
             )
         n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
@@ -366,7 +366,7 @@ def load_config(config_path: str | Path) -> Config:
         )
         if not mushra_trials:
             raise ValueError(
-                "No item has a stimulus for every rateable system; this "
+                "No item has a stimulus for every rateable system. This "
                 "test type requires at least one complete item"
             )
         n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None

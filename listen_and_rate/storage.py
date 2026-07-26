@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import ClassVar
 
+from . import __version__
+
 # Column-name prefixes namespacing per-session form answers in CSV results.
 # The prefix makes a form key structurally unable to collide with the
 # saver-written result columns (a metadata field literally named 'system'
@@ -18,6 +20,7 @@ from typing import ClassVar
 # them (metadata/survey are separate nested objects there); the analysis
 # reader flattens JSON into the same prefixed columns. Mirrored by
 # frontend/save.php for the PHP deployment.
+TOOL_VERSION_COLUMN = "tool_version"
 METADATA_COLUMN_PREFIX = "metadata_"
 SURVEY_COLUMN_PREFIX = "survey_"
 METRICS_COLUMN_PREFIX = "metrics_"
@@ -98,7 +101,8 @@ class ResultSaver(ABC):
 class CSVResultSaver(ResultSaver):
     """Write each session to its own output_dir/experiment_id/{session_id}.csv file.
 
-    Column layout: session_id, timestamp, test_type, [metadata_* keys...],
+    Column layout: tool_version, session_id, timestamp, test_type,
+    [metadata_* keys...],
     [survey_* keys...], then whatever keys the row dicts themselves carry
     (e.g. system/item/rating for MOS, item/system_a/system_b/winner
     for AB), and finally [metrics_* keys...] - the answer columns are inferred
@@ -115,7 +119,15 @@ class CSVResultSaver(ResultSaver):
     two formats.
     """
 
-    _BASE_FIELDS: ClassVar[list[str]] = ["session_id", "timestamp", "test_type"]
+    # tool_version comes first because it belongs to the software rather than
+    # to the session, and because it decides whether the rest can be read at
+    # all - analysis refuses to mix files that disagree on it.
+    _BASE_FIELDS: ClassVar[list[str]] = [
+        TOOL_VERSION_COLUMN,
+        "session_id",
+        "timestamp",
+        "test_type",
+    ]
 
     def __init__(
         self,
@@ -167,6 +179,7 @@ class CSVResultSaver(ResultSaver):
             for r in records:
                 measured = r.get("metrics") or {}
                 row = {
+                    TOOL_VERSION_COLUMN: __version__,
                     "session_id": session_id,
                     "timestamp": ts,
                     "test_type": test_type,
@@ -204,6 +217,7 @@ class JSONResultSaver(ResultSaver):
         """Write this session's records to {experiment_id}/{session_id}.json."""
         self._dir.mkdir(parents=True, exist_ok=True)
         data = {
+            TOOL_VERSION_COLUMN: __version__,
             "session_id": session_id,
             "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
             "test_type": test_type,

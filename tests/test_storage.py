@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from listen_and_rate import __version__
 from listen_and_rate.storage import (
     CSVResultSaver,
     JSONResultSaver,
@@ -26,10 +27,28 @@ METADATA = {"listener": "Alice", "device": "Headphones"}
 # -- CSVResultSaver ---------------------------------------------------------
 
 
+def test_csv_saver_names_the_version_that_produced_the_file_first(tmp_path):
+    # A property of the software, not of the session, so it comes before
+    # session_id. Analysis refuses to mix files that disagree on it.
+    CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
+    with (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open() as f:
+        rows = list(csv.DictReader(f))
+    assert list(rows[0])[0] == "tool_version"
+    assert rows[0]["tool_version"] == __version__
+
+
+def test_json_saver_names_the_version_that_produced_the_file_first(tmp_path):
+    JSONResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
+    data = json.loads((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text())
+    assert list(data)[0] == "tool_version"
+    assert data["tool_version"] == __version__
+
+
 def test_csv_saver_writes_correct_header(tmp_path):
     CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
     rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
     assert set(rows[0].keys()) == {
+        "tool_version",
         "session_id",
         "timestamp",
         "test_type",
@@ -129,6 +148,7 @@ def test_csv_saver_infers_columns_from_ab_row_shape(tmp_path):
     CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, "ab", ab_rows)
     rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
     assert list(rows[0].keys()) == [
+        "tool_version",
         "session_id",
         "timestamp",
         "test_type",
@@ -149,6 +169,7 @@ def test_csv_saver_infers_columns_from_abx_row_shape(tmp_path):
     CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, "abx", abx_rows)
     rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
     assert list(rows[0].keys()) == [
+        "tool_version",
         "session_id",
         "timestamp",
         "test_type",

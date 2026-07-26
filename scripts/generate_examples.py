@@ -92,7 +92,7 @@ def main() -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="do not write; exit non-zero if any committed example is out of date",
+        help="do not write, and exit non-zero if a committed example is stale",
     )
     args = parser.parse_args()
 

@@ -97,7 +97,7 @@ class ReportGroupConfig(_StrictModel):
         if unknown:
             raise PydanticCustomError(
                 "stimuli_filter_unknown_key",
-                "stimuli_filter keys must be one of {valid}; got: {unknown}",
+                "stimuli_filter keys must be one of {valid}. Got: {unknown}",
                 {"valid": sorted(_STIMULI_FILTER_KEYS), "unknown": unknown},
             )
         return v

@@ -67,6 +67,7 @@ def test_cmos_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
         assert rows[0]["rating"] in ("2", "-2")
         # Column order matches MOS's system-first convention.
         assert list(rows[0].keys()) == [
+            "tool_version",
             "session_id",
             "timestamp",
             "test_type",

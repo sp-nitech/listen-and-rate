@@ -5,8 +5,8 @@ test_type: mushra
 title: "Audio Quality Evaluation"
 
 # Prose shown above every trial. The line breaks here are this file's own
-# wrapping and reflow when displayed; leave a blank line where the text should
-# break.
+# wrapping and reflow when displayed. Leave a blank line where the text
+# should break.
 instructions: |
   You will hear a Reference sample (if shown) followed by several Test
   samples of the same item, in random order.
@@ -22,20 +22,20 @@ output:
 
 # Identifies this experiment. Used as the results subdirectory under
 # output.path. Defaults to the config file's name. Set this only if the
-# filename is not a valid directory name; otherwise an error is raised
+# filename is not a valid directory name. Otherwise an error is raised
 # instead of silently modifying the name.
 # experiment_id: null
 
 # How much of each page's audio to fetch up front (default: auto).
 #   none - fetch nothing until the listener first presses play
-#   auto - fetch the whole clip on show so playback is instant (a hint;
+#   auto - fetch the whole clip on show so playback is instant (a hint,
 #          browsers may fetch less on metered/mobile connections)
 # The clip length is shown on the time bar regardless of this setting.
 # audio_preload: auto
 
 # Presentation order of the per-session stimuli/trials (default: random).
-# "random" shuffles the order per listener to cancel order effects; "fixed"
-# keeps the configured order. This governs ordering ONLY - which subset each
+# "random" shuffles the order per listener to cancel order effects, and
+# "fixed" keeps the configured order. This governs ordering ONLY - which subset each
 # listener is sampled, and the within-trial position blinding, are always
 # randomized.
 # presentation_order: random
@@ -85,7 +85,7 @@ stimuli_dirs:
 # before the test, writing WAV copies (into the bundle on export, into a cache
 # on serve). Mutually exclusive with loudness_check (normalization is the fix,
 # the check is the gate). `scope: stimulus` (default) brings every clip to the
-# same loudness; `scope: system` applies one gain per system so the system's
+# same loudness. `scope: system` applies one gain per system so the system's
 # mean reaches target, preserving the natural loudness differences between
 # items within a system.
 # loudness_normalization:
@@ -94,8 +94,8 @@ stimuli_dirs:
 
 # -- Rating labels (optional, shown under each 20-point band) -----------------
 # Defaults to the ITU-R BS.1534 5-band scale shown below. Ticks are always
-# drawn at 0/20/40/60/80/100; each label is centered in the band starting at
-# its key.
+# drawn at 0/20/40/60/80/100. Each label is centered in the band starting
+# at its key.
 # rating_labels:
 #   0: "Bad"
 #   20: "Poor"
@@ -155,7 +155,7 @@ stimuli_dirs:
 
 # -- Per-answer metrics (optional) --------------------------------------------
 # Measurements of how each answer was produced, rather than of the systems
-# under test. Each is opt-in; omit this section to record nothing.
+# under test. Each is opt-in. Omit this section to record nothing.
 #   response_time - seconds from the listener first playing audio on a page to
 #                   moving on from it, minus the clip time they had to sit
 #                   through to get there. A quality-control aid (spotting

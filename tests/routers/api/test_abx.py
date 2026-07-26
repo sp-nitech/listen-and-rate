@@ -161,6 +161,7 @@ def test_abx_submit_scores_exactly_one_of_two_opposite_guesses_correct(
         assert correct1 != correct2
         # Column order matches MOS's system-first convention.
         assert list(rows1[0].keys()) == [
+            "tool_version",
             "session_id",
             "timestamp",
             "test_type",

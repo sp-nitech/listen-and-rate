@@ -1339,4 +1339,57 @@ final class SaveTest extends TestCase
         $this->assertSame("a,b\n1,2\n", file_get_contents($path));
     }
 
+    // -- prepend_tool_version ---------------------------------------------
+
+    public function testPrependToolVersionPutsTheColumnFirstInEveryRow(): void
+    {
+        [$fields, $rows] = prepend_tool_version_columns(
+            ['session_id', 'timestamp'],
+            [['s1', 't1'], ['s1', 't2']],
+            '0.2.0'
+        );
+        $this->assertSame(['tool_version', 'session_id', 'timestamp'], $fields);
+        $this->assertSame([['0.2.0', 's1', 't1'], ['0.2.0', 's1', 't2']], $rows);
+    }
+
+    public function testPrependToolVersionWritesTheColumnEvenWhenTheBundleHasNoVersion(): void
+    {
+        // An older bundle carries no version. The column still has to be there,
+        // or the analysis could not tell "unknown" apart from "not recorded".
+        [$fields, $rows] = prepend_tool_version_columns(['session_id'], [['s1']], '');
+        $this->assertSame(['tool_version', 'session_id'], $fields);
+        $this->assertSame([['', 's1']], $rows);
+    }
+
+    public function testPrependToolVersionPutsTheKeyFirstInJson(): void
+    {
+        $result = prepend_tool_version_json(
+            ['session_id' => 's1', 'records' => []],
+            '0.2.0'
+        );
+        $this->assertSame(['tool_version', 'session_id', 'records'], array_keys($result));
+        $this->assertSame('0.2.0', $result['tool_version']);
+    }
+    public function testEmptyFormObjectsEncodeAsObjectsNotLists(): void
+    {
+        // PHP cannot tell an empty list from an empty map, so json_encode
+        // writes [] for both. The Python saver writes {}, and the report
+        // reads these as objects. Both backends must produce the same file.
+        $path = sys_get_temp_dir() . '/lar-form-' . uniqid() . '.json';
+        write_json_file($path, ['metadata' => [], 'survey' => [], 'records' => []]);
+        $text = file_get_contents($path);
+        unlink($path);
+        $this->assertStringContainsString('"metadata": {}', $text);
+        $this->assertStringContainsString('"survey": {}', $text);
+        $this->assertStringContainsString('"records": []', $text);
+    }
+
+    public function testFilledFormObjectsStillEncodeAsObjects(): void
+    {
+        $path = sys_get_temp_dir() . '/lar-form-' . uniqid() . '.json';
+        write_json_file($path, ['metadata' => ['listener' => 'A'], 'records' => []]);
+        $text = file_get_contents($path);
+        unlink($path);
+        $this->assertStringContainsString('"listener": "A"', $text);
+    }
 }

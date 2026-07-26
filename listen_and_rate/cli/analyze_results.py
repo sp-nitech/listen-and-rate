@@ -7,6 +7,10 @@ import logging
 from pathlib import Path
 
 from listen_and_rate.analysis import generate_report_html
+from listen_and_rate.analysis.report import (
+    ResultVersionMismatch,
+    version_difference_note,
+)
 from listen_and_rate.config import (
     ReportConfig,
     load_config_or_exit,
@@ -52,7 +56,7 @@ def main() -> None:
         help=(
             "Path to the YAML config file used to collect these results. "
             "When given, systems/pairs are shown in stimuli_dirs.systems' "
-            "order instead of alphabetically; with no positional results "
+            "order instead of alphabetically. With no positional results "
             "argument it also locates the results directory."
         ),
     )
@@ -64,7 +68,7 @@ def main() -> None:
             "against: results are read from <root>/<output.path>/<config "
             "name>. Point it at the exported PHP bundle's directory, or at "
             "wherever a FastAPI deployment's working directory was copied. "
-            "Requires --config; cannot be combined with a positional "
+            "Requires --config. It cannot be combined with a positional "
             "results argument or an absolute output.path."
         ),
     )
@@ -81,7 +85,7 @@ def main() -> None:
             "Path to a report (figure) YAML controlling presentation: figure "
             "scale (width/height multipliers), font, confidence level, "
             "system display order/labels, and stacked filtered sections "
-            "(groups). Optional; defaults are used when omitted. See "
+            "(groups). Optional, and defaults are used when omitted. See "
             "examples/report-config.yaml."
         ),
     )
@@ -157,7 +161,27 @@ def main() -> None:
             METADATA_COLUMN_PREFIX + f.key: f.label for f in config.metadata.fields
         } | {SURVEY_COLUMN_PREFIX + f.key: f.label for f in config.survey.fields}
 
-    html = generate_report_html(
+    try:
+        html = _render(paths, report, system_order, require_full_order, form_labels)
+    except ResultVersionMismatch:
+        # Already says the versions differ, in more detail than the note would.
+        raise
+    except Exception as exc:
+        # Results from another release are a common reason for the analysis to
+        # break, and the traceback alone gives no hint of it.
+        note = version_difference_note(paths)
+        if note:
+            exc.add_note(note)
+        raise
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(html, encoding="utf-8")
+    logger.info("Report saved: %s", out_path)
+
+
+def _render(paths, report, system_order, require_full_order, form_labels) -> str:
+    """Build the report HTML from the resolved CLI arguments."""
+    return generate_report_html(
         paths,
         confidence=report.confidence,
         font_family=report.font.family,
@@ -179,7 +203,3 @@ def main() -> None:
             else None
         ),
     )
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(html, encoding="utf-8")
-    logger.info("Report saved: %s", out_path)

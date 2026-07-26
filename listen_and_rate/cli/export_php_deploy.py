@@ -10,6 +10,7 @@ import shutil
 import textwrap
 from pathlib import Path
 
+from listen_and_rate import __version__
 from listen_and_rate.config import (
     ABXConfig,
     Config,
@@ -232,7 +233,7 @@ def _symlink_audio_files(
     if not _symlinks_supported(outdir):
         logger.warning(
             "Symlinks are not supported here (e.g. Windows without Developer "
-            "Mode); copying audio into the bundle instead. Pass --copy-audio "
+            "Mode). Copying audio into the bundle instead. Pass --copy-audio "
             "to make this the explicit, intended behavior."
         )
         _copy_audio_files(outdir, all_stimuli, audio_urls)
@@ -423,6 +424,11 @@ def _build_config_data(
         # (see listen_and_rate/x_token.py); generated once at export time
         # so it stays the same across every request to this deployment.
         "x_secret": secrets.token_hex(32) if isinstance(config, ABXConfig) else None,
+        # Stamped into every result file save.php writes. PHP cannot read the
+        # Python package's version at request time, and the version that
+        # exported this bundle is the one whose behaviour produced the
+        # results, since the PHP files themselves came from it.
+        "tool_version": __version__,
         "stimuli_per_session": (
             config.stimuli_list.stimuli_per_session if config.stimuli_list else None
         ),
@@ -486,8 +492,8 @@ def main() -> None:
         help=(
             "Hard-copy audio files into the bundle instead of symlinking them "
             "(default: symlink). Use this when the bundle is uploaded by a plain "
-            "FTP client or shipped as a zip, since symlinks don't survive either; "
-            "it makes the bundle self-contained at the cost of a larger size."
+            "FTP client or shipped as a zip, since symlinks don't survive "
+            "either. It makes the bundle self-contained at a larger size."
         ),
     )
     args = parser.parse_args()

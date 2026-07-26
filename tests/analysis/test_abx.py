@@ -24,15 +24,23 @@ def test_generate_abx_report_shows_accuracy_and_ci(tmp_path):
     assert "95% confidence intervals" in html
 
 
-def test_generate_abx_report_annotation_shows_ci_value(tmp_path):
-    # The accuracy annotation prints the CI half-width next to the rate,
-    # matching the "value +/- CI" convention used across the report types.
+def test_generate_abx_report_annotation_shows_the_ci_as_an_interval(tmp_path):
+    # The binomial CI is asymmetric, so the annotation prints its bounds
+    # rather than a single "+/- CI" half-width, as in AB. Hair spaces
+    # (U+200A) flank the range dash.
     html = generate_report_html([_write_csv(tmp_path / "s.csv", ABX_CSV_ROWS)])
     _, layout = _plotly_call_args(html)
     texts = [a["text"] for a in layout["annotations"]]
-    # Thin spaces (U+2009) flank the binary "+/-", as in MOS/CMOS/AB.
-    pattern = r"\d+%" + "\u2009±\u2009" + r"\d+%\)"
+    pattern = r"Correct: \d+% \[\d+%\u200a\u2013\u200a\d+%\]"
     assert any(re.search(pattern, t) for t in texts)
+
+
+def test_generate_abx_report_annotation_omits_the_raw_counts(tmp_path):
+    """The counts chart sits directly below, so the annotation need not repeat it."""
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", ABX_CSV_ROWS)])
+    _, layout = _plotly_call_args(html)
+    texts = [a["text"] for a in layout["annotations"]]
+    assert not any(re.search(r"\d+/\d+", t) for t in texts)
 
 
 def test_generate_abx_report_includes_binomial_pvalue(tmp_path):

@@ -12,6 +12,16 @@ plus a server-side secret the client never sees.
 This defeats casual inspection (identical URLs, readable JSON fields) -
 the same threat model already accepted for MOS/AB's blinding - not a
 listener deliberately dumping page JS state, which is out of scope.
+
+Nor does it hide X's *size*. X is served as a byte-for-byte copy of one of
+the pair, so its response length equals that stimulus's whenever the two
+differ in length - as they may when two systems render the same item at
+different durations. The same holds for the <audio> element's own duration
+property, which the browser knows whatever the UI chooses to display (see
+_syncAudioSrcs, which withholds X's length from the time bar for the
+readout, not for this). Closing that would mean padding or re-encoding
+every clip, which is not worth it here: the listener is assumed to be
+cooperating with the experiment, not attacking it.
 """
 
 from __future__ import annotations

@@ -29,16 +29,36 @@ def test_generate_ab_report_shows_preference_rate_and_ci(tmp_path):
     assert "95% confidence intervals" in html
 
 
-def test_generate_ab_report_annotation_shows_ci_value_on_a_side(tmp_path):
-    # The rate annotation carries the CI half-width (as a percentage) on the
-    # A side, matching MOS/CMOS's "value +/- CI" convention; the B side (the
-    # mirror rate) omits the identical +/- to avoid redundancy.
+def test_generate_ab_report_annotation_shows_the_ci_as_an_interval(tmp_path):
+    # The binomial CI is asymmetric, so the annotation prints its bounds
+    # rather than MOS/CMOS's "value +/- CI" - a single half-width would have
+    # to pick a side, and the error whisker draws both.
     html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
     _, layout = _plotly_call_args(html)
     texts = [a["text"] for a in layout["annotations"]]
-    # Thin spaces (U+2009) flank the binary "+/-", as in MOS/CMOS.
-    pattern = r"A: \d+%" + "\u2009±\u2009" + r"\d+%"
+    # Hair spaces (U+200A) flank the range dash: at the chart's 13px the
+    # percent signs otherwise touch it, while a wider space would read as
+    # two separate values rather than one interval.
+    pattern = r"A: \d+% \[\d+%\u200a\u2013\u200a\d+%\]"
     assert any(re.search(pattern, t) for t in texts)
+
+
+def test_generate_ab_report_annotation_omits_the_mirror_rate(tmp_path):
+    """The other side is 1 - this one, so naming it only repeats a number."""
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
+    _, layout = _plotly_call_args(html)
+    texts = [a["text"] for a in layout["annotations"]]
+    assert any(t.startswith("A: ") for t in texts)
+    assert not any("B: " in t for t in texts)
+
+
+def test_generate_ab_report_error_bars_are_asymmetric(tmp_path):
+    """Both bounds reach plotly, so no whisker is drawn past the true CI."""
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
+    data, _ = _plotly_call_args(html)
+    err = data[0]["error_x"]
+    assert err["symmetric"] is False
+    assert err["arrayminus"] is not None
 
 
 def test_generate_ab_report_counts_ties_separately(tmp_path):

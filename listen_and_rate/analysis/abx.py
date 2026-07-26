@@ -37,7 +37,8 @@ def _generate_abx_report(
 
     pair_labels: list[str] = []
     accuracy: list[float] = []
-    accuracy_errors: list[float] = []
+    accuracy_errors_upper: list[float] = []
+    accuracy_errors_lower: list[float] = []
     hover_text: list[str] = []
     count_labels: list[str] = []
     count_values: list[int] = []
@@ -48,13 +49,20 @@ def _generate_abx_report(
         n_correct = int(sub["correct"].astype(bool).sum())
         n_total = len(sub)
         n_incorrect = n_total - n_correct
-        rate, err, p_value = _binomial_pair_stats(n_correct, n_total, confidence)
+        rate, ci_lo, ci_hi, p_value = _binomial_pair_stats(
+            n_correct, n_total, confidence
+        )
 
         pair_labels.append(f"{_disp(system_a)} vs {_disp(system_b)}")
         accuracy.append(rate)
-        accuracy_errors.append(err)
+        accuracy_errors_upper.append(ci_hi - rate)
+        accuracy_errors_lower.append(rate - ci_lo)
         hover_text.append(
-            f"Correct: {n_correct}/{n_total} ({rate:.0%}\u2009±\u2009{err:.0%})"
+            # An interval, not +/-: the binomial CI is asymmetric away from
+            # 50% (see _binomial_pair_stats). The counts behind the rate are
+            # not repeated here - the counts chart sits directly below, and
+            # every other test type's annotation carries the value alone.
+            f"Correct: {rate:.0%} [{ci_lo:.0%}\u200a\u2013\u200a{ci_hi:.0%}]"
         )
         # ABXConfig requires exactly 2 systems, so there is only ever one
         # pair and generic "Correct"/"Incorrect" labels stay unambiguous.
@@ -71,7 +79,8 @@ def _generate_abx_report(
     accuracy_html, counts_html = _render_binary_outcome_charts(
         pair_labels,
         accuracy,
-        accuracy_errors,
+        accuracy_errors_upper,
+        accuracy_errors_lower,
         hover_text,
         count_labels,
         count_values,

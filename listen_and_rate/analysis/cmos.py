@@ -128,6 +128,8 @@ def _generate_cmos_report(
     ci_html = _render_ci_bar_chart(
         pair_labels,
         means,
+        # The t-interval is symmetric, so the same extent reaches both ways.
+        mean_errors,
         mean_errors,
         hover_text,
         "Mean CMOS rating",

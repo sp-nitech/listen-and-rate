@@ -47,7 +47,8 @@ def _generate_ab_report(
 
     pair_labels: list[str] = []
     pref_rate_a: list[float] = []
-    pref_errors: list[float] = []
+    pref_errors_upper: list[float] = []
+    pref_errors_lower: list[float] = []
     hover_text: list[str] = []
     count_labels: list[str] = []
     count_values: list[int] = []
@@ -61,14 +62,18 @@ def _generate_ab_report(
         n_first = int((sub[outcome_column] == OUTCOME_A).sum())
         n_second = int((sub[outcome_column] == OUTCOME_B).sum())
         n_a, n_b = (n_first, n_second) if system_a == orig_a else (n_second, n_first)
-        rate_a, err, p_value = _binomial_pair_stats(n_a, n_a + n_b, confidence)
+        rate_a, ci_lo, ci_hi, p_value = _binomial_pair_stats(n_a, n_a + n_b, confidence)
 
         da, db = _disp(system_a), _disp(system_b)
         pair_labels.append(f"{da} vs {db}")
         pref_rate_a.append(rate_a)
-        pref_errors.append(err)
+        pref_errors_upper.append(ci_hi - rate_a)
+        pref_errors_lower.append(rate_a - ci_lo)
         hover_text.append(
-            f"{da}: {rate_a:.0%}\u2009±\u2009{err:.0%}  /  {db}: {1 - rate_a:.0%}"
+            # The pair's other side is 1 - this one, so naming it would only
+            # repeat the same number; the CI reads as an interval because the
+            # binomial one is asymmetric (see _binomial_pair_stats).
+            f"{da}: {rate_a:.0%} [{ci_lo:.0%}\u200a\u2013\u200a{ci_hi:.0%}]"
         )
         if include_tie:
             # Tie centered between the two systems' counts, matching CMOS's
@@ -92,7 +97,8 @@ def _generate_ab_report(
     pref_html, counts_html = _render_binary_outcome_charts(
         pair_labels,
         pref_rate_a,
-        pref_errors,
+        pref_errors_upper,
+        pref_errors_lower,
         hover_text,
         count_labels,
         count_values,

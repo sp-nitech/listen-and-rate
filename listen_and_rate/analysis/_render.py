@@ -232,7 +232,8 @@ def _fig_to_html(fig, png_scale: float) -> str:
 def _render_ci_bar_chart(
     pair_labels: list[str],
     values: list[float],
-    errors: list[float],
+    errors_upper: list[float],
+    errors_lower: list[float],
     hover_text: list[str],
     axis_title: str,
     x_range: tuple[float, float],
@@ -261,9 +262,16 @@ def _render_ci_bar_chart(
             y=pair_labels,
             x=values,
             orientation="h",
+            # How far the interval reaches above and below the value, given
+            # separately: AB/ABX's Clopper-Pearson interval is asymmetric away
+            # from 50%, and a symmetric whisker would have to pick one side and
+            # draw the other wrong. A symmetric interval (CMOS's t-interval)
+            # simply passes the same extent twice.
             error_x=dict(
                 type="data",
-                array=errors,
+                array=errors_upper,
+                arrayminus=errors_lower,
+                symmetric=False,
                 visible=True,
                 thickness=2,
                 width=6,
@@ -363,13 +371,20 @@ def _render_counts_bar_chart(
 
 def _binomial_pair_stats(
     n_success: int, n_total: int, confidence: float
-) -> tuple[float, float, float]:
-    """Compute (rate, CI half-width, p-value) for one pair's binomial outcome.
+) -> tuple[float, float, float, float]:
+    """Compute (rate, CI low, CI high, p-value) for one pair's binomial outcome.
 
     Shared by AB (successes = wins for system_a among decisive choices) and
     ABX (successes = correct guesses among all guesses); the test is always
     against the 0.5 chance level. A pair with no data at all renders as a
     bar at 0.5 with no CI and p=1.
+
+    Both bounds are returned, not a single half-width: proportion_ci() is a
+    Clopper-Pearson interval, which is asymmetric about the rate away from
+    50%, and collapsing it to one number would have to pick a side. Taking
+    the wider one drew a whisker past the true bound (and past 100% at high
+    rates, where the axis then clipped it); taking either one alone would
+    understate the other.
     """
     from scipy import stats
 
@@ -377,14 +392,15 @@ def _binomial_pair_stats(
         result = stats.binomtest(n_success, n_total)
         rate = n_success / n_total
         lo, hi = result.proportion_ci(confidence_level=confidence)
-        return rate, max(rate - lo, hi - rate), float(result.pvalue)
-    return 0.5, 0.0, 1.0
+        return rate, float(lo), float(hi), float(result.pvalue)
+    return 0.5, 0.5, 0.5, 1.0
 
 
 def _render_binary_outcome_charts(
     pair_labels: list[str],
     rate: list[float],
-    errors: list[float],
+    errors_upper: list[float],
+    errors_lower: list[float],
     hover_text: list[str],
     count_labels: list[str],
     count_values: list[int],
@@ -406,7 +422,8 @@ def _render_binary_outcome_charts(
     rate_html = _render_ci_bar_chart(
         pair_labels,
         rate,
-        errors,
+        errors_upper,
+        errors_lower,
         hover_text,
         rate_axis_title,
         x_range=(0, 1),

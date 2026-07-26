@@ -134,6 +134,8 @@ function base_config_response(array $data, array $extras): array
 {
     return array_merge([
         'experiment_id' => $data['experiment_id'],
+        // Which per-answer measurements the frontend should take.
+        'metrics' => $data['metrics'],
         'config_version' => config_version($data),
         'test_type' => $data['test_type'],
         'title' => $data['title'],

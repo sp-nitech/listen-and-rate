@@ -75,6 +75,12 @@ class SaveRequestError extends RuntimeException
  * '.' and '..' are excluded separately: the dot is allowed so an id like
  * "config.mos" works, and those two are directory references, not names.
  */
+/**
+ * Decimals a metric is stored with. Mirrors listen_and_rate/storage.py's
+ * METRIC_DECIMALS - two, because what these measure is noisier than that.
+ */
+const METRIC_DECIMALS = 2;
+
 function is_valid_id(string $s): bool
 {
     if ($s === '.' || $s === '..') {
@@ -291,6 +297,90 @@ function validate_metadata(array $fields, array $submitted): array
 }
 
 /**
+ * The metric names this experiment opted into, in column order.
+ *
+ * Mirrors listen_and_rate/config/base.py's MetricsConfig.enabled_keys(): a
+ * client may measure whatever it likes, but only what the config asked for is
+ * stored, so an unrequested value cannot reach the results.
+ */
+function enabled_metrics(array $configData): array
+{
+    $metrics = $configData['metrics'] ?? [];
+    return is_array($metrics) ? array_keys(array_filter($metrics)) : [];
+}
+
+/**
+ * The submitted answers, under whichever key this test type sends them.
+ *
+ * One answer produces exactly one stored row in every test type (MUSHRA sends
+ * one per slider), so these line up index-for-index with the rows the builders
+ * return - which is what lets the metrics be attached in one place afterwards
+ * instead of threaded through all six builders.
+ */
+function submitted_answers(string $testType, array $data): array
+{
+    $key     = in_array($testType, ['cmos', 'ab', 'abx', 'xab'], true) ? 'choices' : 'ratings';
+    $answers = $data[$key] ?? [];
+    return is_array($answers) ? array_values($answers) : [];
+}
+
+/** One answer's metrics, keeping only the opted-in keys and rounding to ms. */
+function answer_metrics(array $answer, array $keys): array
+{
+    $measured = [];
+    foreach ($keys as $key) {
+        $value = $answer[$key] ?? null;
+        if (is_numeric($value)) {
+            $measured[$key] = round((float) $value, METRIC_DECIMALS);
+        }
+    }
+    return $measured;
+}
+
+/**
+ * Append metrics_* columns to a built CSV table, mirroring the Python saver's
+ * layout: last, after the answer columns, because they measure how the answer
+ * was produced.
+ */
+function append_metrics_columns(array $fields, array $rows, array $answers, array $keys): array
+{
+    if ($keys === []) {
+        return [$fields, $rows];
+    }
+    foreach ($keys as $key) {
+        $fields[] = 'metrics_' . $key;
+    }
+    foreach ($rows as $i => $row) {
+        $measured = answer_metrics($answers[$i] ?? [], $keys);
+        foreach ($keys as $key) {
+            // Fixed decimals, not PHP's float-to-string: that would write 9.0
+            // as "9" where the FastAPI saver writes "9.00".
+            $row[] = isset($measured[$key])
+                ? sprintf('%.' . METRIC_DECIMALS . 'f', $measured[$key])
+                : '';
+        }
+        $rows[$i] = $row;
+    }
+    return [$fields, $rows];
+}
+
+/** Nest a "metrics" object inside each built JSON entry (Python keeps it nested too). */
+function append_metrics_json(array $entries, array $answers, array $keys): array
+{
+    if ($keys === []) {
+        return $entries;
+    }
+    foreach ($entries as $i => $entry) {
+        $measured = answer_metrics($answers[$i] ?? [], $keys);
+        if ($measured !== []) {
+            $entry['metrics'] = $measured;
+        }
+        $entries[$i] = $entry;
+    }
+    return $entries;
+}
+
+/**
  * Create/resolve the per-experiment results directory under $resultsDir.
  *
  * Resolves both directories to canonical paths before returning, so that a
@@ -382,7 +472,12 @@ function open_result_file_exclusive(string $path, string $cannotWriteMessage)
 function write_json_file(string $path, array $jsonData): void
 {
     $fp = open_result_file_exclusive($path, "Cannot write {$path}");
-    $written = @fwrite($fp, json_encode($jsonData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    $written = @fwrite($fp, json_encode(
+        $jsonData,
+        // PRESERVE_ZERO_FRACTION so a whole-number metric stays 9.0 rather
+        // than collapsing to 9, matching what json.dump writes.
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION
+    ));
     fclose($fp);
     if ($written === false) {
         throw new SaveRequestError(500, "Cannot write {$path}");
@@ -457,7 +552,7 @@ function build_json_result(array $data, array $meta, array $stimulusMap, string 
         'timestamp'  => $ts,
         'test_type'  => $data['test_type'],
         'metadata'   => $meta,
-        'ratings'    => $enriched,
+        'records'    => $enriched,
     ];
 }
 
@@ -569,7 +664,7 @@ function build_cmos_json_result(array $data, array $meta, array $stimulusMap, st
         'timestamp'  => $ts,
         'test_type'  => $data['test_type'],
         'metadata'   => $meta,
-        'ratings'    => $enriched,
+        'records'    => $enriched,
     ];
 }
 
@@ -657,7 +752,7 @@ function build_ab_json_result(array $data, array $meta, array $stimulusMap, stri
         'timestamp'  => $ts,
         'test_type'  => $data['test_type'],
         'metadata'   => $meta,
-        'ratings'    => $enriched,
+        'records'    => $enriched,
     ];
 }
 
@@ -736,7 +831,7 @@ function build_abx_json_result(array $data, array $meta, array $stimulusMap, str
         'timestamp'  => $ts,
         'test_type'  => $data['test_type'],
         'metadata'   => $meta,
-        'ratings'    => $enriched,
+        'records'    => $enriched,
     ];
 }
 
@@ -829,7 +924,7 @@ function build_xab_json_result(array $data, array $meta, array $stimulusMap, str
         'timestamp'  => $ts,
         'test_type'  => $data['test_type'],
         'metadata'   => $meta,
-        'ratings'    => $enriched,
+        'records'    => $enriched,
     ];
 }
 
@@ -1054,7 +1149,8 @@ function handle_save_request(): void
         // merged prefixed map flows through them unchanged. JSON keeps the
         // raw keys inside its nested metadata/survey objects instead.
         $form      = array_merge(prefix_keys('metadata_', $meta), prefix_keys('survey_', $survey));
-        $form_keys = array_keys($form);
+        $form_keys    = array_keys($form);
+        $metrics_keys = enabled_metrics($config_data);
         $ts        = date('c');
 
         if ($output_format === 'json') {
@@ -1066,9 +1162,16 @@ function handle_save_request(): void
                 'xab' => build_xab_json_result($data, $meta, $stimulus_map, $ts, $config_data['reference_system'] ?? ''),
                 'mushra' => build_json_result($data, $meta, $stimulus_map, $ts),
             };
-            // Survey answers are attached here, once, rather than threaded
-            // through every per-test-type builder.
+            // Survey answers and per-answer metrics are attached here, once,
+            // rather than threaded through every per-test-type builder.
             $json_data['survey'] = $survey;
+            // Every builder returns its rows under 'records', whatever key the
+            // client sent them under - matching JSONResultSaver.
+            $json_data['records'] = append_metrics_json(
+                $json_data['records'],
+                submitted_answers($test_type, $data),
+                $metrics_keys
+            );
             write_json_file($experiment_dir . '/' . $session_id_safe . '.json', $json_data);
         } else {
             [$fields, $rows] = match ($test_type) {
@@ -1079,6 +1182,12 @@ function handle_save_request(): void
                 'xab' => build_xab_csv_rows($data, $form, $form_keys, $stimulus_map, $ts, $config_data['reference_system'] ?? ''),
                 'mushra' => build_csv_rows($data, $form, $form_keys, $stimulus_map, $ts),
             };
+            [$fields, $rows] = append_metrics_columns(
+                $fields,
+                $rows,
+                submitted_answers($test_type, $data),
+                $metrics_keys
+            );
             write_csv_file($experiment_dir . '/' . $session_id_safe . '.csv', $fields, $rows, $experiment_dir);
         }
     } catch (SaveRequestError $e) {

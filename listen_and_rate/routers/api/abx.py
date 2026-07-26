@@ -14,6 +14,7 @@ from ._shared import (
     _all_stimuli,
     _build_response_trials,
     _id_to_meta,
+    _metrics_row,
     _practice_extras,
     _require_answered_once,
     _require_non_empty,
@@ -101,6 +102,7 @@ def _submit_abx(
                 "system_b": system_b,
                 "item": meta1["item"],
                 "correct": choice.selected_stimulus_id == ground_truth,
+                **_metrics_row(choice, config),
             }
         )
 

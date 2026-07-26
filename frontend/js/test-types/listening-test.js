@@ -23,6 +23,7 @@
  *   _handleChoiceKey(e)      type-specific answer keys; true when consumed
  *   _choiceHintHtml()        that key group's segment of the shortcut hint
  *   _supportsResume()        false drops mid-clip resume and the rewind key
+ *   _gatedSeconds(index)     clip time the listener must sit through there
  *   _submit()                post the collected answers
  */
 
@@ -46,6 +47,10 @@ export class ListeningTest {
     this.onSubmit = onSubmit;
     this.currentIndex = 0;
     this._boundKeydown = this._handleKeydown.bind(this);
+    // Response-time measurement (config.metrics.response_time); see
+    // _startResponseClock/_stopResponseClock for what the numbers mean.
+    this._playStartedAt = new Map(); // trial index -> ms at its first play
+    this._responseTime = new Map(); // trial index -> seconds, once settled
   }
 
   /** Mount the header, build the page DOM once, then sync it to the first trial. */
@@ -53,8 +58,52 @@ export class ListeningTest {
     this.container = container;
     this._renderHeader();
     this._buildPage();
+    // Capture phase: media events do not bubble, so an ancestor only sees
+    // them this way - which lets one listener here cover every test type
+    // rather than each one wiring its own clips.
+    this._pageSlot.addEventListener('play', () => this._startResponseClock(), true);
     this._syncPage();
     document.addEventListener('keydown', this._boundKeydown);
+  }
+
+  /**
+   * Note when the listener first played audio on the current page.
+   *
+   * The clock starts here rather than on arrival so that reading the page,
+   * or stepping away before engaging with it, is not counted as deciding.
+   */
+  _startResponseClock() {
+    if (!this._measuresResponseTime()) return;
+    if (!this._playStartedAt.has(this.currentIndex)) {
+      this._playStartedAt.set(this.currentIndex, performance.now());
+    }
+  }
+
+  /**
+   * Settle the current page's response time, once, on the way forward.
+   *
+   * Time on the page, less the clip time the listener had to sit through to
+   * be allowed to leave it (_gatedSeconds) - so what remains is deciding, not
+   * listening. Only a forward move settles it, and only the first one:
+   * forward is gated on having answered, which is what makes the result
+   * non-negative, and a later revisit is re-reading rather than answering.
+   */
+  _stopResponseClock() {
+    if (!this._measuresResponseTime()) return;
+    const index = this.currentIndex;
+    const startedAt = this._playStartedAt.get(index);
+    if (startedAt === undefined || this._responseTime.has(index)) return;
+    const elapsed = (performance.now() - startedAt) / 1000;
+    this._responseTime.set(index, elapsed - this._gatedSeconds(index));
+  }
+
+  _measuresResponseTime() {
+    return !!this.config.metrics?.response_time;
+  }
+
+  /** The settled response time for a trial, or null when it has none. */
+  _responseTimeOf(index) {
+    return this._responseTime.get(index) ?? null;
   }
 
   _renderHeader() {
@@ -110,6 +159,7 @@ export class ListeningTest {
     if (delta > 0 && !this._isAnswered(this.currentIndex)) return;
     const next = this.currentIndex + delta;
     if (next < 0 || next >= this._trialCount()) return;
+    if (delta > 0) this._stopResponseClock();
     this.currentIndex = next;
     this._syncPage();
   }
@@ -118,6 +168,8 @@ export class ListeningTest {
     if (this.currentIndex < this._trialCount() - 1) {
       this._navigate(1);
     } else if (this._answeredCount() === this._trialCount()) {
+      // The last page has no forward navigation to settle it.
+      this._stopResponseClock();
       this._submit();
     }
   }
@@ -128,6 +180,9 @@ export class ListeningTest {
       currentIndex: this.currentIndex,
       answers: this._serializeAnswers(),
       played: this._serializePlayed(),
+      // Settled response times only: a page whose clock is still running is
+      // one the listener has not answered, and it restarts on resume anyway.
+      metrics: [...this._responseTime],
     };
   }
 
@@ -135,6 +190,7 @@ export class ListeningTest {
   restoreProgress(saved) {
     this._restoreAnswers(saved.answers ?? []);
     this._restorePlayed(saved.played ?? []);
+    this._responseTime = new Map(saved.metrics ?? []);
     this.currentIndex = Math.min(saved.currentIndex ?? 0, this._trialCount() - 1);
     this._syncPage();
   }

@@ -662,6 +662,19 @@ def test_experiment_id_can_be_set_explicitly(tmp_path, test_audio_file):
     assert result.experiment_id == "my-study"
 
 
+def test_experiment_id_null_means_unset(tmp_path, test_audio_file):
+    """`experiment_id:` written as null is how YAML says "not set".
+
+    Every other optional block in this config takes null that way, and the
+    empty-string sentinel this field stores would otherwise reject it with a
+    bare type error that explains nothing.
+    """
+    data = minimal_config(str(test_audio_file))
+    data["experiment_id"] = None
+    result = load_config(write_config(tmp_path, data, name="study-a.yaml"))
+    assert result.experiment_id == "study-a"
+
+
 def test_experiment_id_rejects_a_path_unsafe_value(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
     data["experiment_id"] = "../escape"
@@ -677,3 +690,27 @@ def test_path_unsafe_config_filename_is_rejected_naming_the_escape_hatch(
     data = minimal_config(str(test_audio_file))
     with pytest.raises(ValueError, match="experiment_id"):
         load_config(write_config(tmp_path, data, name="実験1.yaml"))
+
+
+# -- metrics ----------------------------------------------------------------
+
+
+def test_metrics_defaults_to_collecting_nothing(tmp_path, test_audio_file):
+    """Opt-in, like the metadata and survey forms."""
+    data = minimal_config(str(test_audio_file))
+    result = load_config(write_config(tmp_path, data))
+    assert result.metrics.response_time is False
+
+
+def test_metrics_response_time_can_be_enabled(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["metrics"] = {"response_time": True}
+    result = load_config(write_config(tmp_path, data))
+    assert result.metrics.response_time is True
+
+
+def test_metrics_rejects_an_unknown_key(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["metrics"] = {"respones_time": True}  # typo
+    with pytest.raises(ValidationError, match="Unknown field"):
+        load_config(write_config(tmp_path, data))

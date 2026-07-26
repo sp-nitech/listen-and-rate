@@ -58,3 +58,7 @@ confidence: 0.95
 #   - label: Expert only
 #     survey_filter:
 #       expertise: Expert
+#   - label: Deliberated trial
+#     metrics_filter:
+#       response_time:
+#         min: 1.0

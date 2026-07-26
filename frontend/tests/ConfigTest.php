@@ -93,6 +93,7 @@ final class ConfigTest extends TestCase
                 'durations' => ['A__u1' => 1.5, 'A__u2' => 1.5, 'B__u1' => 1.5, 'B__u2' => 1.5],
                 'metadata' => ['title' => 'Listener Information', 'fields' => []],
                 'survey' => ['title' => 'Questionnaire', 'fields' => []],
+                'metrics' => ['response_time' => false],
                 'stimuli_per_session' => null,
                 'items_per_session' => 1,
                 'stimuli' => $this->stimuliWithTwoSystemsTwoItems(),
@@ -152,6 +153,18 @@ final class ConfigTest extends TestCase
         ]);
         $response = build_config_response($data);
         $this->assertSame($survey, $response['survey']);
+    }
+
+    public function testBuildConfigResponseExposesWhichMetricsToCollect(): void
+    {
+        // The frontend measures only what this says; see listening-test.js.
+        $data = $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+            'metrics' => ['response_time' => true],
+        ]);
+        $response = build_config_response($data);
+        $this->assertSame(['response_time' => true], $response['metrics']);
     }
 
     public function testBuildConfigResponsePassesThroughFormPageTitles(): void

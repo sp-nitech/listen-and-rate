@@ -191,10 +191,10 @@ def test_json_saver_correct_values(tmp_path):
         "session_id",
         "timestamp",
         "test_type",
-        "ratings",
+        "records",
         "metadata",
     } <= data.keys()
-    assert data["ratings"][0] == {"system": "sys_a", "item": "utt001", "rating": 4}
+    assert data["records"][0] == {"system": "sys_a", "item": "utt001", "rating": 4}
     assert data["metadata"] == {}
 
 
@@ -272,3 +272,65 @@ def test_make_result_saver_raises_for_unknown_format(tmp_path):
 def test_result_saver_is_abstract():
     with pytest.raises(TypeError):
         ResultSaver()
+
+
+# -- metrics ----------------------------------------------------------------
+#
+# Per-answer, unlike the session-constant metadata/survey - but stored the same
+# way: nested under one key in JSON, flattened to prefixed columns in CSV.
+
+METRIC_RATINGS = [
+    {
+        "system": "sys_a",
+        "item": "utt001",
+        "rating": 4,
+        "metrics": {"response_time": 2.5},
+    },
+    {
+        "system": "sys_b",
+        "item": "utt002",
+        "rating": 3,
+        "metrics": {"response_time": 9.0},
+    },
+]
+
+
+def test_csv_saver_writes_metrics_with_fixed_decimals(tmp_path):
+    """A whole number keeps its decimals instead of collapsing to "9".
+
+    str(float) would print 2.5 and 9.0 with different widths - and PHP's own
+    float-to-string would print the latter as "9" - so the column is written
+    to a fixed number of decimals on both sides instead.
+    """
+    saver = CSVResultSaver(tmp_path, EXPERIMENT_ID, metrics_keys=["response_time"])
+    saver.save(SESSION_ID, TEST_TYPE, METRIC_RATINGS)
+    rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
+    assert [r["metrics_response_time"] for r in rows] == ["2.50", "9.00"]
+
+
+def test_csv_saver_flattens_metrics_into_prefixed_columns_last(tmp_path):
+    saver = CSVResultSaver(tmp_path, EXPERIMENT_ID, metrics_keys=["response_time"])
+    saver.save(SESSION_ID, TEST_TYPE, METRIC_RATINGS)
+    rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
+    keys = list(rows[0].keys())
+    assert keys[-1] == "metrics_response_time"
+    assert keys.index("metrics_response_time") > keys.index("rating")
+    assert rows[0]["metrics_response_time"] == "2.50"
+    assert rows[1]["metrics_response_time"] == "9.00"
+    # The nested dict itself must not leak out as a column of its own.
+    assert "metrics" not in keys
+
+
+def test_csv_saver_omits_metrics_columns_when_none_are_configured(tmp_path):
+    CSVResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
+    rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
+    assert not [k for k in rows[0] if k.startswith("metrics")]
+
+
+def test_json_saver_keeps_metrics_nested_in_each_record(tmp_path):
+    JSONResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, METRIC_RATINGS)
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
+    assert data["records"][0]["metrics"] == {"response_time": 2.5}
+    assert data["records"][1]["metrics"] == {"response_time": 9.0}

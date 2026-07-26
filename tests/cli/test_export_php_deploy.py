@@ -929,3 +929,22 @@ def test_export_refuses_to_overwrite_when_results_are_the_bundle_root(
     _run_export(config_yaml, outdir, monkeypatch)
     with pytest.raises(ValueError, match="bundle root"):
         _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
+
+
+def test_export_php_deploy_config_data_includes_metrics(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """save.php stores only the metrics the config opted into, so it needs them."""
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "metrics": {"response_time": True},
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    config_yaml = write_config(tmp_path, config)
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    assert "'metrics' => ['response_time' => true]" in text

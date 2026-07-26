@@ -113,7 +113,12 @@ export class DMOSTest extends PairedTrialTest {
     await submitPayload(this, () => ({
       ratings: Array.from(this.choices.entries()).map(([trialIndex, rating]) => {
         const trial = this.trials[trialIndex];
-        return { stimulus_id: trial.test.id, reference_id: trial.reference.id, rating };
+        return {
+          stimulus_id: trial.test.id,
+          reference_id: trial.reference.id,
+          rating,
+          response_time: this._responseTimeOf(trialIndex),
+        };
       }),
     }));
   }

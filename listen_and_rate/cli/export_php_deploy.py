@@ -363,6 +363,9 @@ def _build_config_data(
 
     return {
         "experiment_id": config.experiment_id,
+        # Which per-answer measurements save.php should keep; mirrors the
+        # FastAPI config response (see _test_config_response).
+        "metrics": config.metrics.model_dump(),
         "test_type": config.test_type,
         "title": config.title,
         "instructions": config.instructions,

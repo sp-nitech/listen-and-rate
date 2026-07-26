@@ -10,6 +10,7 @@ from ...storage import ResultSaver
 from ._shared import (
     _all_stimuli,
     _id_to_meta,
+    _metrics_row,
     _pair_config_response,
     _require_answered_once,
     _require_non_empty,
@@ -59,6 +60,7 @@ def _submit_cmos(body: SubmitRequest, config: CMOSConfig, saver: ResultSaver) ->
                 "system_b": system_b,
                 "item": meta1["item"],
                 "rating": rating,
+                **_metrics_row(choice, config),
             }
         )
 

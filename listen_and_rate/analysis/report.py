@@ -11,7 +11,11 @@ from functools import partial
 from html import escape as _escape_html
 from pathlib import Path
 
-from ..storage import METADATA_COLUMN_PREFIX, SURVEY_COLUMN_PREFIX
+from ..storage import (
+    METADATA_COLUMN_PREFIX,
+    METRICS_COLUMN_PREFIX,
+    SURVEY_COLUMN_PREFIX,
+)
 from ._render import (
     _TEXT_SIZE,
     _render_table_html,
@@ -55,6 +59,11 @@ _FILTER_KINDS = (
     ("survey_filter", SURVEY_COLUMN_PREFIX, "survey field"),
     ("stimuli_filter", "", "stimulus column"),
 )
+
+# metrics_filter is kept out of _FILTER_KINDS: its values are numeric ranges,
+# not glob patterns, so it needs its own comparison rather than another entry
+# in the loop that applies them.
+_METRICS_FILTER = ("metrics_filter", METRICS_COLUMN_PREFIX, "recorded metric")
 
 
 def _section_heading_html(label: str) -> str:
@@ -114,6 +123,46 @@ def _participants_section_html(df, form_labels: dict[str, str] | None = None) ->
     return _section_heading_html("Participants") + "".join(subsections)
 
 
+def _apply_metrics_filter(sub, group: dict, label: str):
+    """Drop rows whose recorded metrics fall outside the group's ranges.
+
+    Separate from the glob filters because the values are numbers: a duration
+    has no useful pattern match, only bounds. A row with no reading for a
+    metric never matches, matching how a missing column value is treated
+    there.
+    """
+    kind, prefix, kind_label = _METRICS_FILTER
+    for key, bounds in (group.get(kind) or {}).items():
+        column_name = prefix + key
+        if column_name not in sub.columns:
+            raise ValueError(
+                f"group {label!r}: {key!r} is not a {kind_label} in the results"
+            )
+        values = sub[column_name].apply(_metric_value)
+        matches = values.notna()
+        # Inclusive, so a whole-number threshold reads as written: min 1 keeps
+        # a trial that took exactly one second.
+        if bounds.get("min") is not None:
+            matches &= values >= bounds["min"]
+        if bounds.get("max") is not None:
+            matches &= values <= bounds["max"]
+        sub = sub[matches]
+    return sub
+
+
+def _metric_value(value) -> float:
+    """Parse one stored metric reading; NaN when it is blank or not a number.
+
+    NaN rather than None so the column stays a float Series and the bound
+    comparisons below stay vectorized - and so an unmeasured row is excluded
+    by notna(), the way a missing value is in the glob filters.
+    """
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
 def _filter_group_rows(df, group: dict):
     """Return df's rows matching one group's metadata/survey/stimuli filters.
 
@@ -127,6 +176,7 @@ def _filter_group_rows(df, group: dict):
 
     label = group["label"]
     sub = df
+    sub = _apply_metrics_filter(sub, group, label)
     for kind, prefix, kind_label in _FILTER_KINDS:
         for key, value in (group.get(kind) or {}).items():
             patterns = [value] if isinstance(value, str) else list(value)
@@ -226,7 +276,7 @@ def generate_report_html(
             with open(path, encoding="utf-8") as f:
                 data = _json.load(f)
             rows = []
-            for r in data.get("ratings", []):
+            for r in data.get("records", []):
                 row: dict = {
                     "session_id": data.get("session_id", ""),
                     "timestamp": data.get("timestamp", ""),

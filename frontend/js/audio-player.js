@@ -133,11 +133,29 @@ export function rewindAudio(audio) {
   if (audio.currentTime !== 0) audio.currentTime = 0;
 }
 
+/**
+ * Pause every other clip on the page, so only `audio` is sounding.
+ *
+ * A comparison test asks which of two stimuli is better; two of them playing
+ * at once is a mixture of both, and a judgement made on it is not a judgement
+ * of either. The play-to-completion gate would be satisfied all the same -
+ * every clip reaches 'ended' - so nothing downstream would notice. Every
+ * playback path enforces this: the keyboard shortcut (PairedTrialTest's
+ * _handlePlayShortcut pauses whatever is playing), MUSHRA's own buttons, and
+ * the card play button below.
+ */
+export function pauseOtherAudio(audio) {
+  for (const other of document.querySelectorAll('audio')) {
+    if (other !== audio && !other.paused) other.pause();
+  }
+}
+
 /** Wire the play button, play/pause icon, and progress bar for one <audio>. */
 export function bindAudioPlayer(audio) {
   const { playBtn, rewindBtn, bar, fill, time } = playerParts(audio);
 
   playBtn.addEventListener('click', () => {
+    if (audio.paused) pauseOtherAudio(audio);
     audio.paused ? audio.play() : audio.pause();
     // Drop focus so a later Enter reaches the document-level confirm shortcut
     // (advance/submit) instead of re-toggling this button.

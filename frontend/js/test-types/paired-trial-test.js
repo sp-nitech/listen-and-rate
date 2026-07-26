@@ -45,6 +45,26 @@ export class PairedTrialTest extends ListeningTest {
     return this.choices.size;
   }
 
+  /**
+   * Every clip of the trial: _canChoose waits for all of them to reach
+   * 'ended', so that whole stretch is time the listener had no choice about.
+   *
+   * A clip's own element carries the length even where the served durations
+   * do not - ABX withholds its hidden X's, and the browser knows it anyway
+   * (see listen_and_rate/x_token.py's threat model).
+   */
+  _gatedSeconds(index) {
+    const clips = this._trialAudioClips(this.trials[index]);
+    let total = 0;
+    for (const audio of this._el?.audios ?? []) {
+      const clip = clips[audio.dataset.localIndex];
+      const served = clip?.id == null ? null : this.config.durations?.[clip.id];
+      const length = served ?? audio.duration;
+      if (Number.isFinite(length)) total += length;
+    }
+    return total;
+  }
+
   // -- Build once / sync in place (choice-button test types) ----------------
 
   /**

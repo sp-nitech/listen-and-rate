@@ -118,7 +118,11 @@ export class ABTest extends PairedTrialTest {
       choices: Array.from(this.choices.entries()).map(([trialIndex, value]) => {
         const stimulus_ids = this.trials[trialIndex].stimuli.map((s) => s.id);
         const selected_stimulus_id = value === 'tie' ? null : stimulus_ids[value];
-        return { stimulus_ids, selected_stimulus_id };
+        return {
+          stimulus_ids,
+          selected_stimulus_id,
+          response_time: this._responseTimeOf(trialIndex),
+        };
       }),
     }));
   }

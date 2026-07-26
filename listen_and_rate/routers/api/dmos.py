@@ -12,6 +12,7 @@ from ...storage import ResultSaver
 from ._shared import (
     _all_stimuli,
     _id_to_meta,
+    _metrics_row,
     _practice_extras,
     _require_answered_once,
     _require_non_empty,
@@ -132,6 +133,7 @@ def _submit_dmos(body: SubmitRequest, config: DMOSConfig, saver: ResultSaver) ->
                 "system": test_meta["system"],
                 "item": test_meta["item"],
                 "rating": entry.rating,
+                **_metrics_row(entry, config),
             }
         )
 

@@ -179,3 +179,35 @@ def test_load_report_config_or_exit_exits_on_unknown_field(tmp_path):
     path = write_config(tmp_path, {"nonsense": True}, name="report.yaml")
     with pytest.raises(SystemExit):
         load_report_config_or_exit(path)
+
+
+# -- metrics_filter ---------------------------------------------------------
+
+
+def test_metrics_filter_accepts_a_min_max_range():
+    """Numeric, so a range rather than the glob the other filters take."""
+    rc = ReportConfig(
+        groups=[
+            {
+                "label": "Deliberated",
+                "metrics_filter": {"response_time": {"min": 1.0, "max": 60.0}},
+            }
+        ]
+    )
+    bounds = rc.groups[0].metrics_filter["response_time"]
+    assert (bounds.min, bounds.max) == (1.0, 60.0)
+
+
+def test_metrics_filter_accepts_one_sided_bounds():
+    rc = ReportConfig(
+        groups=[{"label": "L", "metrics_filter": {"response_time": {"min": 1}}}]
+    )
+    bounds = rc.groups[0].metrics_filter["response_time"]
+    assert (bounds.min, bounds.max) == (1.0, None)
+
+
+def test_metrics_filter_rejects_an_unknown_bound():
+    with pytest.raises(ValidationError, match="Unknown field"):
+        ReportConfig(
+            groups=[{"label": "L", "metrics_filter": {"response_time": {"over": 1}}}]
+        )

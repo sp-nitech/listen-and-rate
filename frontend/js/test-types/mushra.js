@@ -28,7 +28,7 @@
  * plays compare the same passage across systems.
  */
 
-import { PAUSE_SVG, PLAY_SVG } from '../audio-player.js';
+import { PAUSE_SVG, PLAY_SVG, pauseOtherAudio } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
 import { submitPayload } from '../submit.js';
 import { PairedTrialTest } from './paired-trial-test.js';
@@ -291,10 +291,7 @@ export class MUSHRATest extends PairedTrialTest {
       if (playBtn) {
         playBtn.addEventListener('click', () => {
           if (audio.paused) {
-            // Only one clip plays at a time - pause whatever else is playing.
-            for (const other of this._pageSlot.querySelectorAll('audio')) {
-              if (other !== audio && !other.paused) other.pause();
-            }
+            pauseOtherAudio(audio);
             this._startPlayback(audio);
           } else {
             audio.pause();
@@ -517,6 +514,17 @@ export class MUSHRATest extends PairedTrialTest {
     return this.trials.filter((_, i) => this._isTrialComplete(i)).length;
   }
 
+  /**
+   * The Reference alone, because it alone must be heard to completion: the
+   * system play buttons stay disabled until it ends, while each system's
+   * slider unlocks on 'play' rather than on 'ended'. A trial without a
+   * Reference gates on nothing, so nothing is subtracted.
+   */
+  _gatedSeconds(index) {
+    const reference = this.trials[index].reference;
+    return reference ? (this.config.durations?.[reference.id] ?? 0) : 0;
+  }
+
   /** Record a slider's value without a full re-render (avoids flicker). */
   _setChoice(trialIndex, stimulusId, value) {
     if (!this.choices.has(trialIndex)) this.choices.set(trialIndex, new Map());
@@ -592,9 +600,12 @@ export class MUSHRATest extends PairedTrialTest {
   async _submit() {
     await submitPayload(this, () => {
       const ratings = [];
-      for (const valuesById of this.choices.values()) {
+      for (const [trialIndex, valuesById] of this.choices.entries()) {
+        // One page holds every system's slider, so the page's response time
+        // repeats on each rating it produced.
+        const response_time = this._responseTimeOf(trialIndex);
         for (const [stimulus_id, rating] of valuesById.entries()) {
-          ratings.push({ stimulus_id, rating });
+          ratings.push({ stimulus_id, rating, response_time });
         }
       }
       return { ratings };

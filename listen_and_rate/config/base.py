@@ -118,6 +118,32 @@ class SurveyFormConfig(FormPageConfig):
     title: str = "Questionnaire"
 
 
+class MetricsConfig(_StrictModel):
+    """Optional per-answer measurements of how the listener produced it.
+
+    Everything here describes the response *process*, not the response, and
+    each field is opt-in (nothing is recorded by default) because it is data
+    about the listener rather than about the systems under test.
+
+    `response_time` is the seconds between the listener first playing audio on
+    a page and moving on from it, minus the clip time they had to sit through
+    to be allowed to move on (see frontend/js/test-types/listening-test.js).
+    It is a quality-control aid - spotting rushed or fatigued listeners - and
+    not a measure of the systems: browser wall-clock includes tab switches,
+    interruptions, and thinking about something else entirely.
+    """
+
+    response_time: bool = False
+
+    def enabled_keys(self) -> list[str]:
+        """Return the metric names to record, in declaration (column) order.
+
+        Derived from the fields rather than listed, so a new metric joins the
+        stored columns by being declared above.
+        """
+        return [name for name in type(self).model_fields if getattr(self, name)]
+
+
 class OutputConfig(_StrictModel):
     """Result output settings."""
 
@@ -502,6 +528,10 @@ class BaseTestConfig(_StrictModel):
     # page). Same shape as metadata; no fields (the default) means no
     # survey page.
     survey: SurveyFormConfig = Field(default_factory=SurveyFormConfig)
+    # Per-answer measurements of how the listener produced it (response time);
+    # nothing is recorded by default. Sits with metadata/survey as the third
+    # thing collected from the listener rather than from the systems.
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     practice: PracticeConfig | None = None
     loudness_check: LoudnessCheckConfig | None = None
     loudness_normalization: LoudnessNormalizationConfig | None = None
@@ -510,6 +540,18 @@ class BaseTestConfig(_StrictModel):
     # load_config(); served to the browser so the time bar shows clip length
     # without a per-clip metadata fetch. Private so it can't be set via YAML.
     _durations: dict[str, float] = PrivateAttr(default_factory=dict)
+
+    @field_validator("experiment_id", mode="before")
+    @classmethod
+    def experiment_id_null_means_unset(cls, v: object) -> object:
+        """Accept `experiment_id:` written as null, the YAML for "not set".
+
+        The field stores its unset state as the empty string so that every
+        consumer sees a plain str (it names a directory), but null is how the
+        rest of this config spells "not set" - and left alone it would fail
+        with a bare "Input should be a valid string" that explains nothing.
+        """
+        return "" if v is None else v
 
     @field_validator("experiment_id")
     @classmethod

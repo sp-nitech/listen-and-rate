@@ -51,6 +51,11 @@ export class MOSTest extends ListeningTest {
     return this.ratings.size;
   }
 
+  /** The page's single clip must be played to completion before rating. */
+  _gatedSeconds(index) {
+    return this.config.durations?.[this.stimuli[index].id] ?? 0;
+  }
+
   /**
    * Build the stimulus-page DOM once and cache references to the parts that
    * change between stimuli. Navigation then mutates these in place (_syncPage)
@@ -249,11 +254,16 @@ export class MOSTest extends ListeningTest {
   async _submit() {
     // system/item are never sent: the server enriches each rating from
     // its own stimulus map, and the config response withholds both anyway.
-    await submitPayload(this, () => ({
-      ratings: Array.from(this.ratings.entries()).map(([stimulus_id, rating]) => ({
-        stimulus_id,
-        rating,
-      })),
-    }));
+    await submitPayload(this, () => {
+      // Ratings are keyed by stimulus id, response times by page index.
+      const pageOf = new Map(this.stimuli.map((s, index) => [s.id, index]));
+      return {
+        ratings: Array.from(this.ratings.entries()).map(([stimulus_id, rating]) => ({
+          stimulus_id,
+          rating,
+          response_time: this._responseTimeOf(pageOf.get(stimulus_id)),
+        })),
+      };
+    });
   }
 }

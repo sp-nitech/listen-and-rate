@@ -12,6 +12,7 @@ from ...storage import ResultSaver
 from ._shared import (
     _all_stimuli,
     _id_to_meta,
+    _metrics_row,
     _practice_extras,
     _require_answered_once,
     _require_non_empty,
@@ -149,6 +150,9 @@ def _submit_mushra(
                 "system": meta["system"],
                 "item": meta["item"],
                 "rating": entry.rating,
+                # One page holds N sliders, so the page's value repeats on
+                # each of its rows - as a session's metadata does.
+                **_metrics_row(entry, config),
             }
         )
 

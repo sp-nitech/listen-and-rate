@@ -107,7 +107,7 @@ def _write_json(
         "test_type": test_type,
         "metadata": metadata or {},
         "survey": survey or {},
-        "ratings": ratings,
+        "records": ratings,
     }
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     return path

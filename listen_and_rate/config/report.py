@@ -38,6 +38,18 @@ def _coerce_filter_values_to_str(v: object) -> object:
     }
 
 
+class MetricRange(_StrictModel):
+    """Inclusive bounds one recorded metric must fall within to keep a row.
+
+    Either end may be omitted for a one-sided bound. Inclusive on both ends so
+    a whole-number threshold reads as written: `min: 1` keeps a trial that took
+    exactly one second.
+    """
+
+    min: float | None = None
+    max: float | None = None
+
+
 class ReportGroupConfig(_StrictModel):
     """One vertically stacked report section: a heading label plus row filters.
 
@@ -50,12 +62,20 @@ class ReportGroupConfig(_StrictModel):
     via the stored metadata_/survey_ column prefixes); stimuli_filter keys
     name stimulus-side columns - item or system - and drop individual
     trial rows.
+
+    metrics_filter is the one numeric filter: its keys name recorded metrics
+    (see MetricsConfig) and its values are inclusive {min, max} bounds rather
+    than patterns, because a glob over a duration means nothing. Like
+    stimuli_filter it drops individual rows, since a metric is measured per
+    answer rather than per session - excluding a whole listener is a different
+    decision, and one this tool leaves to the analyst.
     """
 
     label: str
     metadata_filter: dict[str, str | list[str]] | None = None
     survey_filter: dict[str, str | list[str]] | None = None
     stimuli_filter: dict[str, str | list[str]] | None = None
+    metrics_filter: dict[str, MetricRange] | None = None
 
     @field_validator(
         "metadata_filter", "survey_filter", "stimuli_filter", mode="before"

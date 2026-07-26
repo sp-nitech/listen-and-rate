@@ -124,6 +124,7 @@ export class ABXTest extends PairedTrialTest {
           stimulus_ids,
           selected_stimulus_id: stimulus_ids[value],
           x_token: trial.x.token,
+          response_time: this._responseTimeOf(trialIndex),
         };
       }),
     }));

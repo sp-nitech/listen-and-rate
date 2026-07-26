@@ -85,7 +85,7 @@ def test_submit_writes_json_when_format_is_json(tmp_path, test_audio_file, monke
     data = json.loads(json_path.read_text(encoding="utf-8"))
     assert data["session_id"] == "sess-json"
     assert data["test_type"] == "mos"
-    assert len(data["ratings"]) == 2
+    assert len(data["records"]) == 2
 
 
 def test_submit_unknown_stimulus_returns_400(client):
@@ -532,3 +532,84 @@ def test_submit_pair_types_reject_the_same_pair_judged_twice(
             },
         )
         assert res.status_code == 400
+
+
+# -- metrics ----------------------------------------------------------------
+
+
+def _metrics_config(tmp_path, test_audio_file, fmt="csv", **metrics):
+    return {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": fmt, "path": str(tmp_path / "results")},
+        "metrics": metrics,
+        "stimuli": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+
+
+def _submit_with_response_time(tc, value=2.5):
+    return tc.post(
+        "/api/submit",
+        json={
+            "session_id": "s1",
+            "test_type": "mos",
+            "ratings": [{"stimulus_id": "s001", "rating": 4, "response_time": value}],
+        },
+    )
+
+
+def test_config_reports_which_metrics_are_collected(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """The frontend only measures what the config asked for."""
+    config = _metrics_config(tmp_path, test_audio_file, response_time=True)
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert tc.get("/api/config").json()["metrics"] == {"response_time": True}
+
+
+def test_submit_stores_response_time_as_a_prefixed_csv_column(
+    tmp_path, test_audio_file, monkeypatch
+):
+    config = _metrics_config(tmp_path, test_audio_file, response_time=True)
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_response_time(tc).status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert row["metrics_response_time"] == "2.50"
+
+
+def test_submit_stores_response_time_nested_in_json(
+    tmp_path, test_audio_file, monkeypatch
+):
+    config = _metrics_config(tmp_path, test_audio_file, "json", response_time=True)
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_response_time(tc).status_code == 200
+    path = next((tmp_path / "results").rglob("*.json"))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["records"][0]["metrics"] == {"response_time": 2.5}
+
+
+def test_submit_discards_a_metric_the_config_did_not_ask_for(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """A client that measures anyway must not get it into the results."""
+    config = _metrics_config(tmp_path, test_audio_file)  # nothing enabled
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_response_time(tc).status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert not [k for k in row if k.startswith("metrics")]
+
+
+def test_submit_rounds_response_time_to_two_decimals(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """Browser timers are coarsened and click latency is tens of ms, so the
+    digits below this are noise rather than measurement."""
+    config = _metrics_config(tmp_path, test_audio_file, response_time=True)
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_response_time(tc, 2.50449).status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert row["metrics_response_time"] == "2.50"

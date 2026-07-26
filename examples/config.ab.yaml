@@ -19,7 +19,7 @@ output:
 # output.path. Defaults to the config file's name. Set this only if the
 # filename is not a valid directory name; otherwise an error is raised
 # instead of silently modifying the name.
-# experiment_id: test-a
+# experiment_id: null
 
 # How much of each page's audio to fetch up front (default: auto).
 #   none - fetch nothing until the listener first presses play
@@ -124,3 +124,13 @@ stimuli_dirs:
 #         - "Appropriate"
 #         - "Too Many"
 #       required: true
+
+# -- Per-answer metrics (optional) --------------------------------------------
+# Measurements of how each answer was produced, rather than of the systems
+# under test. Each is opt-in; omit this section to record nothing.
+#   response_time - seconds from the listener first playing audio on a page to
+#                   moving on from it, minus the clip time they had to sit
+#                   through to get there. A quality-control aid (spotting
+#                   rushed or fatigued listeners), not a measure of the test.
+# metrics:
+#   response_time: false

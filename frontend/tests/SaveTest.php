@@ -99,6 +99,79 @@ final class SaveTest extends TestCase
         $this->assertSame('Etc/UTC', detect_server_timezone('Etc/UTC', ...$missingFiles));
     }
 
+    // -- metrics ----------------------------------------------------------
+
+    public function testEnabledMetricsKeepsOnlyWhatWasOptedInto(): void
+    {
+        $this->assertSame([], enabled_metrics([]));
+        $this->assertSame([], enabled_metrics(['metrics' => ['response_time' => false]]));
+        $this->assertSame(
+            ['response_time'],
+            enabled_metrics(['metrics' => ['response_time' => true]])
+        );
+    }
+
+    public function testAnswerMetricsRoundsToTwoDecimalsAndDropsNonNumbers(): void
+    {
+        $keys = ['response_time'];
+        $this->assertSame(
+            ['response_time' => 2.5],
+            answer_metrics(['response_time' => 2.50449], $keys)
+        );
+        $this->assertSame([], answer_metrics(['response_time' => null], $keys));
+        $this->assertSame([], answer_metrics([], $keys));
+    }
+
+    public function testAppendMetricsColumnsPutsThemLast(): void
+    {
+        [$fields, $rows] = append_metrics_columns(
+            ['session_id', 'system', 'rating'],
+            [['s1', 'A', 4], ['s1', 'B', 3]],
+            [['response_time' => 2.5], ['response_time' => 9.0]],
+            ['response_time']
+        );
+        $this->assertSame(['session_id', 'system', 'rating', 'metrics_response_time'], $fields);
+        // Fixed decimals, so a whole number keeps them instead of PHP's own
+        // float-to-string collapsing 9.0 to "9" - see METRIC_DECIMALS.
+        $this->assertSame([['s1', 'A', 4, '2.50'], ['s1', 'B', 3, '9.00']], $rows);
+    }
+
+    public function testAppendMetricsColumnsIsANoOpWhenNothingIsCollected(): void
+    {
+        [$fields, $rows] = append_metrics_columns(['a'], [['x']], [['response_time' => 1]], []);
+        $this->assertSame(['a'], $fields);
+        $this->assertSame([['x']], $rows);
+    }
+
+    public function testAppendMetricsJsonNestsThemInEachEntry(): void
+    {
+        $entries = append_metrics_json(
+            [['system' => 'A', 'rating' => 4], ['system' => 'B', 'rating' => 3]],
+            [['response_time' => 2.5], ['response_time' => 9.0]],
+            ['response_time']
+        );
+        $this->assertSame(['response_time' => 2.5], $entries[0]['metrics']);
+        $this->assertSame(['response_time' => 9.0], $entries[1]['metrics']);
+    }
+
+    public function testSubmittedAnswersReadsTheKeyEachTestTypeSends(): void
+    {
+        $body = ['ratings' => [['a' => 1]], 'choices' => [['b' => 2]]];
+        $this->assertSame([['a' => 1]], submitted_answers('mos', $body));
+        $this->assertSame([['a' => 1]], submitted_answers('mushra', $body));
+        $this->assertSame([['b' => 2]], submitted_answers('ab', $body));
+        $this->assertSame([['b' => 2]], submitted_answers('cmos', $body));
+    }
+
+    public function testWriteJsonFileKeepsAWholeNumbersDecimals(): void
+    {
+        // json_encode drops the fraction of 9.0 without this flag, so the PHP
+        // deployment would write 9 where the FastAPI one writes 9.0.
+        $path = $this->tmpDir . '/r.json';
+        write_json_file($path, ['records' => [['metrics' => ['response_time' => 9.0]]]]);
+        $this->assertStringContainsString('9.0', file_get_contents($path));
+    }
+
     // -- validate_submission_shape ----------------------------------------
 
     public function testValidateSubmissionShapeAcceptsMosWithRatings(): void
@@ -450,9 +523,9 @@ final class SaveTest extends TestCase
         ];
         $stimulusMap = ['a1' => ['system' => 'System A', 'item' => 'utt1']];
         $result = build_json_result($data, [], $stimulusMap, '2026-01-01T00:00:00+00:00');
-        $this->assertSame('System A', $result['ratings'][0]['system']);
-        $this->assertSame('utt1', $result['ratings'][0]['item']);
-        $this->assertSame(4, $result['ratings'][0]['rating']);
+        $this->assertSame('System A', $result['records'][0]['system']);
+        $this->assertSame('utt1', $result['records'][0]['item']);
+        $this->assertSame(4, $result['records'][0]['rating']);
     }
 
     public function testBuildCsvRowsOrdersMetadataBetweenTestTypeAndSystem(): void
@@ -491,8 +564,8 @@ final class SaveTest extends TestCase
             ],
         ];
         $result = build_json_result($data, [], [], '2026-01-01T00:00:00+00:00');
-        $this->assertSame('', $result['ratings'][0]['system']);
-        $this->assertSame('', $result['ratings'][0]['item']);
+        $this->assertSame('', $result['records'][0]['system']);
+        $this->assertSame('', $result['records'][0]['item']);
     }
 
     public function testBuildCsvRowsDoesNotFallBackToClientSuppliedSystemItem(): void
@@ -593,7 +666,7 @@ final class SaveTest extends TestCase
             ],
         ];
         $result = build_json_result($data, [], $this->dmosStimulusMap(), '2026-01-01T00:00:00+00:00');
-        $row = $result['ratings'][0];
+        $row = $result['records'][0];
         $this->assertSame('Test', $row['system']);
         $this->assertSame('u1', $row['item']);
         $this->assertSame(4, $row['rating']);
@@ -708,7 +781,7 @@ final class SaveTest extends TestCase
             ],
         ];
         $result = build_json_result($data, [], $this->mushraStimulusMap(), '2026-01-01T00:00:00+00:00');
-        $row = $result['ratings'][0];
+        $row = $result['records'][0];
         $this->assertSame('B', $row['system']);
         $this->assertSame('u1', $row['item']);
         $this->assertSame(70, $row['rating']);
@@ -777,7 +850,7 @@ final class SaveTest extends TestCase
             'choices'    => [['stimulus_ids' => ['a1', 'b1'], 'rating' => 2]],
         ];
         $result = build_cmos_json_result($data, [], $this->abStimulusMap(), '2026-01-01T00:00:00+00:00');
-        $row = $result['ratings'][0];
+        $row = $result['records'][0];
         $this->assertSame('u1', $row['item']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
@@ -794,7 +867,7 @@ final class SaveTest extends TestCase
             'choices'    => [['stimulus_ids' => ['b1', 'a1'], 'rating' => 2]],
         ];
         $result = build_cmos_json_result($data, [], $this->abStimulusMap(), '2026-01-01T00:00:00+00:00');
-        $row = $result['ratings'][0];
+        $row = $result['records'][0];
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
         $this->assertSame(-2, $row['rating']);
@@ -894,7 +967,7 @@ final class SaveTest extends TestCase
             'choices'    => [['stimulus_ids' => ['a1', 'b1'], 'selected_stimulus_id' => 'a1']],
         ];
         $result = build_ab_json_result($data, [], $this->abStimulusMap(), '2026-01-01T00:00:00+00:00');
-        $row = $result['ratings'][0];
+        $row = $result['records'][0];
         $this->assertSame('u1', $row['item']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
@@ -909,7 +982,7 @@ final class SaveTest extends TestCase
             'choices'    => [['stimulus_ids' => ['a1', 'b1'], 'selected_stimulus_id' => null]],
         ];
         $result = build_ab_json_result($data, [], $this->abStimulusMap(), '2026-01-01T00:00:00+00:00');
-        $this->assertSame('=', $result['ratings'][0]['winner']); // OUTCOME_TIE
+        $this->assertSame('=', $result['records'][0]['winner']); // OUTCOME_TIE
     }
 
     public function testBuildAbJsonResultWinnerIsPositionalNotSystemName(): void
@@ -930,10 +1003,10 @@ final class SaveTest extends TestCase
             ],
         ];
         $result = build_ab_json_result($data, [], $stimulusMap, '2026-01-01T00:00:00+00:00');
-        $this->assertSame('=', $result['ratings'][0]['system_a']);
-        $this->assertSame('tie', $result['ratings'][0]['system_b']);
-        $this->assertSame('b', $result['ratings'][0]['winner']); // system_b ("tie") won
-        $this->assertSame('=', $result['ratings'][1]['winner']); // an actual tie
+        $this->assertSame('=', $result['records'][0]['system_a']);
+        $this->assertSame('tie', $result['records'][0]['system_b']);
+        $this->assertSame('b', $result['records'][0]['winner']); // system_b ("tie") won
+        $this->assertSame('=', $result['records'][1]['winner']); // an actual tie
     }
 
     public function testBuildAbJsonResultSortsNumericSystemNamesLexicographically(): void
@@ -952,7 +1025,7 @@ final class SaveTest extends TestCase
             'choices'    => [['stimulus_ids' => ['a1', 'b1'], 'selected_stimulus_id' => 'a1']],
         ];
         $result = build_ab_json_result($data, [], $stimulusMap, '2026-01-01T00:00:00+00:00');
-        $row = $result['ratings'][0];
+        $row = $result['records'][0];
         $this->assertSame('128', $row['system_a']);
         $this->assertSame('64', $row['system_b']);
     }
@@ -1061,7 +1134,7 @@ final class SaveTest extends TestCase
             '2026-01-01T00:00:00+00:00',
             self::ABX_SECRET
         );
-        $row = $result['ratings'][0];
+        $row = $result['records'][0];
         $this->assertSame('u1', $row['item']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);
@@ -1085,7 +1158,7 @@ final class SaveTest extends TestCase
             '2026-01-01T00:00:00+00:00',
             self::ABX_SECRET
         );
-        $this->assertFalse($result['ratings'][0]['correct']);
+        $this->assertFalse($result['records'][0]['correct']);
     }
 
     public function testBuildAbxCsvRowsOrdersMetadataBeforeAbxColumns(): void
@@ -1188,7 +1261,7 @@ final class SaveTest extends TestCase
             'choices'    => [['stimulus_ids' => ['b1', 'a1'], 'selected_stimulus_id' => 'b1']],
         ];
         $result = build_xab_json_result($data, [], $this->xabStimulusMap(), '2026-01-01T00:00:00+00:00', 'Reference');
-        $row = $result['ratings'][0];
+        $row = $result['records'][0];
         $this->assertSame('u1', $row['item']);
         $this->assertSame('A', $row['system_a']);
         $this->assertSame('B', $row['system_b']);

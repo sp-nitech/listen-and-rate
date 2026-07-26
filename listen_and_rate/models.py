@@ -6,6 +6,12 @@ from pydantic import BaseModel, Field, field_validator
 
 from .ids import is_valid_id
 
+# Seconds the listener took on the page this answer came from, measured by the
+# frontend (see listening-test.js). allow_inf_nan keeps a broken client from
+# writing "inf"/"nan" into a results file. Stored only when the config opts in;
+# absent otherwise, and never required.
+_RESPONSE_TIME = Field(default=None, allow_inf_nan=False)
+
 
 class RatingEntry(BaseModel):
     """A single rating submitted by a listener.
@@ -16,6 +22,7 @@ class RatingEntry(BaseModel):
     stimulus_id: str
     reference_id: str | None = None  # DMOS only: what this rating is relative to
     rating: int
+    response_time: float | None = _RESPONSE_TIME
 
 
 class ChoiceEntry(BaseModel):
@@ -36,6 +43,7 @@ class ChoiceEntry(BaseModel):
     selected_stimulus_id: str | None = None
     x_token: str | None = None
     rating: int | None = None
+    response_time: float | None = _RESPONSE_TIME
 
 
 class SubmitRequest(BaseModel):

@@ -12,6 +12,7 @@ from ...storage import OUTCOME_A, OUTCOME_B, ResultSaver
 from ._shared import (
     _all_stimuli,
     _id_to_meta,
+    _metrics_row,
     _practice_extras,
     _require_answered_once,
     _require_non_empty,
@@ -115,6 +116,7 @@ def _submit_xab(body: SubmitRequest, config: XABConfig, saver: ResultSaver) -> d
                 "system_b": system_b,
                 "item": meta1["item"],
                 "closer": closer,
+                **_metrics_row(choice, config),
             }
         )
 

@@ -12,6 +12,7 @@ from ...storage import ResultSaver
 from ._shared import (
     _all_stimuli,
     _id_to_meta,
+    _metrics_row,
     _practice_extras,
     _require_answered_once,
     _require_non_empty,
@@ -76,5 +77,8 @@ def _submit_mos(body: SubmitRequest, config: MOSConfig, saver: ResultSaver) -> d
                 detail=f"MOS rating must be 1-5, got {r.rating} for {r.stimulus_id}",
             )
 
-    rows = [{**id_to_meta[r.stimulus_id], "rating": r.rating} for r in body.ratings]
+    rows = [
+        {**id_to_meta[r.stimulus_id], "rating": r.rating, **_metrics_row(r, config)}
+        for r in body.ratings
+    ]
     return _save_and_ok(body, config, saver, rows)

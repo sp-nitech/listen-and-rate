@@ -132,7 +132,11 @@ export class CMOSTest extends PairedTrialTest {
     await submitPayload(this, () => ({
       choices: Array.from(this.choices.entries()).map(([trialIndex, rating]) => {
         const stimulus_ids = this.trials[trialIndex].stimuli.map((s) => s.id);
-        return { stimulus_ids, rating };
+        return {
+          stimulus_ids,
+          rating,
+          response_time: this._responseTimeOf(trialIndex),
+        };
       }),
     }));
   }

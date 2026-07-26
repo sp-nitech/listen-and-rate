@@ -110,6 +110,7 @@ export class XABTest extends PairedTrialTest {
         return {
           stimulus_ids,
           selected_stimulus_id: stimulus_ids[value],
+          response_time: this._responseTimeOf(trialIndex),
         };
       }),
     }));

@@ -689,3 +689,74 @@ def test_require_full_order_rejects_incomplete_pair_order(tmp_path):
             system_order=["A"],
             require_full_order=True,
         )
+
+
+# -- metrics_filter ---------------------------------------------------------
+
+_TIMED_ROWS = [
+    {
+        "session_id": "s1",
+        "timestamp": "t",
+        "test_type": "mos",
+        "system": "A",
+        "item": "u1",
+        "rating": 4,
+        "metrics_response_time": 0.4,
+    },
+    {
+        "session_id": "s1",
+        "timestamp": "t",
+        "test_type": "mos",
+        "system": "A",
+        "item": "u2",
+        "rating": 5,
+        "metrics_response_time": 8.0,
+    },
+    {
+        "session_id": "s2",
+        "timestamp": "t",
+        "test_type": "mos",
+        "system": "B",
+        "item": "u1",
+        "rating": 3,
+        "metrics_response_time": "",
+    },
+]
+
+
+def _timed_df(tmp_path):
+    pd = pytest.importorskip("pandas")
+    return pd.read_csv(_write_csv(tmp_path / "timed.csv", _TIMED_ROWS))
+
+
+def _kept_items(tmp_path, bounds):
+    from listen_and_rate.analysis.report import _filter_group_rows
+
+    kept = _filter_group_rows(
+        _timed_df(tmp_path), {"label": "L", "metrics_filter": {"response_time": bounds}}
+    )
+    return list(kept["item"])
+
+
+def test_metrics_filter_keeps_only_rows_within_the_range(tmp_path):
+    """Row-level: a rushed trial drops without dropping the listener."""
+    assert _kept_items(tmp_path, {"min": 1.0}) == ["u2"]
+
+
+def test_metrics_filter_bounds_are_inclusive(tmp_path):
+    assert _kept_items(tmp_path, {"min": 0.4, "max": 0.4}) == ["u1"]
+
+
+def test_metrics_filter_drops_rows_with_no_measurement(tmp_path):
+    """A blank reading cannot satisfy a range, matching the glob filters."""
+    assert _kept_items(tmp_path, {}) == ["u1", "u2"]
+
+
+def test_metrics_filter_names_the_group_for_an_unrecorded_metric(tmp_path):
+    from listen_and_rate.analysis.report import _filter_group_rows
+
+    with pytest.raises(ValueError, match="'Fast'.*replay_count"):
+        _filter_group_rows(
+            _timed_df(tmp_path),
+            {"label": "Fast", "metrics_filter": {"replay_count": {"min": 1}}},
+        )

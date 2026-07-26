@@ -28,7 +28,7 @@ from ...config import (
 )
 from ...config._utils import _duplicates
 from ...models import SubmitRequest
-from ...storage import ResultSaver
+from ...storage import METRIC_DECIMALS, ResultSaver
 
 T = TypeVar("T")
 
@@ -179,6 +179,9 @@ def _test_config_response(config: Config, **extras: object) -> dict:
             "title": config.survey.title,
             "fields": [f.model_dump() for f in config.survey.fields],
         },
+        # Which per-answer measurements to take; the frontend measures only
+        # what is enabled here, and the submit handlers store only that too.
+        "metrics": config.metrics.model_dump(),
         "shortcuts": config.shortcuts.browser_dict(),
         **extras,
     }
@@ -213,6 +216,25 @@ def _require_non_empty(values: list, name: str) -> None:
     """Raise HTTPException(400) if the submitted ratings/choices list is empty."""
     if not values:
         raise HTTPException(status_code=400, detail=f"{name} must be a non-empty list")
+
+
+def _metrics_row(entry: object, config: Config) -> dict:
+    """Build the `metrics` sub-dict for one answer, or {} to store none.
+
+    Only the metrics the config opts into are kept, so a client that sends a
+    value the experiment did not ask for cannot slip it into the results. The
+    key is omitted entirely when nothing is collected, which keeps the stored
+    shape (and the CSV header) identical to before this existed.
+
+    Rounded to METRIC_DECIMALS: the browser reports sub-microsecond floats,
+    and the digits below that are noise rather than measurement.
+    """
+    measured = {}
+    for key in config.metrics.enabled_keys():
+        value = getattr(entry, key, None)
+        if value is not None:
+            measured[key] = round(float(value), METRIC_DECIMALS)
+    return {"metrics": measured} if measured else {}
 
 
 def _require_answered_once(keys: list[str], name: str, unit: str) -> None:
@@ -250,7 +272,7 @@ def _save_and_ok(
     saver.save(
         session_id=body.session_id,
         test_type=config.test_type,
-        ratings=rows,
+        records=rows,
         metadata=metadata,
         survey=survey,
     )

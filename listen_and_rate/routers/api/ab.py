@@ -10,6 +10,7 @@ from ...storage import OUTCOME_A, OUTCOME_B, OUTCOME_TIE, ResultSaver
 from ._shared import (
     _all_stimuli,
     _id_to_meta,
+    _metrics_row,
     _pair_config_response,
     _require_answered_once,
     _require_non_empty,
@@ -64,6 +65,7 @@ def _submit_ab(body: SubmitRequest, config: ABConfig, saver: ResultSaver) -> dic
                 "system_b": system_b,
                 "item": meta1["item"],
                 "winner": winner,
+                **_metrics_row(choice, config),
             }
         )
 

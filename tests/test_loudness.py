@@ -1,5 +1,8 @@
-"""Tests for the loudness check: pure aggregation (no deps) and, gated on the
-optional audio libraries, real measurement + the config-driven runner."""
+"""Tests for the loudness check and normalization.
+
+The aggregation they are built on lives in tests/test_audio_qa.py, since the
+silence check is built on the same functions.
+"""
 
 from __future__ import annotations
 
@@ -8,52 +11,7 @@ import sys
 
 import pytest
 
-from listen_and_rate import loudness
-from listen_and_rate.loudness import (
-    per_item_spreads,
-    per_system_stats,
-    system_mean_range,
-)
-
 from ._helpers import write_config, write_sine
-
-# -- pure aggregation (no soundfile/pyloudnorm needed) ------------------------
-
-
-def test_per_system_stats_mean_std_count():
-    rows = [
-        ("A", "u1", -20.0),
-        ("A", "u2", -22.0),
-        ("B", "u1", -23.0),
-        ("B", "u2", -23.0),
-    ]
-    stats = per_system_stats(rows)
-    assert stats["A"] == pytest.approx((-21.0, 1.0, 2))  # mean -21, pstdev 1.0
-    assert stats["B"] == pytest.approx((-23.0, 0.0, 2))
-
-
-def test_system_mean_range_is_max_minus_min_of_means():
-    rows = [("A", "u1", -20.0), ("B", "u1", -23.0), ("C", "u1", -21.5)]
-    assert system_mean_range(per_system_stats(rows)) == pytest.approx(3.0)
-
-
-def test_system_mean_range_none_with_fewer_than_two_systems():
-    rows = [("A", "u1", -20.0), ("A", "u2", -21.0)]
-    assert system_mean_range(per_system_stats(rows)) is None
-
-
-def test_per_item_spreads_only_multi_system_items():
-    rows = [
-        ("A", "u1", -20.0),
-        ("B", "u1", -23.0),  # u1 present in A and B -> spread 3.0
-        ("A", "u2", -20.0),  # u2 only in A -> excluded (no cross-system spread)
-    ]
-    spreads = per_item_spreads(rows)
-    assert set(spreads) == {"u1"}
-    spread, by_system = spreads["u1"]
-    assert spread == pytest.approx(3.0)
-    assert by_system == {"A": -20.0, "B": -23.0}
-
 
 # -- measurement + runner (require the optional audio libraries) --------------
 
@@ -386,30 +344,3 @@ def test_normalize_noop_returns_empty_when_not_configured(tmp_path):
         run_configured_loudness_normalization(load_config(p), lambda item: tmp_path)
         == {}
     )
-
-
-def test_measure_stimuli_reads_each_file_once(monkeypatch):
-    """Ids sharing one file are measured once, not once per id.
-
-    Several systems may point at the same directory (a deliberate repeat of
-    the same clips under two names), which gives distinct ids the same path.
-    """
-    from listen_and_rate.config.base import StimulusConfig
-
-    calls: list[str] = []
-
-    def _fake_measure(path):
-        calls.append(str(path))
-        return -20.0
-
-    monkeypatch.setattr(loudness, "measure_loudness", _fake_measure)
-    stimuli = [
-        StimulusConfig(id="A__u1", path="/x/u1.wav", system="A", item="u1"),
-        StimulusConfig(id="B__u1", path="/x/u1.wav", system="B", item="u1"),
-        StimulusConfig(id="A__u2", path="/x/u2.wav", system="A", item="u2"),
-    ]
-    result = loudness._measure_stimuli(stimuli, desc="t")
-
-    assert sorted(calls) == ["/x/u1.wav", "/x/u2.wav"]
-    # Every id still gets its own entry, whatever the file was shared with.
-    assert result == {"A__u1": -20.0, "B__u1": -20.0, "A__u2": -20.0}

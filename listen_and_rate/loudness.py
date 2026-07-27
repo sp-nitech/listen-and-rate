@@ -3,57 +3,27 @@
 from __future__ import annotations
 
 import math
-import statistics
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .audio_qa import (
+    MeasuredRow,
+    check_per_item,
+    measure_per_stimulus,
+    measured_rows,
+    per_system_stats,
+    print_per_system,
+    system_mean_range,
+)
 from .config import Config
 from .config.base import LoudnessCriterion, LoudnessNormalizationConfig, StimulusConfig
 
-# One measured clip: system, item, and integrated loudness (LUFS).
-LoudnessRow = tuple[str, str, float]
+_UNIT = "LUFS"  # an absolute level
+_DIFFERENCE_UNIT = "LU"  # a distance between two levels
+_LABEL = "loudness"
 
 _MIN_DURATION_SECONDS = 1.0
-
-
-def per_system_stats(rows: list[LoudnessRow]) -> dict[str, tuple[float, float, int]]:
-    """Per system, the mean loudness, population std, and clip count."""
-    by_system: dict[str, list[float]] = {}
-    for system, _item, lufs in rows:
-        by_system.setdefault(system, []).append(lufs)
-    return {
-        system: (statistics.fmean(values), statistics.pstdev(values), len(values))
-        for system, values in by_system.items()
-    }
-
-
-def system_mean_range(stats: dict[str, tuple[float, float, int]]) -> float | None:
-    """Range (max-min) of the per-system means, or None if < 2 systems."""
-    means = [mean for mean, _std, _count in stats.values()]
-    if len(means) < 2:
-        return None
-    return max(means) - min(means)
-
-
-def per_item_spreads(
-    rows: list[LoudnessRow],
-) -> dict[str, tuple[float, dict[str, float]]]:
-    """Per item in >= 2 systems: cross-system spread (max-min) + each value.
-
-    Items present in fewer than two systems have no cross-system spread and
-    are omitted.
-    """
-    by_item: dict[str, dict[str, float]] = {}
-    for system, item, lufs in rows:
-        by_item.setdefault(item, {})[system] = lufs
-    spreads: dict[str, tuple[float, dict[str, float]]] = {}
-    for item, by_system in by_item.items():
-        if len(by_system) < 2:
-            continue
-        values = by_system.values()
-        spreads[item] = (max(values) - min(values), by_system)
-    return spreads
 
 
 def measure_loudness(path: str | Path) -> float | None:
@@ -84,40 +54,6 @@ def _meter_for(rate: int) -> Any:
     return _meters[rate]
 
 
-def _measure_stimuli(
-    stimuli: list[StimulusConfig], desc: str
-) -> dict[str, float | None]:
-    """Measure each stimulus's integrated loudness (LUFS), keyed by id.
-
-    The progress bar goes to stderr (separate from the stdout report) and,
-    with disable=None, shows only on an interactive terminal - silent in
-    pipes/tests. Unmeasurable clips (silent / < 1s, see measure_loudness)
-    map to None.
-
-    Measured per FILE, reported per id: several systems may be backed by the
-    same directory, which gives distinct ids an identical path, and decoding
-    one clip several times would only produce the same number again.
-    """
-    from tqdm import tqdm
-
-    by_path: dict[str, float | None] = {}
-    for s in tqdm(stimuli, desc=desc, unit="clip", disable=None):
-        if s.path not in by_path:
-            by_path[s.path] = measure_loudness(s.path)
-    return {s.id: by_path[s.path] for s in stimuli}
-
-
-def _measured_rows(
-    stimuli: list[StimulusConfig], loudness_by_id: dict[str, float | None]
-) -> list[LoudnessRow]:
-    """Build the (system, item, LUFS) rows of the measurable stimuli, in order."""
-    return [
-        (s.system or "", s.item or s.id, lufs)
-        for s in stimuli
-        if (lufs := loudness_by_id[s.id]) is not None
-    ]
-
-
 def run_configured_loudness_check(config: Config) -> None:
     """Run the loudness check if `loudness_check` is configured (else no-op).
 
@@ -129,8 +65,10 @@ def run_configured_loudness_check(config: Config) -> None:
         return
 
     stimuli = config.stimuli_list.entries if config.stimuli_list else []
-    loudness_by_id = _measure_stimuli(stimuli, desc="Measuring loudness")
-    rows = _measured_rows(stimuli, loudness_by_id)
+    loudness_by_id = measure_per_stimulus(
+        stimuli, measure_loudness, "Measuring loudness"
+    )
+    rows = measured_rows(stimuli, loudness_by_id)
 
     excluded = len(stimuli) - len(rows)
     if excluded:
@@ -140,62 +78,31 @@ def run_configured_loudness_check(config: Config) -> None:
     if check.per_system is not None:
         failed |= _check_per_system(rows, check.per_system)
     if check.per_item is not None:
-        failed |= _check_per_item(rows, check.per_item)
+        failed |= check_per_item(
+            rows,
+            check.per_item.threshold,
+            check.per_item.verbose,
+            _UNIT,
+            _LABEL,
+            difference_unit=_DIFFERENCE_UNIT,
+        )
 
     if failed:
         raise SystemExit(1)
 
 
-def _check_per_system(rows: list[LoudnessRow], criterion: LoudnessCriterion) -> bool:
+def _check_per_system(rows: list[MeasuredRow], criterion: LoudnessCriterion) -> bool:
     stats = per_system_stats(rows)
     range_ = system_mean_range(stats)
     exceeded = range_ is not None and range_ > criterion.threshold
     if criterion.verbose or exceeded:
-        _print_per_system(stats)
+        print_per_system(stats, _UNIT, _LABEL)
     if exceeded:
         print(
             f"[loudness] per_system: mean range {range_:.2f} LU exceeds "
             f"threshold {criterion.threshold:.2f} LU."
         )
     return exceeded
-
-
-def _check_per_item(rows: list[LoudnessRow], criterion: LoudnessCriterion) -> bool:
-    spreads = per_item_spreads(rows)
-    offenders = {
-        item: by_system
-        for item, (spread, by_system) in spreads.items()
-        if spread > criterion.threshold
-    }
-    if criterion.verbose:
-        _print_per_item(spreads)
-    elif offenders:
-        _print_per_item({item: spreads[item] for item in offenders})
-    if offenders:
-        print(
-            f"[loudness] per_item: {len(offenders)} item(s) exceed "
-            f"threshold {criterion.threshold:.2f} LU: {sorted(offenders)}"
-        )
-    return bool(offenders)
-
-
-def _print_per_system(stats: dict[str, tuple[float, float, int]]) -> None:
-    # stats preserves the order systems first appear in the stimuli list, i.e.
-    # the order they are declared in the config - keep that, don't re-sort.
-    print("[loudness] per-system integrated loudness (LUFS):")
-    for system, (mean, std, count) in stats.items():
-        print(f"  {system}: mean {mean:.2f}  std {std:.2f}  (n={count})")
-
-
-def _print_per_item(
-    spreads: dict[str, tuple[float, dict[str, float]]],
-) -> None:
-    # Within each item, systems keep their config declaration order.
-    print("[loudness] per-item loudness across systems (LUFS):")
-    for item in sorted(spreads):
-        spread, by_system = spreads[item]
-        per_sys = "  ".join(f"{s}={lufs:.2f}" for s, lufs in by_system.items())
-        print(f"  {item}: spread {spread:.2f}  [{per_sys}]")
 
 
 # -- Loudness normalization ----------------------------------------------------
@@ -253,7 +160,7 @@ def _normalization_gains(
     # clip's system mean (one gain per system, preserving within-system
     # differences); for scope="stimulus" it is the clip's own loudness.
     if norm.scope == "system":
-        stats = per_system_stats(_measured_rows(stimuli, loudness_by_id))
+        stats = per_system_stats(measured_rows(stimuli, loudness_by_id))
         system_mean = {system: mean for system, (mean, _std, _n) in stats.items()}
         reference_of = {s.id: system_mean.get(s.system or "") for s in stimuli}
     else:
@@ -285,7 +192,9 @@ def run_configured_loudness_normalization(
     stimuli = config.stimuli_list.entries if config.stimuli_list else []
 
     # Phase 1: measure every clip's integrated loudness once.
-    loudness_by_id = _measure_stimuli(stimuli, desc="Normalizing loudness")
+    loudness_by_id = measure_per_stimulus(
+        stimuli, measure_loudness, "Normalizing loudness"
+    )
 
     # Phase 2: decide each clip's gain (per-clip, or one gain per system).
     gains, unmeasured = _normalization_gains(stimuli, loudness_by_id, norm)

@@ -477,6 +477,112 @@ def test_loudness_check_rejects_unknown_field(tmp_path, test_audio_file):
         load_config(write_config(tmp_path, data))
 
 
+def test_silence_check_defaults_to_none(tmp_path, test_audio_file):
+    result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
+    assert result.silence_check is None
+
+
+def test_silence_check_sides_are_independent(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.silence_check.leading.per_stimulus.threshold == 0.3
+    assert result.silence_check.leading.per_item is None
+    assert result.silence_check.trailing is None
+    assert result.silence_check.floor_db == -50.0
+
+
+def test_silence_check_parses_both_criteria_on_both_sides(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {
+        "floor_db": -50.0,
+        "leading": {
+            "per_stimulus": {"threshold": 0.2, "verbose": True},
+            "per_item": {"threshold": 0.1},
+        },
+        "trailing": {"per_stimulus": {"threshold": 1.0}},
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.silence_check.floor_db == -50.0
+    assert result.silence_check.leading.per_stimulus.verbose is True
+    assert result.silence_check.leading.per_item.threshold == 0.1
+    assert result.silence_check.trailing.per_stimulus.threshold == 1.0
+
+
+def test_silence_check_accepts_a_zero_threshold(tmp_path, test_audio_file):
+    # Unlike a loudness difference, "no leading silence at all" is a
+    # requirement someone may actually want to state.
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {"leading": {"per_stimulus": {"threshold": 0}}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.silence_check.leading.per_stimulus.threshold == 0
+
+
+def test_silence_check_window_and_hop_defaults(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.silence_check.window_ms == 25.0
+    assert result.silence_check.hop_ms == 10.0
+
+
+def test_silence_check_rejects_a_hop_longer_than_the_window(tmp_path, test_audio_file):
+    # Audio between readings would never be looked at.
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {
+        "window_ms": 20.0,
+        "hop_ms": 30.0,
+        "leading": {"per_stimulus": {}},
+    }
+    with pytest.raises(ValidationError, match="hop_ms"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_silence_check_allows_a_hop_equal_to_the_window(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {
+        "window_ms": 20.0,
+        "hop_ms": 20.0,
+        "leading": {"per_stimulus": {}},
+    }
+    assert load_config(write_config(tmp_path, data)).silence_check.hop_ms == 20.0
+
+
+def test_silence_check_rejects_a_non_negative_floor(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {"floor_db": 0.0, "leading": {"per_stimulus": {}}}
+    with pytest.raises(ValidationError):
+        load_config(write_config(tmp_path, data))
+
+
+def test_silence_check_rejects_unknown_field(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {"leading": {"bogus": 1}}
+    with pytest.raises(ValidationError, match="bogus"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_silence_check_can_be_combined_with_loudness_check(tmp_path, test_audio_file):
+    # Pure observation, so unlike loudness_check/loudness_normalization there
+    # is nothing for it to conflict with.
+    data = minimal_config(str(test_audio_file))
+    data["loudness_check"] = {"per_system": {}}
+    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.loudness_check is not None and result.silence_check is not None
+
+
+def test_silence_check_can_be_combined_with_loudness_normalization(
+    tmp_path, test_audio_file
+):
+    data = minimal_config(str(test_audio_file))
+    data["loudness_normalization"] = {"target": -23.0}
+    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.loudness_normalization is not None
+    assert result.silence_check is not None
+
+
 def test_loudness_normalization_defaults_to_none(tmp_path, test_audio_file):
     result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
     assert result.loudness_normalization is None

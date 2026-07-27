@@ -77,8 +77,27 @@ stimuli_dirs:
 #     threshold: .inf
 #     verbose: true
 #   per_item:
-#     threshold: 1.0
+#     threshold: 1.0 # LU
 #     verbose: false
+
+# -- Silence check (optional) -------------------------------------------------
+# When configured, each clip's leading and trailing silence is measured and
+# the run aborts if a threshold is exceeded. Silence is judged on short-term
+# RMS: `floor_db` is what counts as silence, `window_ms` is how much audio
+# each reading averages, and `hop_ms` is how often a reading is taken.
+# silence_check:
+#   floor_db: -50.0
+#   window_ms: 25.0
+#   hop_ms: 10.0
+#   leading:
+#     per_item:
+#       threshold: 0.05 # seconds
+#       verbose: true
+#     per_stimulus:
+#       threshold: 0.5
+#   trailing:
+#     per_stimulus:
+#       threshold: 0.5
 
 # -- Loudness normalization (optional) ----------------------------------------
 # When configured, every stimulus is loudness-normalized to `target` (LUFS)

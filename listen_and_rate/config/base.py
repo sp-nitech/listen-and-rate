@@ -208,6 +208,67 @@ class LoudnessCheckConfig(_StrictModel):
     per_item: LoudnessCriterion | None = None
 
 
+class SilenceCriterion(_StrictModel):
+    """One silence-check criterion (`per_stimulus` or `per_item`).
+
+    The check exceeds when the relevant leading/trailing silence (in seconds)
+    is greater than `threshold`. `verbose` prints the figures every run,
+    regardless of whether the threshold was exceeded. Unlike
+    LoudnessCriterion, 0 is allowed: "no leading silence at all" is a
+    meaningful requirement, while a loudness difference of exactly 0 is not.
+    """
+
+    threshold: float = Field(default=0.3, ge=0)  # seconds
+    verbose: bool = False
+
+
+class SilenceSideConfig(_StrictModel):
+    """The criteria applied to one end of the clips (`leading` or `trailing`).
+
+    Each criterion, when present, is enabled. `per_stimulus` caps one clip's
+    own silence, which is what bounds the time a listener sits through
+    nothing. `per_item` compares, within one item, the silence across systems
+    - the axis that matters for blinding, since a system that always starts
+    later identifies itself.
+    """
+
+    per_stimulus: SilenceCriterion | None = None
+    per_item: SilenceCriterion | None = None
+
+
+class SilenceCheckConfig(_StrictModel):
+    """Optional pre-test leading/trailing silence check.
+
+    Runs at serve/export after the loudness check. The three settings here
+    define the measurement rather than any one criterion. `floor_db` is what
+    counts as silence at all, absolute (dBFS) rather than relative to each
+    clip's peak so that the same boundary applies to every clip being
+    compared. `window_ms` is how much audio each reading averages, which is
+    what keeps a lone click or a noise floor's peaks from ending the silence,
+    and `hop_ms` is how often a reading is taken, which sets the resolution of
+    the answer. The two are separate so that a finer answer does not have to
+    come from a shorter, noisier window. See listen_and_rate/silence.py.
+    """
+
+    floor_db: float = Field(default=-50.0, lt=0)
+    window_ms: float = Field(default=25.0, gt=0)
+    hop_ms: float = Field(default=10.0, gt=0)
+    leading: SilenceSideConfig | None = None
+    trailing: SilenceSideConfig | None = None
+
+    @model_validator(mode="after")
+    def hop_must_fit_inside_the_window(self) -> SilenceCheckConfig:
+        """Reject a hop longer than the window, which would skip audio."""
+        if self.hop_ms > self.window_ms:
+            raise PydanticCustomError(
+                "silence_hop_gap",
+                "hop_ms ({hop}) must not exceed window_ms ({window}), "
+                "or the audio between readings is never looked at",
+                {"hop": self.hop_ms, "window": self.window_ms},
+            )
+        return self
+
+
 class LoudnessNormalizationConfig(_StrictModel):
     """Optional loudness normalization applied to stimuli before the test.
 
@@ -547,6 +608,7 @@ class BaseTestConfig(_StrictModel):
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
     practice: PracticeConfig | None = None
     loudness_check: LoudnessCheckConfig | None = None
+    silence_check: SilenceCheckConfig | None = None
     loudness_normalization: LoudnessNormalizationConfig | None = None
 
     # {stimulus_id: duration_seconds}, measured from the audio headers by

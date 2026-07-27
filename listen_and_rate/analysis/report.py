@@ -373,7 +373,10 @@ def generate_report_html(
             axis_step=10,
             axis_tickformat=None,  # integer 0-100 scale: "60", not "60.0"
             value_precision=1,  # 0-100 scale: "62.3±5.1", not "62.34±5.12"
-            boxplot_range=(0, 100),
+            # Padded past the scale's own ends: a whisker cap or a point
+            # drawn exactly at 0 or 100 would be half outside the plot area.
+            # The MOS/DMOS call above pads its 1-5 scale for the same reason.
+            boxplot_range=(-2, 102),
             boxplot_dtick=20,  # 0/20/.../100, matching the MUSHRA slider labels
         )
 

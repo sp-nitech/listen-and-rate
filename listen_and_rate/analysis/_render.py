@@ -295,7 +295,11 @@ def _render_ci_bar_chart(
             x=0.5,
             xref="paper",
             y=label,
-            yshift=22,
+            # Bottom-anchored for the same reason as _generate_mos_report's
+            # value labels: the gap above the bar then does not shrink as
+            # font_size grows.
+            yanchor="bottom",
+            yshift=6,
             text=txt,
             showarrow=False,
             xanchor="center",

@@ -121,7 +121,14 @@ def _generate_mos_report(
         mos_fig.add_annotation(
             x=_disp(sys_name),
             y=mean + err,
-            yshift=14,
+            # The anchor is the whisker's cap, so anchor the box's bottom edge
+            # to it and let yshift be the gap. Centred (the default), the gap
+            # would be yshift minus half the box, which shrinks as font_size
+            # grows until the box sits on the cap - and the backing box is
+            # translucent, so an overlap shows as a washed-out whisker rather
+            # than as a clean overlap.
+            yanchor="bottom",
+            yshift=6,
             text=f"{mean:.{value_precision}f}\u2009±\u2009{err:.{value_precision}f}",
             showarrow=False,
             font=dict(size=font_size),

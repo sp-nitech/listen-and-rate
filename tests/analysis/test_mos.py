@@ -222,10 +222,13 @@ def test_generate_mushra_report_returns_html(tmp_path):
     assert "<html>" in html
 
 
-def test_generate_mushra_report_boxplot_range_is_0_100(tmp_path):
+def test_generate_mushra_report_boxplot_range_clears_the_ends_of_the_scale(tmp_path):
+    # Padded past 0 and 100: a whisker cap or a point drawn exactly on the
+    # end of the scale would be half outside the plot area.
     html = generate_report_html([_write_csv(tmp_path / "s.csv", MUSHRA_CSV_ROWS)])
     _, layout = _plotly_call_args(html, occurrence=1)
-    assert layout["yaxis"]["range"] == [0, 100]
+    lo, hi = layout["yaxis"]["range"]
+    assert lo < 0 and hi > 100
     assert layout["yaxis"]["dtick"] == 20  # matches the slider's 20-step labels
     # 0-100 integer scale: the Rating axis reads "10" not "10.0" too.
     assert "tickformat" not in layout["yaxis"]

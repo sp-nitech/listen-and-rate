@@ -84,7 +84,25 @@ def _capture(browser, theme: str, output: str) -> None:
     # Both MOS and the paired-choice tests render into .stimulus-page.
     page.wait_for_selector(".stimulus-page", timeout=15000)
     page.wait_for_timeout(500)  # let the audio time bar settle
-    page.screenshot(path=str(ASSETS / output))
+    # Crop to the content. The viewport is a fixed 700px so that every shot
+    # lays out the same way, but each interface is shorter than that by a
+    # different amount and the leftover reads as dead space in the README.
+    # #app's own bottom padding is part of that leftover, so the crop is taken
+    # from where the content actually ends, plus the padding above the title
+    # so the shot is not lopsided.
+    box = page.evaluate(
+        "() => {"
+        " const app = document.getElementById('app');"
+        " const bottom = [...app.querySelectorAll('*')]"
+        "   .reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0);"
+        " return {bottom, pad: parseFloat(getComputedStyle(app).paddingTop)};"
+        "}"
+    )
+    height = min(round(box["bottom"] + box["pad"]), 700)
+    page.screenshot(
+        path=str(ASSETS / output),
+        clip={"x": 0, "y": 0, "width": 1000, "height": height},
+    )
     context.close()
 
 

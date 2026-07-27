@@ -22,6 +22,7 @@ from .routers import audio as audio_router
 from .routers import report as report_router
 from .routers.api import get_test_config, submit
 from .routers.audio import serve_abx_x_php_alias
+from .silence import run_configured_silence_check
 from .storage import make_result_saver
 
 
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     config_path = os.environ.get("LISTEN_AND_RATE_CONFIG", "./config.yaml")
     config = load_config_or_exit(config_path)
     run_configured_loudness_check(config)
+    run_configured_silence_check(config)
     app.state.config = config
     app.state.result_saver = make_result_saver(
         config.output.format,

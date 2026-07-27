@@ -24,6 +24,7 @@ from listen_and_rate.loudness import (
     run_configured_loudness_check,
     run_configured_loudness_normalization,
 )
+from listen_and_rate.silence import run_configured_silence_check
 
 logger = logging.getLogger(__name__)
 
@@ -500,6 +501,7 @@ def main() -> None:
 
     config = load_config_or_exit(args.config)
     run_configured_loudness_check(config)
+    run_configured_silence_check(config)
     if config.stimuli_list is None:
         raise RuntimeError("config.stimuli_list is None after loading")
 

@@ -110,6 +110,26 @@ def test_export_invalid_config_exits_without_pydantic_url(
     assert expected_substring in message
 
 
+def test_export_checks_loudness_before_silence(config_yaml, tmp_path, monkeypatch):
+    # Same gate and same order as the serve path, so an experiment cannot pass
+    # QA on one backend and fail it on the other.
+    from listen_and_rate.cli import export_php_deploy
+
+    called: list[str] = []
+    monkeypatch.setattr(
+        export_php_deploy,
+        "run_configured_loudness_check",
+        lambda c: called.append("loudness"),
+    )
+    monkeypatch.setattr(
+        export_php_deploy,
+        "run_configured_silence_check",
+        lambda c: called.append("silence"),
+    )
+    _run_export(config_yaml, tmp_path / "deploy", monkeypatch)
+    assert called == ["loudness", "silence"]
+
+
 def test_export_php_deploy_bakes_in_the_version_that_exported_the_bundle(
     config_yaml, tmp_path, monkeypatch
 ):

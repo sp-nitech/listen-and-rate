@@ -31,6 +31,14 @@ Screenshots of the interface are shown below.
 - **XAB**: Determine whether the first sample (X) is closer to sample A or B.
 - **MUSHRA**: Compare multiple stimuli and rate each on a 0-100 scale.
 
+## Supported Browsers
+
+- **Chrome** (Recommended)
+- **Edge**
+- **Firefox**
+
+Safari is currently not supported due to issues with audio playback.
+
 ## Requirements
 
 - Python 3.11+

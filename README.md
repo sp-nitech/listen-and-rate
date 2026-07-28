@@ -68,7 +68,7 @@ title: "Audio Quality Evaluation"
 instructions: |
   Please listen to each audio sample carefully and rate its overall quality
   on a scale from 1 (Bad) to 5 (Excellent).
-  You may replay each sample as many times as needed before rating.
+  You may replay each sample as many times as needed.
 
 output:
   format: csv

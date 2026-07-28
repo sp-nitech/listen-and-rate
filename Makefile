@@ -66,10 +66,10 @@ lint: tool
 	uv run --no-sync djlint --check frontend/*.html
 	uv run --no-sync mdformat --check *.md
 	(cd frontend && ../$(BIOME) check .)
+	(cd frontend && php ../$(PHP_CS_FIXER) check --config .php-cs-fixer.php --no-ansi)
 	$(PINACT) run --check .github/*/*.yaml
 	$(TAPLO) format --check pyproject.toml
 	$(YAMLFMT) --lint scripts/examples examples .yamlfmt.yaml .github/*/*.yaml
-	php $(PHP_CS_FIXER) check --config frontend/.php-cs-fixer.php --no-ansi
 
 .PHONY: format
 format: tool
@@ -78,10 +78,10 @@ format: tool
 	uv run --no-sync djlint --reformat frontend/*.html
 	uv run --no-sync mdformat *.md
 	(cd frontend && ../$(BIOME) format --write .)
+	(cd frontend && php ../$(PHP_CS_FIXER) fix --config .php-cs-fixer.php --no-ansi)
 	$(PINACT) run -u --min-age 14 .github/*/*.yaml
 	$(TAPLO) format pyproject.toml
 	$(YAMLFMT) scripts/examples examples .yamlfmt.yaml .github/*/*.yaml
-	php $(PHP_CS_FIXER) fix --config frontend/.php-cs-fixer.php --no-ansi
 
 .PHONY: test
 test: tool

@@ -6,7 +6,7 @@ instructions: |
   You will hear two reference samples, A and B, followed by a third sample X.
   X is identical to either A or B.
   Listen to all three completely, then decide which one X matches.
-  You may replay each sample as many times as needed before choosing.
+  You may replay each sample as many times as needed.
 stimuli: |
   # ABX tests compare exactly 2 systems, defined via directories (each dir
   # should contain the same filenames - explicit `stimuli:` lists are not

@@ -7,7 +7,7 @@ instructions: |
   Listen to both completely, then rate how much the Test sample is degraded
   relative to the Reference on a scale from 1 (Very annoying) to
   5 (Imperceptible).
-  You may replay each sample as many times as needed before rating.
+  You may replay each sample as many times as needed.
 stimuli: |
   # DMOS tests compare one reference system against one or more test systems,
   # defined via directories. Exactly one system must be flagged `reference: true`.

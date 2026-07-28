@@ -5,7 +5,7 @@ title: Audio Preference Comparison
 instructions: |
   You will hear two versions of the same sentence, one after the other.
   Listen to both completely, then pick the one you prefer.
-  You may replay each sample as many times as needed before choosing.
+  You may replay each sample as many times as needed.
 stimuli: |
   # AB tests compare exactly 2 systems, defined via directories (each dir
   # should contain the same filenames - explicit `stimuli:` lists are not

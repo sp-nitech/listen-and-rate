@@ -17,7 +17,7 @@ instructions: |
   identity sounds to the Reference, on a scale from 1 (Identical) to
   5 (Very different).
   Focus on the speaker's voice, not the audio quality.
-  You may replay each sample as many times as needed before rating.
+  You may replay each sample as many times as needed.
 stimuli: |
   # DMOS tests compare one reference system against one or more test systems,
   # defined via directories (each dir should contain the same filenames -

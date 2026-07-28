@@ -21,7 +21,7 @@ instructions: |
   identity sounds to the Reference, on a scale from 1 (Identical) to
   5 (Very different).
   Focus on the speaker's voice, not the audio quality.
-  You may replay each sample as many times as needed before rating.
+  You may replay each sample as many times as needed.
 
 output:
   format: csv # "csv" or "json" - each session is saved as a separate file

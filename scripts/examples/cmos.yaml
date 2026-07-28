@@ -6,7 +6,7 @@ instructions: |
   You will hear two versions of the same sentence, played as "A" and "B".
   Listen to both completely, then rate how B compares to A on a scale from
   -3 (much worse) to +3 (much better). 0 means about the same.
-  You may replay each sample as many times as needed before rating.
+  You may replay each sample as many times as needed.
   Which system plays as A or B is randomized for every trial.
 stimuli: |
   # CMOS tests compare exactly 2 systems, defined via directories (each dir

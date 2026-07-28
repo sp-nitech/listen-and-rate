@@ -12,7 +12,7 @@ instructions: |
   Listen to both completely, then rate how much the Test sample is degraded
   relative to the Reference on a scale from 1 (Very annoying) to
   5 (Imperceptible).
-  You may replay each sample as many times as needed before rating.
+  You may replay each sample as many times as needed.
 
 output:
   format: csv # "csv" or "json" - each session is saved as a separate file

@@ -39,7 +39,12 @@ def test_measure_silence_finds_the_padding_on_both_ends(tmp_path):
     window = 0.02
     path = write_padded_sine(tmp_path / "a.wav", lead=0.5, trail=0.25)
     leading, trailing = measure_silence(
-        path, floor_db=-60.0, window_ms=window * 1000, hop_ms=10.0
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=window * 1000,
+        hop_ms=10.0,
     )
     assert 0.5 - window <= leading <= 0.5
     assert 0.25 - window <= trailing <= 0.25
@@ -51,7 +56,12 @@ def test_measure_silence_is_negligible_when_the_clip_is_signal_end_to_end(tmp_pa
     # threshold, which is why the measurement needs no run-length rule.
     path = write_sine(tmp_path / "a.wav", seconds=1.0)
     leading, trailing = measure_silence(
-        path, floor_db=-60.0, window_ms=25.0, hop_ms=10.0
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=25.0,
+        hop_ms=10.0,
     )
     assert leading == pytest.approx(0.0, abs=0.001)
     assert trailing == pytest.approx(0.0, abs=0.001)
@@ -66,7 +76,12 @@ def test_measure_silence_reports_a_fully_silent_clip_as_silent_throughout(tmp_pa
 
     sf.write(str(tmp_path / "a.wav"), np.zeros(16000, dtype="float32"), 16000)
     leading, trailing = measure_silence(
-        tmp_path / "a.wav", floor_db=-60.0, window_ms=25.0, hop_ms=10.0
+        tmp_path / "a.wav",
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=25.0,
+        hop_ms=10.0,
     )
     assert leading == pytest.approx(1.0)
     assert trailing == pytest.approx(1.0)
@@ -86,9 +101,14 @@ def test_measure_silence_survives_a_single_stray_sample(tmp_path):
     # but spread across a 20 ms window it carries only -71 dBFS of energy.
     data[int(0.1 * rate)] = 0.005
     sf.write(str(path), data, rate)
-    assert measure_silence(path, floor_db=-60.0, window_ms=25.0, hop_ms=10.0)[
-        0
-    ] == pytest.approx(0.5, abs=0.03)
+    assert measure_silence(
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=25.0,
+        hop_ms=10.0,
+    )[0] == pytest.approx(0.5, abs=0.03)
 
 
 def test_measure_silence_ignores_a_noise_floor_below_the_threshold(tmp_path):
@@ -105,9 +125,14 @@ def test_measure_silence_ignores_a_noise_floor_below_the_threshold(tmp_path):
     rng = np.random.default_rng(0)
     data[:lead] += rng.normal(0, 10 ** (-70 / 20), lead)
     sf.write(str(path), data, rate)
-    assert measure_silence(path, floor_db=-60.0, window_ms=25.0, hop_ms=10.0)[
-        0
-    ] == pytest.approx(0.5, abs=0.03)
+    assert measure_silence(
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=25.0,
+        hop_ms=10.0,
+    )[0] == pytest.approx(0.5, abs=0.03)
 
 
 @pytest.mark.parametrize(
@@ -121,7 +146,12 @@ def test_measure_silence_examines_the_last_samples_whatever_the_grid(
     # silence - erring long, which is the direction a cap must not err in.
     path = write_padded_sine(tmp_path / "a.wav", lead=0.1, trail=0.0, tone=1.0)
     _, trailing = measure_silence(
-        path, floor_db=-60.0, window_ms=window_ms, hop_ms=hop_ms
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=window_ms,
+        hop_ms=hop_ms,
     )
     assert trailing == pytest.approx(0.0, abs=0.001)
 
@@ -133,7 +163,12 @@ def test_measure_silence_reports_on_the_grid_the_hop_sets(tmp_path):
     path = write_padded_sine(tmp_path / "a.wav", lead=0.5)
     for hop in (0.1, 0.005):
         leading = measure_silence(
-            path, floor_db=-60.0, window_ms=20.0, hop_ms=hop * 1000
+            path,
+            floor_db=-60.0,
+            hysteresis_db=0.0,
+            debounce_ms=0.0,
+            window_ms=20.0,
+            hop_ms=hop * 1000,
         )[0]
         assert leading == pytest.approx(round(leading / hop) * hop)  # on the grid
         assert 0.5 - 0.02 - hop < leading <= 0.5  # short by at most a window
@@ -141,18 +176,38 @@ def test_measure_silence_reports_on_the_grid_the_hop_sets(tmp_path):
 
 def test_measure_silence_hop_does_not_change_how_far_short_the_window_pulls(tmp_path):
     path = write_padded_sine(tmp_path / "a.wav", lead=0.5)
-    wide = measure_silence(path, floor_db=-60.0, window_ms=100.0, hop_ms=5.0)[0]
-    narrow = measure_silence(path, floor_db=-60.0, window_ms=20.0, hop_ms=5.0)[0]
+    wide = measure_silence(
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=100.0,
+        hop_ms=5.0,
+    )[0]
+    narrow = measure_silence(
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=20.0,
+        hop_ms=5.0,
+    )[0]
     assert 0.5 - 0.1 <= wide < narrow <= 0.5
 
 
-def test_measure_silence_never_overstates_the_silence(tmp_path):
-    # A window straddling the boundary is pulled above the floor by the
-    # signal in it, so the reported silence is short rather than long. Callers
-    # use the number as a cap, and erring short keeps that conservative.
+def test_measure_silence_stays_within_a_window_of_the_truth(tmp_path):
+    # With the guards off, the only error left is the window straddling the
+    # boundary, which pulls the answer short. Turning them on adds error in
+    # the other direction (see the hysteresis and debounce tests), so the
+    # measurement is bounded rather than one-directional.
     path = write_padded_sine(tmp_path / "a.wav", lead=0.5, trail=0.3)
     leading, trailing = measure_silence(
-        path, floor_db=-60.0, window_ms=50.0, hop_ms=10.0
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=50.0,
+        hop_ms=10.0,
     )
     assert leading <= 0.5 + 1e-9
     assert trailing <= 0.3 + 1e-9
@@ -168,12 +223,22 @@ def test_measure_silence_follows_the_floor(tmp_path):
     data = np.asarray(data)
     data[: int(0.5 * rate)] = 0.01  # -40 dBFS
     sf.write(str(path), data, rate)
-    assert measure_silence(path, floor_db=-60.0, window_ms=25.0, hop_ms=10.0)[
-        0
-    ] == pytest.approx(0.0)
-    assert measure_silence(path, floor_db=-30.0, window_ms=25.0, hop_ms=10.0)[
-        0
-    ] == pytest.approx(0.5, abs=0.03)
+    assert measure_silence(
+        path,
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=25.0,
+        hop_ms=10.0,
+    )[0] == pytest.approx(0.0)
+    assert measure_silence(
+        path,
+        floor_db=-30.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=25.0,
+        hop_ms=10.0,
+    )[0] == pytest.approx(0.5, abs=0.03)
 
 
 def test_measure_silence_handles_a_multichannel_clip(tmp_path):
@@ -187,7 +252,12 @@ def test_measure_silence_handles_a_multichannel_clip(tmp_path):
     mono = np.concatenate([silence, body])
     sf.write(str(tmp_path / "a.wav"), np.stack([mono, mono], axis=1), rate)
     assert measure_silence(
-        tmp_path / "a.wav", floor_db=-60.0, window_ms=25.0, hop_ms=10.0
+        tmp_path / "a.wav",
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=25.0,
+        hop_ms=10.0,
     )[0] == pytest.approx(0.5, abs=0.03)
 
 
@@ -199,11 +269,112 @@ def test_measure_silence_does_not_copy_the_windowed_signal(tmp_path):
 
     write_padded_sine(tmp_path / "a.wav", lead=0.2, tone=20.0)
     tracemalloc.start()
-    measure_silence(tmp_path / "a.wav", floor_db=-60.0, window_ms=25.0, hop_ms=10.0)
+    measure_silence(
+        tmp_path / "a.wav",
+        floor_db=-60.0,
+        hysteresis_db=0.0,
+        debounce_ms=0.0,
+        window_ms=25.0,
+        hop_ms=10.0,
+    )
     _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     samples = 20.2 * 16000 * 8  # the clip itself, as float64
     assert peak < samples * 4
+
+
+# -- hysteresis and debounce -------------------------------------------------
+
+
+def write_signal(path, segments, rate=16000):
+    """Write a clip from (seconds, amplitude) segments, 0 amplitude meaning silence."""
+    import numpy as np
+    import soundfile as sf
+
+    parts = []
+    for seconds, amplitude in segments:
+        n = int(seconds * rate)
+        if amplitude == 0:
+            parts.append(np.zeros(n))
+        else:
+            parts.append(amplitude * np.sin(2 * np.pi * 440.0 * np.arange(n) / rate))
+    sf.write(str(path), np.concatenate(parts).astype("float32"), rate)
+    return path
+
+
+DEFAULTS = dict(
+    floor_db=-50.0, hysteresis_db=5.0, debounce_ms=30.0, window_ms=25.0, hop_ms=10.0
+)
+
+
+def test_debounce_ignores_a_burst_shorter_than_it(tmp_path):
+    # 10 ms of tone inside the silence, then the real onset. Without debounce
+    # the blip would end the silence at 0.2 s.
+    path = write_signal(
+        tmp_path / "a.wav", [(0.2, 0), (0.01, 0.3), (0.29, 0), (0.5, 0.3)]
+    )
+    leading = measure_silence(path, **DEFAULTS)[0]
+    assert leading == pytest.approx(0.5, abs=0.03)
+
+
+def test_debounce_keeps_a_burst_longer_than_it(tmp_path):
+    path = write_signal(
+        tmp_path / "a.wav", [(0.2, 0), (0.05, 0.3), (0.25, 0), (0.5, 0.3)]
+    )
+    leading = measure_silence(path, **DEFAULTS)[0]
+    assert leading == pytest.approx(0.2, abs=0.03)
+
+
+def test_hysteresis_lets_a_quiet_onset_ramp_count_as_sound(tmp_path):
+    # The loud part qualifies, and the quiet ramp before it is above the lower
+    # threshold, so the sound starts at the ramp - not where it gets loud.
+    quiet = 10 ** ((-50 + 4) / 20)  # between the two thresholds
+    path = write_signal(tmp_path / "a.wav", [(0.3, 0), (0.1, quiet), (0.5, 0.3)])
+    leading = measure_silence(path, **DEFAULTS)[0]
+    assert leading == pytest.approx(0.3, abs=0.03)
+
+
+def test_hysteresis_keeps_a_decaying_tail_inside_the_sound(tmp_path):
+    quiet = 10 ** ((-50 + 4) / 20)
+    path = write_signal(tmp_path / "a.wav", [(0.5, 0.3), (0.1, quiet), (0.3, 0)])
+    trailing = measure_silence(path, **DEFAULTS)[1]
+    assert trailing == pytest.approx(0.3, abs=0.03)
+
+
+def test_a_level_between_the_thresholds_alone_is_not_sound(tmp_path):
+    # Nothing ever reaches the upper threshold, so there is no onset to hold.
+    quiet = 10 ** ((-50 + 4) / 20)
+    path = write_signal(tmp_path / "a.wav", [(0.2, 0), (0.5, quiet)])
+    leading, trailing = measure_silence(path, **DEFAULTS)
+    assert leading == pytest.approx(0.7, abs=0.03)
+    assert trailing == pytest.approx(0.7, abs=0.03)
+
+
+def test_a_clip_shorter_than_the_debounce_reads_as_silent(tmp_path):
+    # Nothing in it sustains the upper threshold for debounce_ms, so by the
+    # rule's own definition there is no sound. Such a clip is broken for a
+    # listening test anyway, and reading it as silent is what fails a cap.
+    path = write_signal(tmp_path / "a.wav", [(0.02, 0.3)])
+    assert measure_silence(path, **DEFAULTS) == pytest.approx((0.02, 0.02))
+
+
+def test_a_noise_floor_above_the_threshold_leaves_no_silence_to_find(tmp_path):
+    # An absolute floor assumes the recordings sit below it when nothing is
+    # sounding. Room tone above it holds the sound open, so every clip reads
+    # as 0 and the check passes vacuously - the floor has to be raised for
+    # material like this. Pinned because the failure is otherwise silent.
+    import numpy as np
+    import soundfile as sf
+
+    rate = 16000
+    tone = np.random.default_rng(0).normal(0, 10 ** (-45 / 20), int(0.5 * rate))
+    body = 0.3 * np.sin(2 * np.pi * 440.0 * np.arange(rate) / rate)
+    sf.write(str(tmp_path / "a.wav"), np.concatenate([tone, body]), rate)
+    assert measure_silence(tmp_path / "a.wav", **DEFAULTS) == (0.0, 0.0)
+    raised = dict(DEFAULTS, floor_db=-40.0)
+    assert measure_silence(tmp_path / "a.wav", **raised)[0] == pytest.approx(
+        0.5, abs=0.03
+    )
 
 
 # -- the configured runner ---------------------------------------------------
@@ -226,6 +397,62 @@ def _config(tmp_path, silence_check, lead_by_system):
     if silence_check is not None:
         data["silence_check"] = silence_check
     return load_config(write_config(tmp_path, data))
+
+
+def _dmos_config(tmp_path, silence_check, lead_by_system):
+    """A DMOS config whose first system is the (disclosed) reference."""
+    systems = []
+    for i, (system, lead) in enumerate(lead_by_system.items()):
+        directory = tmp_path / system
+        directory.mkdir()
+        write_padded_sine(directory / "i1.wav", lead=lead)
+        entry = {"path": str(directory)}
+        if i == 0:
+            entry["reference"] = True
+        else:
+            entry["system"] = system
+        systems.append(entry)
+    data = {
+        "test_type": "dmos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "stimuli_dirs": {"systems": systems},
+        "silence_check": silence_check,
+    }
+    return load_config(write_config(tmp_path, data))
+
+
+def test_silence_check_measures_the_reference_by_default(tmp_path):
+    config = _dmos_config(
+        tmp_path,
+        {"leading": {"per_item": {"threshold": 0.1}}},
+        {"Ref": 0.6, "Test": 0.05},
+    )
+    with pytest.raises(SystemExit):
+        run_configured_silence_check(config)
+
+
+def test_silence_check_can_leave_the_reference_out(tmp_path, capsys):
+    # The reference is disclosed in every test type that has one, so its
+    # silence cannot give away which clip it is - the risk per_item exists
+    # for. A natural recording also tends to carry silence nobody can edit.
+    config = _dmos_config(
+        tmp_path,
+        {"include_reference": False, "leading": {"per_item": {"threshold": 0.1}}},
+        {"Ref": 0.6, "Test": 0.05},
+    )
+    run_configured_silence_check(config)
+    assert capsys.readouterr().out == ""
+
+
+def test_leaving_the_reference_out_also_applies_to_the_per_clip_cap(tmp_path):
+    config = _dmos_config(
+        tmp_path,
+        {"include_reference": False, "leading": {"per_stimulus": {"threshold": 0.3}}},
+        {"Ref": 0.6, "Test": 0.05},
+    )
+    run_configured_silence_check(config)
 
 
 def test_silence_check_is_a_noop_when_unconfigured(tmp_path, capsys):

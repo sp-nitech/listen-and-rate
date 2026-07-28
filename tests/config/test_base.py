@@ -526,6 +526,17 @@ def test_silence_check_window_and_hop_defaults(tmp_path, test_audio_file):
     assert result.silence_check.hop_ms == 10.0
 
 
+def test_silence_check_measures_the_reference_unless_told_otherwise(
+    tmp_path, test_audio_file
+):
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.silence_check.include_reference is True
+    assert result.silence_check.hysteresis_db == 5.0
+    assert result.silence_check.debounce_ms == 30.0
+
+
 def test_silence_check_rejects_a_hop_longer_than_the_window(tmp_path, test_audio_file):
     # Audio between readings would never be looked at.
     data = minimal_config(str(test_audio_file))

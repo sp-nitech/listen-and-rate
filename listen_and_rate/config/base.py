@@ -239,20 +239,35 @@ class SilenceSideConfig(_StrictModel):
 class SilenceCheckConfig(_StrictModel):
     """Optional pre-test leading/trailing silence check.
 
-    Runs at serve/export after the loudness check. The three settings here
-    define the measurement rather than any one criterion. `floor_db` is what
-    counts as silence at all, absolute (dBFS) rather than relative to each
-    clip's peak so that the same boundary applies to every clip being
-    compared. `window_ms` is how much audio each reading averages, which is
-    what keeps a lone click or a noise floor's peaks from ending the silence,
-    and `hop_ms` is how often a reading is taken, which sets the resolution of
-    the answer. The two are separate so that a finer answer does not have to
-    come from a shorter, noisier window. See listen_and_rate/silence.py.
+    Runs at serve/export after the loudness check. The settings here define
+    the measurement rather than any one criterion.
+
+    `floor_db` is what counts as silence at all, absolute (dBFS) rather than
+    relative to each clip's peak so that the same boundary applies to every
+    clip being compared. `hysteresis_db` is how far above that a sound has
+    to reach to begin, having only to fall below `floor_db` to end, which
+    keeps a quiet onset ramp or a decaying tail inside the sound.
+    `debounce_ms` is how long it has to stay there to count, which is what a
+    lone click fails.
+
+    `window_ms` is how much audio each reading averages and `hop_ms` is how
+    often a reading is taken, so a finer answer does not have to come from a
+    shorter, noisier window.
+
+    `include_reference` decides whether the reference system is measured at
+    all. It is disclosed to the listener in every test type that has one, so
+    its silence cannot give away which clip it is - the risk `per_item` is
+    there for - and a natural recording tends to carry lead-in nobody can
+    edit. No effect on the test types without a reference. See
+    listen_and_rate/silence.py.
     """
 
     floor_db: float = Field(default=-50.0, lt=0)
+    hysteresis_db: float = Field(default=5.0, ge=0)
+    debounce_ms: float = Field(default=30.0, ge=0)
     window_ms: float = Field(default=25.0, gt=0)
     hop_ms: float = Field(default=10.0, gt=0)
+    include_reference: bool = True
     leading: SilenceSideConfig | None = None
     trailing: SilenceSideConfig | None = None
 

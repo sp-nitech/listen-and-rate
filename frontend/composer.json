@@ -1,0 +1,6 @@
+{
+  "description": "The PHP half of listen-and-rate, deployed as a static bundle by lar-export. There are no PHP dependencies - this file exists to state the version the exported bundle needs, so php-cs-fixer targets it and the requirement lives somewhere machine-readable rather than in the README alone.",
+  "require": {
+    "php": ">=8.1"
+  }
+}

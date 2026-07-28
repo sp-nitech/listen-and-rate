@@ -33,7 +33,7 @@ Screenshots of the interface are shown below.
 
 ## Supported Browsers
 
-- **Chrome** (Recommended)
+- **Chrome** (recommended)
 - **Edge**
 - **Firefox**
 
@@ -102,6 +102,7 @@ stimuli_dirs:
 ### 2.A. PHP deployment
 
 Choose this option if you already have PHP web hosting, such as a shared hosting service with FTP access but no shell access.
+Note that the bundle needs **PHP 8.1+** on that server.
 
 Start by running:
 

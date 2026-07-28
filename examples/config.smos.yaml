@@ -83,13 +83,16 @@ stimuli_dirs:
 
 # -- Silence check (optional) -------------------------------------------------
 # When configured, each clip's leading and trailing silence is measured and
-# the run aborts if a threshold is exceeded. Silence is judged on short-term
-# RMS: `floor_db` is what counts as silence, `window_ms` is how much audio
-# each reading averages, and `hop_ms` is how often a reading is taken.
+# the run aborts if a threshold is exceeded. Silence is detected on short-term
+# RMS. The thresholds are absolute, so recordings whose noise floor sits
+# above floor_db read as sound end to end and the check finds nothing.
 # silence_check:
-#   floor_db: -50.0
-#   window_ms: 25.0
-#   hop_ms: 10.0
+#   floor_db: -50.0 # below this a reading is silence.
+#   hysteresis_db: 5.0 # sound begins at floor_db + this, ends at floor_db.
+#   debounce_ms: 30.0 # the shortest sound that counts, so a click is ignored.
+#   window_ms: 25.0 # how much audio one reading averages.
+#   hop_ms: 10.0 # how often a reading is taken.
+#   include_reference: true # include the reference system in the check.
 #   leading:
 #     per_item:
 #       threshold: 0.05 # seconds
@@ -97,6 +100,9 @@ stimuli_dirs:
 #     per_stimulus:
 #       threshold: 0.5
 #   trailing:
+#     per_item:
+#       threshold: 0.1
+#       verbose: true
 #     per_stimulus:
 #       threshold: 0.5
 

@@ -167,6 +167,8 @@ def test_abx_submit_scores_exactly_one_of_two_opposite_guesses_correct(
             "test_type",
             "system_a",
             "system_b",
+                "presented_first",
+                "x_matched",
             "item",
             "correct",
         ]

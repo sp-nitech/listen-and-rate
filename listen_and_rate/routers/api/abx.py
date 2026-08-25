@@ -99,6 +99,8 @@ def _submit_abx(
             {
                 "system_a": system_a,
                 "system_b": system_b,
+                "presented_first": meta1["system"],
+                "x_matched": id_to_meta[ground_truth]["system"],
                 "item": meta1["item"],
                 "correct": choice.selected_stimulus_id == ground_truth,
                 **_metrics_row(choice, config),

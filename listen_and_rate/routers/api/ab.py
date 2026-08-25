@@ -63,6 +63,10 @@ def _submit_ab(body: SubmitRequest, config: ABConfig, saver: ResultSaver) -> dic
             {
                 "system_a": system_a,
                 "system_b": system_b,
+                # The system whose clip was presented first (as "A" on screen).
+                # `stimulus_ids` arrives in presentation order; without this
+                # column a position bias is invisible in the results.
+                "presented_first": meta1["system"],
                 "item": meta1["item"],
                 "winner": winner,
                 **_metrics_row(choice, config),

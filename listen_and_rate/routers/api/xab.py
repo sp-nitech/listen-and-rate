@@ -12,6 +12,7 @@ from ._shared import (
     _all_stimuli,
     _id_to_meta,
     _metrics_row,
+    _pair_row,
     _practice_extras,
     _require_answered_once,
     _require_non_empty,
@@ -104,19 +105,11 @@ def _submit_xab(body: SubmitRequest, config: XABConfig, saver: ResultSaver) -> d
                 detail="selected_stimulus_id must be one of stimulus_ids",
             )
 
-        system_a, system_b = sorted([meta1["system"], meta2["system"]])
+        pair = _pair_row(meta1, meta2)
         # Positional token (which side is closer to the reference), not the
-        # system name - matches AB's winner encoding; XAB has no tie.
+        # system name - matches AB's winner encoding. XAB has no tie.
         chosen = id_to_meta[choice.selected_stimulus_id]["system"]
-        closer = OUTCOME_A if chosen == system_a else OUTCOME_B
-        rows.append(
-            {
-                "system_a": system_a,
-                "system_b": system_b,
-                "item": meta1["item"],
-                "closer": closer,
-                **_metrics_row(choice, config),
-            }
-        )
+        closer = OUTCOME_A if chosen == pair["system_a"] else OUTCOME_B
+        rows.append({**pair, "closer": closer, **_metrics_row(choice, config)})
 
     return _save_and_ok(body, config, saver, rows)

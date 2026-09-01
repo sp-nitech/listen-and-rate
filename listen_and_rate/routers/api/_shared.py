@@ -311,6 +311,32 @@ def _validate_pair(
     return meta1, meta2
 
 
+def _pair_row(
+    meta1: dict[str, str], meta2: dict[str, str], system_x: str | None = None
+) -> dict[str, str]:
+    """Build the row fields every pair-based type shares, from the submitted pair.
+
+    The systems are sorted so that a trial aggregates with every other trial
+    of the same pair, whichever way round it happened to be shown. That
+    normalization is what makes `presented_first` necessary: without it the
+    stored row no longer says which side the listener actually heard first,
+    and a listener answering by position rather than by listening looks
+    exactly like one with no preference. `meta1` is the first submitted id,
+    and the client echoes them back in the order it displayed them.
+
+    `system_x` is ABX's alone - the system its hidden X duplicated - and is
+    passed here rather than added by the caller so that this function stays
+    the only place that decides the shared columns and their order.
+    """
+    system_a, system_b = sorted([meta1["system"], meta2["system"]])
+    row = {"system_a": system_a, "system_b": system_b}
+    if system_x is not None:
+        row["system_x"] = system_x
+    row["item"] = meta1["item"]
+    row["presented_first"] = meta1["system"]
+    return row
+
+
 def _build_response_trials(
     config: CMOSConfig | ABConfig | ABXConfig, all_stimuli: list[StimulusConfig]
 ) -> list[ABTrial]:

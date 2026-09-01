@@ -12,6 +12,7 @@ from ._shared import (
     _id_to_meta,
     _metrics_row,
     _pair_config_response,
+    _pair_row,
     _require_answered_once,
     _require_non_empty,
     _save_and_ok,
@@ -49,19 +50,12 @@ def _submit_cmos(body: SubmitRequest, config: CMOSConfig, saver: ResultSaver) ->
                 detail=f"CMOS rating must be -3 to 3, got {choice.rating}",
             )
 
-        system_a, system_b = sorted([meta1["system"], meta2["system"]])
-        # choice.rating means "stimulus_ids[1] relative to stimulus_ids[0]";
-        # flip its sign when stimulus_ids[0] isn't the canonical (system_a)
-        # side.
-        rating = choice.rating if meta1["system"] == system_a else -choice.rating
-        rows.append(
-            {
-                "system_a": system_a,
-                "system_b": system_b,
-                "item": meta1["item"],
-                "rating": rating,
-                **_metrics_row(choice, config),
-            }
-        )
+        pair = _pair_row(meta1, meta2)
+        # choice.rating means "stimulus_ids[1] relative to stimulus_ids[0]".
+        # Flip its sign when stimulus_ids[0] isn't the canonical (system_a)
+        # side; presented_first records which way round that was.
+        canonical = meta1["system"] == pair["system_a"]
+        rating = choice.rating if canonical else -choice.rating
+        rows.append({**pair, "rating": rating, **_metrics_row(choice, config)})
 
     return _save_and_ok(body, config, saver, rows)

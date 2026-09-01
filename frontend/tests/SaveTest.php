@@ -890,10 +890,10 @@ final class SaveTest extends TestCase
             '2026-01-01'
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'rating'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'presented_first', 'rating'],
             $fields
         );
-        $this->assertSame(['s1', '2026-01-01', 'cmos', 'Alice', 'A', 'B', 'u1', -1], $rows[0]);
+        $this->assertSame(['s1', '2026-01-01', 'cmos', 'Alice', 'A', 'B', 'u1', 'A', -1], $rows[0]);
     }
 
     // -- validate_ab_choice_pair / validate_ab_choices ---------------------
@@ -1047,10 +1047,10 @@ final class SaveTest extends TestCase
             '2026-01-01'
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'winner'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'presented_first', 'winner'],
             $fields
         );
-        $this->assertSame(['s1', '2026-01-01', 'ab', 'Alice', 'A', 'B', 'u1', 'b'], $rows[0]);
+        $this->assertSame(['s1', '2026-01-01', 'ab', 'Alice', 'A', 'B', 'u1', 'A', 'b'], $rows[0]);
     }
 
     // -- validate_abx_choice ------------------------------------------------
@@ -1182,10 +1182,10 @@ final class SaveTest extends TestCase
             self::ABX_SECRET
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'correct'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'system_x', 'item', 'presented_first', 'correct'],
             $fields
         );
-        $this->assertSame(['s1', '2026-01-01', 'abx', 'Alice', 'A', 'B', 'u1', 'true'], $rows[0]);
+        $this->assertSame(['s1', '2026-01-01', 'abx', 'Alice', 'A', 'B', 'B', 'u1', 'A', 'true'], $rows[0]);
     }
 
     // -- validate_xab_choice ------------------------------------------------
@@ -1286,10 +1286,10 @@ final class SaveTest extends TestCase
             'Reference'
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'closer'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'presented_first', 'closer'],
             $fields
         );
-        $this->assertSame(['s1', '2026-01-01', 'xab', 'Alice', 'A', 'B', 'u1', 'a'], $rows[0]);
+        $this->assertSame(['s1', '2026-01-01', 'xab', 'Alice', 'A', 'B', 'u1', 'A', 'a'], $rows[0]);
     }
 
     // -- write_json_file / write_csv_file ---------------------------------
@@ -1428,5 +1428,108 @@ final class SaveTest extends TestCase
     {
         $this->assertSame('results', experiment_id_for([]));
         $this->assertSame('results', experiment_id_for(['experiment_id' => '']));
+    }
+
+    // -- presentation order ------------------------------------------------
+    //
+    // The pair is stored sorted so trials aggregate, which drops which side
+    // the listener actually heard first. Mirrors the FastAPI backend's
+    // _pair_row(): both must write the same columns, or the same experiment
+    // yields different files depending on how it was deployed.
+
+    private function pairMap(): array
+    {
+        return [
+            'B__i1' => ['system' => 'Baseline', 'item' => 'i1'],
+            'P__i1' => ['system' => 'Proposed', 'item' => 'i1'],
+        ];
+    }
+
+    public function testAbCsvRecordsWhichSystemWasPresentedFirst(): void
+    {
+        $data = ['session_id' => 's1', 'test_type' => 'ab', 'choices' => [
+            ['stimulus_ids' => ['P__i1', 'B__i1'], 'selected_stimulus_id' => 'B__i1'],
+        ]];
+        [$fields, $rows] = build_ab_csv_rows($data, [], [], $this->pairMap(), 't');
+        $this->assertSame(
+            ['session_id', 'timestamp', 'test_type', 'system_a', 'system_b', 'item', 'presented_first', 'winner'],
+            $fields
+        );
+        // Proposed was submitted first, so it is what the listener heard first.
+        $this->assertSame('Proposed', $rows[0][array_search('presented_first', $fields, true)]);
+    }
+
+    public function testAbJsonRecordsWhichSystemWasPresentedFirst(): void
+    {
+        $data = ['session_id' => 's1', 'test_type' => 'ab', 'choices' => [
+            ['stimulus_ids' => ['P__i1', 'B__i1'], 'selected_stimulus_id' => 'B__i1'],
+        ]];
+        $result = build_ab_json_result($data, [], $this->pairMap(), 't');
+        $this->assertSame(
+            ['system_a', 'system_b', 'item', 'presented_first', 'winner'],
+            array_keys($result['records'][0])
+        );
+        $this->assertSame('Proposed', $result['records'][0]['presented_first']);
+    }
+
+    public function testCmosCsvRecordsWhichSystemWasPresentedFirst(): void
+    {
+        $data = ['session_id' => 's1', 'test_type' => 'cmos', 'choices' => [
+            ['stimulus_ids' => ['P__i1', 'B__i1'], 'rating' => 2],
+        ]];
+        [$fields, $rows] = build_cmos_csv_rows($data, [], [], $this->pairMap(), 't');
+        $this->assertSame(
+            ['session_id', 'timestamp', 'test_type', 'system_a', 'system_b', 'item', 'presented_first', 'rating'],
+            $fields
+        );
+        $this->assertSame('Proposed', $rows[0][array_search('presented_first', $fields, true)]);
+    }
+
+    public function testXabCsvRecordsWhichSystemWasPresentedFirst(): void
+    {
+        $map = $this->pairMap() + ['R__i1' => ['system' => 'Ref', 'item' => 'i1']];
+        $data = ['session_id' => 's1', 'test_type' => 'xab', 'choices' => [
+            ['stimulus_ids' => ['P__i1', 'B__i1'], 'selected_stimulus_id' => 'B__i1',
+             'reference_id' => 'R__i1'],
+        ]];
+        [$fields, $rows] = build_xab_csv_rows($data, [], [], $map, 't', 'Ref');
+        $this->assertSame(
+            ['session_id', 'timestamp', 'test_type', 'system_a', 'system_b', 'item', 'presented_first', 'closer'],
+            $fields
+        );
+        $this->assertSame('Proposed', $rows[0][array_search('presented_first', $fields, true)]);
+    }
+
+    public function testAbxCsvRecordsTheGroundTruthAndThePresentationOrder(): void
+    {
+        $secret = 'test-secret';
+        $token  = commit_x('P__i1', 'B__i1', 'B__i1', $secret);
+        $data   = ['session_id' => 's1', 'test_type' => 'abx', 'choices' => [
+            ['stimulus_ids' => ['P__i1', 'B__i1'], 'selected_stimulus_id' => 'B__i1',
+             'x_token' => $token],
+        ]];
+        [$fields, $rows] = build_abx_csv_rows($data, [], [], $this->pairMap(), 't', $secret);
+        $this->assertSame(
+            ['session_id', 'timestamp', 'test_type', 'system_a', 'system_b', 'system_x', 'item', 'presented_first', 'correct'],
+            $fields
+        );
+        $this->assertSame('Baseline', $rows[0][array_search('system_x', $fields, true)]);
+        $this->assertSame('Proposed', $rows[0][array_search('presented_first', $fields, true)]);
+    }
+
+    public function testAbxJsonRecordsTheGroundTruthAndThePresentationOrder(): void
+    {
+        $secret = 'test-secret';
+        $token  = commit_x('P__i1', 'B__i1', 'B__i1', $secret);
+        $data   = ['session_id' => 's1', 'test_type' => 'abx', 'choices' => [
+            ['stimulus_ids' => ['P__i1', 'B__i1'], 'selected_stimulus_id' => 'B__i1',
+             'x_token' => $token],
+        ]];
+        $result = build_abx_json_result($data, [], $this->pairMap(), 't', $secret);
+        $this->assertSame(
+            ['system_a', 'system_b', 'system_x', 'item', 'presented_first', 'correct'],
+            array_keys($result['records'][0])
+        );
+        $this->assertSame('Baseline', $result['records'][0]['system_x']);
     }
 }

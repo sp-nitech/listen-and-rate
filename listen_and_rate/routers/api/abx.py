@@ -14,6 +14,7 @@ from ._shared import (
     _build_response_trials,
     _id_to_meta,
     _metrics_row,
+    _pair_row,
     _practice_extras,
     _require_answered_once,
     _require_non_empty,
@@ -94,12 +95,13 @@ def _submit_abx(
         if ground_truth is None:
             raise HTTPException(status_code=400, detail="Invalid or expired x_token")
 
-        system_a, system_b = sorted([meta1["system"], meta2["system"]])
+        # system_x is which system X was a copy of. `correct` alone cannot say
+        # which side the listener picked, and that is where a position bias
+        # shows up.
+        pair = _pair_row(meta1, meta2, id_to_meta[ground_truth]["system"])
         rows.append(
             {
-                "system_a": system_a,
-                "system_b": system_b,
-                "item": meta1["item"],
+                **pair,
                 "correct": choice.selected_stimulus_id == ground_truth,
                 **_metrics_row(choice, config),
             }

@@ -632,3 +632,93 @@ def test_submit_ignores_an_experiment_id_from_the_client(client, tmp_path):
     written = list((tmp_path / "results").rglob("s-owned.*"))
     assert len(written) == 1
     assert written[0].parent.name != "somebody-elses-study"
+
+
+# -- presentation order ------------------------------------------------------
+#
+# Every pair-based type shuffles its two clips per trial and then stores the
+# systems sorted, so the outcome column says which system won, never which
+# side of the screen did. A listener answering by position rather than by
+# listening is invisible in that form: the shuffle averages them out to an
+# even split, which reads as "no preference" and quietly dilutes everyone
+# else's real one. presented_first is the assignment the shuffle made, kept
+# so the analysis can condition on it. The column's position is pinned by
+# each type's own test.
+
+_PAIR_CLIENTS = {
+    "ab": _ab_client,
+    "cmos": _cmos_client,
+    "xab": _xab_client,
+    "abx": _abx_client,
+}
+
+
+def _answer_every_trial(tc, test_type, pick=0):
+    """Answer every trial, returning the system presented first in each."""
+    trials = tc.get("/api/config").json()["trials"]
+    presented_first = []
+    choices = []
+    for trial in trials:
+        ids = [s["id"] for s in trial["stimuli"]]
+        presented_first.append(ids[0].split("__")[0])
+        choice: dict = {"stimulus_ids": ids}
+        if test_type == "cmos":
+            choice["rating"] = 2
+        else:
+            choice["selected_stimulus_id"] = ids[pick]
+        if test_type == "abx":
+            choice["x_token"] = trial["x"]["token"]
+        choices.append(choice)
+    res = tc.post(
+        "/api/submit",
+        json={"session_id": "s1", "test_type": test_type, "choices": choices},
+    )
+    assert res.status_code == 200, res.text
+    return presented_first
+
+
+def _stored_rows(tmp_path):
+    path = next((tmp_path / "results").rglob("s1.csv"))
+    with path.open(encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+@pytest.mark.parametrize("test_type", ["ab", "cmos", "xab", "abx"])
+def test_submit_records_which_system_was_presented_first(
+    tmp_path, test_audio_file, monkeypatch, test_type
+):
+    # The client echoes stimulus_ids back in the order it displayed them, so
+    # the first id names the system the listener heard first.
+    with _PAIR_CLIENTS[test_type](tmp_path, test_audio_file, monkeypatch) as tc:
+        expected = _answer_every_trial(tc, test_type)
+    assert [row["presented_first"] for row in _stored_rows(tmp_path)] == expected
+
+
+@pytest.mark.parametrize("test_type", ["ab", "cmos", "xab", "abx"])
+def test_submit_presented_first_names_one_of_the_pair(
+    tmp_path, test_audio_file, monkeypatch, test_type
+):
+    with _PAIR_CLIENTS[test_type](tmp_path, test_audio_file, monkeypatch) as tc:
+        _answer_every_trial(tc, test_type)
+    for row in _stored_rows(tmp_path):
+        assert row["presented_first"] in (row["system_a"], row["system_b"])
+
+
+def test_submit_makes_a_pure_position_bias_visible(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """The whole point: a listener who never listens must be findable.
+
+    Answering "the second clip" every time wins each system about half the
+    trials, so the outcome column looks like an ordinary near-tie. Read
+    against presented_first the same rows are unanimous.
+    """
+    with _ab_client(tmp_path, test_audio_file, monkeypatch, n_items=8) as tc:
+        _answer_every_trial(tc, "ab", pick=1)
+    rows = _stored_rows(tmp_path)
+    assert len(rows) == 8
+    chose_second = [
+        (row["winner"] == "a") != (row["presented_first"] == row["system_a"])
+        for row in rows
+    ]
+    assert all(chose_second)

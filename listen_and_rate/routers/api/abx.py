@@ -95,9 +95,9 @@ def _submit_abx(
         if ground_truth is None:
             raise HTTPException(status_code=400, detail="Invalid or expired x_token")
 
-        # system_x is which system X was a copy of. `correct` alone cannot say
-        # which side the listener picked, and that is where a position bias
-        # shows up.
+        # presented_as_x is which system X was a copy of. `correct` alone
+        # cannot say which side the listener picked, and that is where a
+        # position bias shows up.
         pair = _pair_row(meta1, meta2, id_to_meta[ground_truth]["system"])
         rows.append(
             {

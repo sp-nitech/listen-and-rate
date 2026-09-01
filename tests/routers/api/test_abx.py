@@ -167,9 +167,9 @@ def test_abx_submit_scores_exactly_one_of_two_opposite_guesses_correct(
             "test_type",
             "system_a",
             "system_b",
-            "system_x",
             "item",
             "presented_first",
+            "presented_as_x",
             "correct",
         ]
         assert {rows1[0]["system_a"], rows1[0]["system_b"]} == {"A", "B"}
@@ -333,9 +333,11 @@ def test_abx_config_includes_practice_trials_with_x_token(
         assert trial["x"]["token"]
 
 
-def test_abx_records_which_system_x_duplicated(tmp_path, test_audio_file, monkeypatch):
+def test_abx_records_which_system_was_presented_as_x(
+    tmp_path, test_audio_file, monkeypatch
+):
     # `correct` alone cannot say which side the listener picked, which is what
-    # a position bias shows up in: the pick is system_x when correct and the
+    # a position bias shows up in: the pick is presented_as_x when correct and
     # other one when not. Storing it costs nothing - the server resolved the
     # ground truth to score the answer - and the blinding is unaffected, since
     # X is drawn afresh on every request.
@@ -361,8 +363,8 @@ def test_abx_records_which_system_x_duplicated(tmp_path, test_audio_file, monkey
     with path.open(encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     for row in rows:
-        assert row["system_x"] in (row["system_a"], row["system_b"])
+        assert row["presented_as_x"] in (row["system_a"], row["system_b"])
         # The listener always picked the clip shown first, so they were right
         # exactly when X was that clip's system.
         picked_first = row["presented_first"]
-        assert (row["correct"] == "true") == (row["system_x"] == picked_first)
+        assert (row["correct"] == "true") == (row["presented_as_x"] == picked_first)

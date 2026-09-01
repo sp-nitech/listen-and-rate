@@ -74,6 +74,7 @@ dev = [
   "httpx2",
   "mdformat",
   "mdformat-gfm",
+  "nodejs-wheel-binaries",
   "playwright",
   "pyright[nodejs]",
   "pytest",

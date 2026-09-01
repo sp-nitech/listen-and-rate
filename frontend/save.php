@@ -601,6 +601,41 @@ function prepend_tool_version_columns(array $fields, array $rows, string $versio
 }
 
 /**
+ * The row fields every pair-based type shares, given the submitted pair.
+ *
+ * The systems are sorted so that a trial aggregates with every other trial of
+ * the same pair, whichever way round it happened to be shown. That
+ * normalization is what makes 'presented_first' necessary: without it the
+ * stored row no longer says which side the listener actually heard first, and
+ * a listener answering by position rather than by listening looks exactly like
+ * one with no preference. $meta1 is the first submitted id, and the client
+ * echoes them back in the order it displayed them.
+ *
+ * $systemX is ABX's alone - the system its hidden X duplicated - and is
+ * passed here rather than added by the caller, so that this function stays
+ * the only place deciding the shared columns and their order. Mirrors the
+ * FastAPI backend's _pair_row().
+ */
+function pair_row(array $meta1, array $meta2, ?string $systemX = null): array
+{
+    $sorted = [$meta1['system'], $meta2['system']];
+    sort($sorted, SORT_STRING);
+    $row = ['system_a' => $sorted[0], 'system_b' => $sorted[1]];
+    if ($systemX !== null) {
+        $row['system_x'] = $systemX;
+    }
+    $row['item']            = $meta1['item'];
+    $row['presented_first'] = $meta1['system'];
+    return $row;
+}
+
+/** The column names pair_row() contributes, in order. */
+function pair_row_fields(?string $systemX = null): array
+{
+    return array_keys(pair_row(['system' => '', 'item' => ''], ['system' => ''], $systemX));
+}
+
+/**
  * Lay the JSON result out in JSONResultSaver.save()'s key order.
  *
  * The version goes first for the reason above. The rest are ordered here
@@ -711,17 +746,14 @@ function build_cmos_json_result(array $data, array $meta, array $stimulusMap, st
     $enriched = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2] = validate_cmos_choice($stimulusMap, $c);
-        $pair = [$meta1['system'], $meta2['system']];
-        sort($pair, SORT_STRING);
-        // $c['rating'] means "stimulus_ids[1] relative to stimulus_ids[0]";
-        // flip its sign when stimulus_ids[0] isn't the canonical (system_a) side.
-        $rating     = $meta1['system'] === $pair[0] ? intval($c['rating']) : -intval($c['rating']);
-        $enriched[] = [
-            'system_a'  => $pair[0],
-            'system_b'  => $pair[1],
-            'item' => $meta1['item'],
-            'rating'    => $rating,
-        ];
+        $pair = pair_row($meta1, $meta2);
+        // $c['rating'] means "stimulus_ids[1] relative to stimulus_ids[0]".
+        // Flip its sign when stimulus_ids[0] isn't the canonical (system_a)
+        // side; presented_first records which way round that was.
+        $rating     = $meta1['system'] === $pair['system_a']
+            ? intval($c['rating'])
+            : -intval($c['rating']);
+        $enriched[] = $pair + ['rating' => $rating];
     }
     return [
         'session_id' => $data['session_id'],
@@ -738,21 +770,20 @@ function build_cmos_csv_rows(array $data, array $meta, array $metaKeys, array $s
     $fields = array_merge(
         ['session_id', 'timestamp', 'test_type'],
         $metaKeys,
-        ['system_a', 'system_b', 'item', 'rating']
+        array_merge(pair_row_fields(), ['rating'])
     );
     $rows = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2] = validate_cmos_choice($stimulusMap, $c);
-        $pair = [$meta1['system'], $meta2['system']];
-        sort($pair, SORT_STRING);
-        $rating = $meta1['system'] === $pair[0] ? intval($c['rating']) : -intval($c['rating']);
+        $pair   = pair_row($meta1, $meta2);
+        $rating = $meta1['system'] === $pair['system_a']
+            ? intval($c['rating'])
+            : -intval($c['rating']);
         $row    = [$data['session_id'], $ts, $data['test_type']];
         foreach ($metaKeys as $k) {
             $row[] = $meta[$k] ?? '';
         }
-        $row[]  = $pair[0];
-        $row[]  = $pair[1];
-        $row[]  = $meta1['item'];
+        $row    = array_merge($row, array_values($pair));
         $row[]  = $rating;
         $rows[] = $row;
     }
@@ -801,14 +832,14 @@ function build_ab_json_result(array $data, array $meta, array $stimulusMap, stri
     $enriched = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2] = validate_ab_choice_pair($stimulusMap, $c['stimulus_ids']);
-        $pair = [$meta1['system'], $meta2['system']];
-        sort($pair, SORT_STRING);
+        $pair = pair_row($meta1, $meta2);
         $selected   = $c['selected_stimulus_id'] ?? null;
-        $enriched[] = [
-            'system_a'  => $pair[0],
-            'system_b'  => $pair[1],
-            'item' => $meta1['item'],
-            'winner'    => ab_winner_token($selected, $stimulusMap, $pair),
+        $enriched[] = $pair + [
+            'winner' => ab_winner_token(
+                $selected,
+                $stimulusMap,
+                [$pair['system_a'], $pair['system_b']]
+            ),
         ];
     }
     return [
@@ -826,22 +857,19 @@ function build_ab_csv_rows(array $data, array $meta, array $metaKeys, array $sti
     $fields = array_merge(
         ['session_id', 'timestamp', 'test_type'],
         $metaKeys,
-        ['system_a', 'system_b', 'item', 'winner']
+        array_merge(pair_row_fields(), ['winner'])
     );
     $rows = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2] = validate_ab_choice_pair($stimulusMap, $c['stimulus_ids']);
-        $pair = [$meta1['system'], $meta2['system']];
-        sort($pair, SORT_STRING);
+        $pair     = pair_row($meta1, $meta2);
         $selected = $c['selected_stimulus_id'] ?? null;
         $row      = [$data['session_id'], $ts, $data['test_type']];
         foreach ($metaKeys as $k) {
             $row[] = $meta[$k] ?? '';
         }
-        $row[]  = $pair[0];
-        $row[]  = $pair[1];
-        $row[]  = $meta1['item'];
-        $row[]  = ab_winner_token($selected, $stimulusMap, $pair);
+        $row    = array_merge($row, array_values($pair));
+        $row[]  = ab_winner_token($selected, $stimulusMap, [$pair['system_a'], $pair['system_b']]);
         $rows[] = $row;
     }
     return [$fields, $rows];
@@ -881,13 +909,9 @@ function build_abx_json_result(array $data, array $meta, array $stimulusMap, str
     $enriched = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2, $groundTruth] = validate_abx_choice($stimulusMap, $c, $secret);
-        $pair = [$meta1['system'], $meta2['system']];
-        sort($pair, SORT_STRING);
-        $enriched[] = [
-            'system_a'  => $pair[0],
-            'system_b'  => $pair[1],
-            'item' => $meta1['item'],
-            'correct'   => $c['selected_stimulus_id'] === $groundTruth,
+        $pair       = pair_row($meta1, $meta2, $stimulusMap[$groundTruth]['system']);
+        $enriched[] = $pair + [
+            'correct' => $c['selected_stimulus_id'] === $groundTruth,
         ];
     }
     return [
@@ -905,20 +929,20 @@ function build_abx_csv_rows(array $data, array $meta, array $metaKeys, array $st
     $fields = array_merge(
         ['session_id', 'timestamp', 'test_type'],
         $metaKeys,
-        ['system_a', 'system_b', 'item', 'correct']
+        array_merge(pair_row_fields(''), ['correct'])
     );
     $rows = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2, $groundTruth] = validate_abx_choice($stimulusMap, $c, $secret);
-        $pair = [$meta1['system'], $meta2['system']];
-        sort($pair, SORT_STRING);
-        $row = [$data['session_id'], $ts, $data['test_type']];
+        // system_x is which system X was a copy of. `correct` alone cannot
+        // say which side the listener picked, and that is where a position
+        // bias shows up.
+        $pair = pair_row($meta1, $meta2, $stimulusMap[$groundTruth]['system']);
+        $row  = [$data['session_id'], $ts, $data['test_type']];
         foreach ($metaKeys as $k) {
             $row[] = $meta[$k] ?? '';
         }
-        $row[]  = $pair[0];
-        $row[]  = $pair[1];
-        $row[]  = $meta1['item'];
+        $row    = array_merge($row, array_values($pair));
         // Matches Python's str(True)/str(False), since storage.py's CSV
         // writer does the same for the equivalent MOS/AB row shape's values.
         // JSON-style lowercase tokens, matching the JSON output's native
@@ -974,13 +998,13 @@ function build_xab_json_result(array $data, array $meta, array $stimulusMap, str
     $enriched = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2] = validate_xab_choice($stimulusMap, $c, $referenceSystem);
-        $pair = [$meta1['system'], $meta2['system']];
-        sort($pair, SORT_STRING);
-        $enriched[] = [
-            'system_a'  => $pair[0],
-            'system_b'  => $pair[1],
-            'item' => $meta1['item'],
-            'closer'    => xab_closer_token($c['selected_stimulus_id'], $stimulusMap, $pair),
+        $pair = pair_row($meta1, $meta2);
+        $enriched[] = $pair + [
+            'closer' => xab_closer_token(
+                $c['selected_stimulus_id'],
+                $stimulusMap,
+                [$pair['system_a'], $pair['system_b']]
+            ),
         ];
     }
     return [
@@ -998,21 +1022,22 @@ function build_xab_csv_rows(array $data, array $meta, array $metaKeys, array $st
     $fields = array_merge(
         ['session_id', 'timestamp', 'test_type'],
         $metaKeys,
-        ['system_a', 'system_b', 'item', 'closer']
+        array_merge(pair_row_fields(), ['closer'])
     );
     $rows = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2] = validate_xab_choice($stimulusMap, $c, $referenceSystem);
-        $pair = [$meta1['system'], $meta2['system']];
-        sort($pair, SORT_STRING);
+        $pair = pair_row($meta1, $meta2);
         $row = [$data['session_id'], $ts, $data['test_type']];
         foreach ($metaKeys as $k) {
             $row[] = $meta[$k] ?? '';
         }
-        $row[]  = $pair[0];
-        $row[]  = $pair[1];
-        $row[]  = $meta1['item'];
-        $row[]  = xab_closer_token($c['selected_stimulus_id'], $stimulusMap, $pair);
+        $row    = array_merge($row, array_values($pair));
+        $row[]  = xab_closer_token(
+            $c['selected_stimulus_id'],
+            $stimulusMap,
+            [$pair['system_a'], $pair['system_b']]
+        );
         $rows[] = $row;
     }
     return [$fields, $rows];

@@ -99,6 +99,7 @@ def test_ab_submit_happy_path_preference(tmp_path, test_audio_file, monkeypatch)
             "system_a",
             "system_b",
             "item",
+            "presented_first",
             "winner",
         ]
 

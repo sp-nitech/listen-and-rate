@@ -101,6 +101,7 @@ def test_xab_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
             "system_a",
             "system_b",
             "item",
+            "presented_first",
             "closer",
         ]
 

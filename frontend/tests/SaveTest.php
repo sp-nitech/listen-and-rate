@@ -1182,10 +1182,10 @@ final class SaveTest extends TestCase
             self::ABX_SECRET
         );
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'system_x', 'item', 'presented_first', 'correct'],
+            ['session_id', 'timestamp', 'test_type', 'listener', 'system_a', 'system_b', 'item', 'presented_first', 'presented_as_x', 'correct'],
             $fields
         );
-        $this->assertSame(['s1', '2026-01-01', 'abx', 'Alice', 'A', 'B', 'B', 'u1', 'A', 'true'], $rows[0]);
+        $this->assertSame(['s1', '2026-01-01', 'abx', 'Alice', 'A', 'B', 'u1', 'A', 'B', 'true'], $rows[0]);
     }
 
     // -- validate_xab_choice ------------------------------------------------
@@ -1510,10 +1510,10 @@ final class SaveTest extends TestCase
         ]];
         [$fields, $rows] = build_abx_csv_rows($data, [], [], $this->pairMap(), 't', $secret);
         $this->assertSame(
-            ['session_id', 'timestamp', 'test_type', 'system_a', 'system_b', 'system_x', 'item', 'presented_first', 'correct'],
+            ['session_id', 'timestamp', 'test_type', 'system_a', 'system_b', 'item', 'presented_first', 'presented_as_x', 'correct'],
             $fields
         );
-        $this->assertSame('Baseline', $rows[0][array_search('system_x', $fields, true)]);
+        $this->assertSame('Baseline', $rows[0][array_search('presented_as_x', $fields, true)]);
         $this->assertSame('Proposed', $rows[0][array_search('presented_first', $fields, true)]);
     }
 
@@ -1527,9 +1527,9 @@ final class SaveTest extends TestCase
         ]];
         $result = build_abx_json_result($data, [], $this->pairMap(), 't', $secret);
         $this->assertSame(
-            ['system_a', 'system_b', 'system_x', 'item', 'presented_first', 'correct'],
+            ['system_a', 'system_b', 'item', 'presented_first', 'presented_as_x', 'correct'],
             array_keys($result['records'][0])
         );
-        $this->assertSame('Baseline', $result['records'][0]['system_x']);
+        $this->assertSame('Baseline', $result['records'][0]['presented_as_x']);
     }
 }

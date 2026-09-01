@@ -611,28 +611,36 @@ function prepend_tool_version_columns(array $fields, array $rows, string $versio
  * one with no preference. $meta1 is the first submitted id, and the client
  * echoes them back in the order it displayed them.
  *
- * $systemX is ABX's alone - the system its hidden X duplicated - and is
+ * $presentedAsX is ABX's alone - the system its hidden X duplicated - and is
  * passed here rather than added by the caller, so that this function stays
- * the only place deciding the shared columns and their order. Mirrors the
- * FastAPI backend's _pair_row().
+ * the only place deciding the shared columns and their order. It sits with
+ * 'presented_first' rather than among the system_ columns because those two
+ * say what the listener was shown, while system_a/system_b are the pair in
+ * sorted order and mean nothing about the screen. Mirrors the FastAPI
+ * backend's _pair_row().
  */
-function pair_row(array $meta1, array $meta2, ?string $systemX = null): array
+function pair_row(array $meta1, array $meta2, ?string $presentedAsX = null): array
 {
     $sorted = [$meta1['system'], $meta2['system']];
     sort($sorted, SORT_STRING);
-    $row = ['system_a' => $sorted[0], 'system_b' => $sorted[1]];
-    if ($systemX !== null) {
-        $row['system_x'] = $systemX;
+    $row = [
+        'system_a'        => $sorted[0],
+        'system_b'        => $sorted[1],
+        'item'            => $meta1['item'],
+        'presented_first' => $meta1['system'],
+    ];
+    if ($presentedAsX !== null) {
+        $row['presented_as_x'] = $presentedAsX;
     }
-    $row['item']            = $meta1['item'];
-    $row['presented_first'] = $meta1['system'];
     return $row;
 }
 
 /** The column names pair_row() contributes, in order. */
-function pair_row_fields(?string $systemX = null): array
+function pair_row_fields(?string $presentedAsX = null): array
 {
-    return array_keys(pair_row(['system' => '', 'item' => ''], ['system' => ''], $systemX));
+    return array_keys(
+        pair_row(['system' => '', 'item' => ''], ['system' => ''], $presentedAsX)
+    );
 }
 
 /**
@@ -934,9 +942,9 @@ function build_abx_csv_rows(array $data, array $meta, array $metaKeys, array $st
     $rows = [];
     foreach ($data['choices'] as $c) {
         [$meta1, $meta2, $groundTruth] = validate_abx_choice($stimulusMap, $c, $secret);
-        // system_x is which system X was a copy of. `correct` alone cannot
-        // say which side the listener picked, and that is where a position
-        // bias shows up.
+        // presented_as_x is which system X was a copy of. `correct` alone
+        // cannot say which side the listener picked, and that is where a
+        // position bias shows up.
         $pair = pair_row($meta1, $meta2, $stimulusMap[$groundTruth]['system']);
         $row  = [$data['session_id'], $ts, $data['test_type']];
         foreach ($metaKeys as $k) {

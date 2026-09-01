@@ -87,6 +87,7 @@ format: tool
 test: tool
 	uv run --no-sync pytest -s -x
 	php $(PHPUNIT) --configuration frontend/phpunit.xml
+	(cd frontend && uv run --no-sync python -m nodejs_wheel --test "tests/js/*.test.js")
 
 .PHONY: tool
 tool:

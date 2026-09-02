@@ -35,6 +35,12 @@ function fakeLocalStorage(entries) {
 
 const fresh = (savedAt, fingerprint = 'v1') => JSON.stringify({ savedAt, fingerprint });
 
+// A record's window lives at config.resume.max_age_ms - the same delivered
+// config already frozen into the record - so a record without a `config` at
+// all (e.g. one saved before this existed) carries no window of its own.
+const withWindow = (savedAt, maxAgeMs, fingerprint = 'v1') =>
+  JSON.stringify({ savedAt, fingerprint, config: { resume: { max_age_ms: maxAgeMs } } });
+
 // -- isResumable -------------------------------------------------------------
 
 test('a record is resumable only while it is fresh', () => {
@@ -81,20 +87,20 @@ test('an absent experiment id still yields a usable key', () => {
 
 test('pruning drops expired records and keeps the rest', () => {
   const store = fakeLocalStorage([
-    [recordKey('expired'), fresh(0)],
-    [recordKey('current'), fresh(900)],
+    [recordKey('expired'), withWindow(0, 500)],
+    [recordKey('current'), withWindow(900, 500)],
   ]);
-  pruneExpiredRecords(1000, 500);
+  pruneExpiredRecords(1000);
   assert.deepEqual([...store.keys()], [recordKey('current')]);
 });
 
 test('pruning leaves keys that are not resume records alone', () => {
   // The store is shared with whatever else the origin has saved.
   const store = fakeLocalStorage([
-    [recordKey('expired'), fresh(0)],
+    [recordKey('expired'), withWindow(0, 500)],
     ['theme', 'dark'],
   ]);
-  pruneExpiredRecords(1000, 500);
+  pruneExpiredRecords(1000);
   assert.deepEqual([...store.keys()], ['theme']);
 });
 
@@ -104,17 +110,17 @@ test('pruning drops records it cannot read an age from', () => {
   const store = fakeLocalStorage([
     [recordKey('corrupt'), '{not json'],
     [recordKey('no-timestamp'), JSON.stringify({ fingerprint: 'v1' })],
-    [recordKey('current'), fresh(900)],
+    [recordKey('current'), withWindow(900, 500)],
   ]);
-  pruneExpiredRecords(1000, 500);
+  pruneExpiredRecords(1000);
   assert.deepEqual([...store.keys()], [recordKey('current')]);
 });
 
 test('pruning ignores a config change on its own', () => {
   // A fingerprint mismatch can be temporary - the config is edited back - so
   // only the age is grounds for removal.
-  const store = fakeLocalStorage([[recordKey('other-config'), fresh(900, 'v2')]]);
-  pruneExpiredRecords(1000, 500);
+  const store = fakeLocalStorage([[recordKey('other-config'), withWindow(900, 500, 'v2')]]);
+  pruneExpiredRecords(1000);
   assert.deepEqual([...store.keys()], [recordKey('other-config')]);
 });
 
@@ -123,17 +129,36 @@ test("pruning judges a record by its own window, not the pruning experiment's", 
   // experiment's prune sweep, and vice versa - each origin serves several
   // experiments that may configure resume differently.
   const store = fakeLocalStorage([
-    [recordKey('long-window'), JSON.stringify({ savedAt: 900, fingerprint: 'v1', maxAgeMs: 2000 })],
-    [recordKey('short-window'), JSON.stringify({ savedAt: 900, fingerprint: 'v1', maxAgeMs: 50 })],
+    [recordKey('long-window'), withWindow(900, 2000)],
+    [recordKey('short-window'), withWindow(900, 50)],
   ]);
-  // fallbackMaxAgeMs (500) would keep both if it were applied uniformly.
-  pruneExpiredRecords(1000, 500);
+  pruneExpiredRecords(1000);
   assert.deepEqual([...store.keys()], [recordKey('long-window')]);
 });
 
-test('pruning falls back to the given window for a record with no window of its own', () => {
-  // A record saved before the window became configurable carries no maxAgeMs.
-  const store = fakeLocalStorage([[recordKey('legacy'), fresh(900)]]);
-  pruneExpiredRecords(1000, 50);
+test('a record with no window of its own is dropped immediately, regardless of age', () => {
+  // A record saved before config carried a window (pre-migration) can never
+  // become resumable again - isResumable() needs the fresh config's window
+  // too - so there is nothing to gain by guessing at what its window might
+  // have been, and every reason to reclaim its storage now.
+  const store = fakeLocalStorage([[recordKey('legacy'), fresh(999)]]);
+  pruneExpiredRecords(1000);
   assert.deepEqual([...store.keys()], []);
+});
+
+test('pruning returns the surviving records it already parsed, keyed by storage key', () => {
+  // The scan already parses every record's JSON to judge its age; handing
+  // the results back lets a caller read its own record without parsing the
+  // same JSON blob a second time (see app.js).
+  fakeLocalStorage([
+    [recordKey('current'), withWindow(900, 500)],
+    [recordKey('expired'), withWindow(0, 500)],
+  ]);
+  const records = pruneExpiredRecords(1000);
+  assert.deepEqual(records.get(recordKey('current')), {
+    savedAt: 900,
+    fingerprint: 'v1',
+    config: { resume: { max_age_ms: 500 } },
+  });
+  assert.equal(records.has(recordKey('expired')), false);
 });

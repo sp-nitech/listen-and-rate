@@ -5,8 +5,10 @@ from __future__ import annotations
 from ..storage import OUTCOME_A, OUTCOME_B, OUTCOME_TIE
 from ._render import (
     _binomial_pair_stats,
+    _figure_text,
     _namers,
     _ordered_pairs,
+    _pair_label,
     _pvalue_header,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
@@ -66,7 +68,7 @@ def _generate_ab_report(
         rate_a, ci_lo, ci_hi, p_value = _binomial_pair_stats(n_a, n_a + n_b, confidence)
 
         da, db = figure_name(system_a), figure_name(system_b)
-        pair_labels.append(f"{da} vs {db}")
+        pair_labels.append(_pair_label(da, db))
         pref_rate_a.append(rate_a)
         pref_errors_upper.append(ci_hi - rate_a)
         pref_errors_lower.append(rate_a - ci_lo)
@@ -82,14 +84,16 @@ def _generate_ab_report(
             # configurable (report-config tie_label); its centered position is
             # not, since it encodes "neither of the flanking systems".
             n_tie = int((sub[outcome_column] == OUTCOME_TIE).sum())
-            count_labels.extend([da, figure_name(tie_label), db])
+            # tie_label is not a system name, so it bypasses figure_name's
+            # system_labels rename lookup - only the escaping/bolding applies.
+            count_labels.extend([da, _figure_text(tie_label, bold_system_names), db])
             count_values.extend([n_a, n_tie, n_b])
         else:
             count_labels.extend([da, db])
             count_values.extend([n_a, n_b])
         table_rows.append(
             [
-                f"{table_name(system_a)} vs {table_name(system_b)}",
+                _pair_label(table_name(system_a), table_name(system_b)),
                 f"{p_value:.4f}",
                 "*" if p_value < alpha else "",
             ]

@@ -153,8 +153,10 @@ function base_config_response(array $data, array $extras): array
         'metrics' => $data['metrics'],
         // How long an interrupted session may be resumed for, in the
         // milliseconds the browser compares against Date.now(); the export
-        // converted the config's hours (0 means resume is off).
-        'resume' => $data['resume'],
+        // converted the config's hours (0 means resume is off). Falls back to
+        // off (not a guessed window) for a bundle exported before this
+        // existed - e.g. this file upgraded without re-running lar-export.
+        'resume' => $data['resume'] ?? ['max_age_ms' => 0],
         'config_version' => config_version($data),
         'test_type' => $data['test_type'],
         'title' => $data['title'],

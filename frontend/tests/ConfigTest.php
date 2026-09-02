@@ -181,6 +181,23 @@ final class ConfigTest extends TestCase
         $this->assertSame(['max_age_ms' => 1800000], $response['resume']);
     }
 
+    public function testBuildConfigResponseDefaultsResumeOffForABundleFromBeforeTheFeature(): void
+    {
+        // config_data.php is baked at export time; a bundle exported before
+        // resume existed carries no 'resume' key at all, e.g. when the PHP
+        // deployment's code is upgraded without re-running lar-export
+        // (avoided mid-experiment, since re-exporting changes config_version).
+        // Defaulting to off (rather than guessing a window) matches the
+        // pre-upgrade behavior instead of silently turning resume on.
+        $data = $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+        ]);
+        unset($data['resume']);
+        $response = build_config_response($data);
+        $this->assertSame(['max_age_ms' => 0], $response['resume']);
+    }
+
     public function testBuildConfigResponsePassesThroughFormPageTitles(): void
     {
         $data = $this->baseFakeConfigData('mos', [

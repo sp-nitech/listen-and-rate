@@ -7,6 +7,7 @@ from ._render import (
     _fig_to_html,
     _namers,
     _ordered_pairs,
+    _pair_label,
     _pvalue_header,
     _render_ci_bar_chart,
     _render_trailing_tables_html,
@@ -112,7 +113,7 @@ def _generate_cmos_report(
             err = 0.0
             p_value = float("nan")
 
-        pair = f"{figure_name(system_a)} vs {figure_name(system_b)}"
+        pair = _pair_label(figure_name(system_a), figure_name(system_b))
         pair_labels.append(pair)
         means.append(mean)
         mean_errors.append(err)
@@ -120,7 +121,7 @@ def _generate_cmos_report(
         counts_per_pair.append([int((ratings == v).sum()) for v in _CMOS_CATEGORIES])
         table_rows.append(
             [
-                f"{table_name(system_a)} vs {table_name(system_b)}",
+                _pair_label(table_name(system_a), table_name(system_b)),
                 "N/A" if math.isnan(p_value) else f"{p_value:.4f}",
                 "" if math.isnan(p_value) else ("*" if p_value < alpha else ""),
             ]

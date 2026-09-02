@@ -6,6 +6,7 @@ from ._render import (
     _binomial_pair_stats,
     _namers,
     _ordered_pairs,
+    _pair_label,
     _pvalue_header,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
@@ -54,7 +55,7 @@ def _generate_abx_report(
             n_correct, n_total, confidence
         )
 
-        pair_labels.append(f"{figure_name(system_a)} vs {figure_name(system_b)}")
+        pair_labels.append(_pair_label(figure_name(system_a), figure_name(system_b)))
         accuracy.append(rate)
         accuracy_errors_upper.append(ci_hi - rate)
         accuracy_errors_lower.append(rate - ci_lo)
@@ -71,7 +72,7 @@ def _generate_abx_report(
         count_values.extend([n_correct, n_incorrect])
         table_rows.append(
             [
-                f"{table_name(system_a)} vs {table_name(system_b)}",
+                _pair_label(table_name(system_a), table_name(system_b)),
                 f"{p_value:.4f}",
                 "*" if p_value < alpha else "",
             ]

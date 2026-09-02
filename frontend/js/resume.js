@@ -59,40 +59,55 @@ export function clearRecord(key) {
  * accumulating dead weight. saveRecord() swallows the resulting quota error,
  * which would silently disable resume for the session actually running.
  *
- * Each record is judged against the window it was saved with, not against the
- * window of the experiment doing the pruning: this runs over every experiment
- * served from the origin, and one with a short window must not delete a
- * still-resumable session belonging to an experiment with a long one.
- * `fallbackMaxAgeMs` (the pruning experiment's own window) covers a record
- * saved before the window became configurable. A window that was since
- * shortened therefore prunes on its old schedule, which costs only storage -
- * isResumable() judges against the fresh config, so the record is not offered
- * in the meantime.
+ * Each record is judged against its own window - read off its own frozen
+ * config.resume.max_age_ms, never against the window of the experiment doing
+ * the pruning: this runs over every experiment served from the origin, and
+ * one with a short window must not delete a still-resumable session
+ * belonging to an experiment with a long one. A record with no window of its
+ * own (saved before config carried one at all) is dropped outright: it can
+ * never become resumable again either way - isResumable() also needs the
+ * fresh config's window - so there is nothing to gain by guessing at what its
+ * window might have been.
  *
- * Only the age is used: a fingerprint mismatch can be temporary (the config is
- * edited back), so an unexpired record is left alone whether or not it matches
- * the config being served right now.
+ * Only the age is used beyond that: a fingerprint mismatch can be temporary
+ * (the config is edited back), so an unexpired record is left alone whether
+ * or not it matches the config being served right now.
+ *
+ * Returns every surviving record, keyed by its storage key: the scan already
+ * parses each one's JSON to judge its age, so a caller that needs its own
+ * record back (see app.js) can read it from here instead of parsing the same
+ * blob a second time.
  *
  * @param {number} now - Date.now().
- * @param {number} fallbackMaxAgeMs - Window for records carrying none of their own.
+ * @returns {Map<string, Object>}
  */
-export function pruneExpiredRecords(now, fallbackMaxAgeMs) {
+export function pruneExpiredRecords(now) {
+  const records = new Map();
   try {
     const stale = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key?.startsWith(RECORD_KEY_PREFIX)) continue;
       const record = loadRecord(key);
-      const maxAgeMs = typeof record?.maxAgeMs === 'number' ? record.maxAgeMs : fallbackMaxAgeMs;
-      // A record with no usable savedAt can never become resumable either.
-      if (!record || typeof record.savedAt !== 'number' || now - record.savedAt >= maxAgeMs) {
+      const maxAgeMs = record?.config?.resume?.max_age_ms;
+      // A record with no usable savedAt, or no window of its own, can never
+      // become resumable either.
+      if (
+        !record ||
+        typeof record.savedAt !== 'number' ||
+        typeof maxAgeMs !== 'number' ||
+        now - record.savedAt >= maxAgeMs
+      ) {
         stale.push(key);
+      } else {
+        records.set(key, record);
       }
     }
     for (const key of stale) localStorage.removeItem(key);
   } catch {
     // Ignore: pruning is housekeeping, never a correctness requirement.
   }
+  return records;
 }
 
 /**

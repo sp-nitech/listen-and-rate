@@ -6,6 +6,7 @@ from ._render import (
     _bar_gap,
     _fig_to_html,
     _namers,
+    _pair_label,
     _pvalue_header,
     _render_trailing_tables_html,
     _significant_header,
@@ -107,8 +108,8 @@ def _generate_mos_report(
             marker_color=mean_bar_color,
             showlegend=False,
             # %{x} already carries figure_name's own bolding (the <b> from
-            # bold_system_names, if set) - wrapping it in another <b> here
-            # would double it up in the rendered tooltip.
+            # bold_system_names, if set), so the tooltip follows the axis
+            # exactly rather than forcing its own bold state on top of it.
             hovertemplate=(
                 "%{x}<br>"
                 f"{metric_label}: %{{y:.3f}}<br>"
@@ -222,11 +223,10 @@ def _generate_mos_report(
     n_pairs = math.comb(len(systems), 2)
     table_rows = []
     for sys_i, sys_j in itertools.combinations(systems, 2):
+        pair = _pair_label(table_name(sys_i), table_name(sys_j))
         if len(raw[sys_i]) < 2 or len(raw[sys_j]) < 2:
             # t-test needs at least 2 samples per group to estimate variance.
-            table_rows.append(
-                [f"{table_name(sys_i)} vs {table_name(sys_j)}", "N/A", "N/A", ""]
-            )
+            table_rows.append([pair, "N/A", "N/A", ""])
             continue
         # Near-identical (or exactly identical) samples make scipy warn about
         # precision loss in its internal variance calculation; we already
@@ -241,18 +241,11 @@ def _generate_mos_report(
             # significant", so show N/A instead of a misleading blank marker
             # (nan < 0.05 is False, which would otherwise read as "not
             # significant").
-            table_rows.append(
-                [f"{table_name(sys_i)} vs {table_name(sys_j)}", "N/A", "N/A", ""]
-            )
+            table_rows.append([pair, "N/A", "N/A", ""])
             continue
         adj_p = min(raw_p * n_pairs, 1.0) if n_pairs else raw_p
         table_rows.append(
-            [
-                f"{table_name(sys_i)} vs {table_name(sys_j)}",
-                f"{raw_p:.4f}",
-                f"{adj_p:.4f}",
-                "*" if adj_p < alpha else "",
-            ]
+            [pair, f"{raw_p:.4f}", f"{adj_p:.4f}", "*" if adj_p < alpha else ""]
         )
     trailing_tables = _render_trailing_tables_html(
         [

@@ -94,6 +94,7 @@ final class ConfigTest extends TestCase
                 'metadata' => ['title' => 'Listener Information', 'fields' => []],
                 'survey' => ['title' => 'Questionnaire', 'fields' => []],
                 'metrics' => ['response_time' => false],
+                'resume' => ['max_age_ms' => 7200000],
                 'stimuli_per_session' => null,
                 'items_per_session' => 1,
                 'stimuli' => $this->stimuliWithTwoSystemsTwoItems(),
@@ -165,6 +166,36 @@ final class ConfigTest extends TestCase
         ]);
         $response = build_config_response($data);
         $this->assertSame(['response_time' => true], $response['metrics']);
+    }
+
+    public function testBuildConfigResponseExposesTheResumeWindow(): void
+    {
+        // Already in browser milliseconds when the bundle is exported: the
+        // hours the experimenter wrote never reach the PHP host. See resume.js.
+        $data = $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+            'resume' => ['max_age_ms' => 1800000],
+        ]);
+        $response = build_config_response($data);
+        $this->assertSame(['max_age_ms' => 1800000], $response['resume']);
+    }
+
+    public function testBuildConfigResponseDefaultsResumeOffForABundleFromBeforeTheFeature(): void
+    {
+        // config_data.php is baked at export time; a bundle exported before
+        // resume existed carries no 'resume' key at all, e.g. when the PHP
+        // deployment's code is upgraded without re-running lar-export
+        // (avoided mid-experiment, since re-exporting changes config_version).
+        // Defaulting to off (rather than guessing a window) matches the
+        // pre-upgrade behavior instead of silently turning resume on.
+        $data = $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+        ]);
+        unset($data['resume']);
+        $response = build_config_response($data);
+        $this->assertSame(['max_age_ms' => 0], $response['resume']);
     }
 
     public function testBuildConfigResponsePassesThroughFormPageTitles(): void

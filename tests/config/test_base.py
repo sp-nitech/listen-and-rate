@@ -869,3 +869,50 @@ def test_form_page_may_carry_a_description_with_no_fields(tmp_path, test_audio_f
     result = load_config(write_config(tmp_path, data))
     assert result.metadata.description == "Research use only."
     assert result.metadata.fields == []
+
+
+# -- resume -----------------------------------------------------------------
+
+
+def test_resume_defaults_to_two_hours(tmp_path, test_audio_file):
+    """The window resume shipped with, now that it is configurable."""
+    data = minimal_config(str(test_audio_file))
+    result = load_config(write_config(tmp_path, data))
+    assert result.resume.max_age_hours == 2.0
+
+
+def test_resume_max_age_hours_is_configurable(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["resume"] = {"max_age_hours": 48}
+    result = load_config(write_config(tmp_path, data))
+    assert result.resume.max_age_hours == 48.0
+
+
+def test_resume_max_age_hours_accepts_a_fraction_of_an_hour(tmp_path, test_audio_file):
+    """Sub-hour windows are why the field is a float: 0.5 is 30 minutes."""
+    data = minimal_config(str(test_audio_file))
+    data["resume"] = {"max_age_hours": 0.5}
+    result = load_config(write_config(tmp_path, data))
+    assert result.resume.max_age_hours == 0.5
+
+
+def test_resume_max_age_hours_zero_disables_resume(tmp_path, test_audio_file):
+    """0 is how resume is turned off entirely, so it must validate."""
+    data = minimal_config(str(test_audio_file))
+    data["resume"] = {"max_age_hours": 0}
+    result = load_config(write_config(tmp_path, data))
+    assert result.resume.max_age_hours == 0.0
+
+
+def test_resume_max_age_hours_rejects_a_negative_window(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["resume"] = {"max_age_hours": -1}
+    with pytest.raises(ValidationError, match="resume.max_age_hours"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_resume_rejects_an_unknown_key(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["resume"] = {"max_age": 2}  # the unit belongs in the field name
+    with pytest.raises(ValidationError, match="Unknown field"):
+        load_config(write_config(tmp_path, data))

@@ -7,11 +7,11 @@
  * re-sample and re-shuffle into a different test.
  *
  * A record is offered for resume only when it still matches the current config
- * (fingerprint) and was last touched within RESUME_MAX_AGE_MS.
+ * (fingerprint) and was last touched within the window the config asks for
+ * (resume.max_age_hours, delivered as resume.max_age_ms). Every window here is
+ * a parameter rather than a constant: the default belongs to the config schema
+ * (see ResumeConfig), and a second copy of it in this file could drift from it.
  */
-
-/** Two hours, measured from the last save (refreshed on every answer/navigation). */
-export const RESUME_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
 /** Shared prefix of every saved record's key, so they can be enumerated. */
 const RECORD_KEY_PREFIX = 'lar:session:';
@@ -50,7 +50,7 @@ export function clearRecord(key) {
 }
 
 /**
- * Drop every saved record past `maxAgeMs`, across all experiments.
+ * Drop every saved record past its own window, across all experiments.
  *
  * A record is otherwise only removed when the listener declines the prompt or
  * finishes the test. One that merely expired - or whose config changed under
@@ -59,38 +59,72 @@ export function clearRecord(key) {
  * accumulating dead weight. saveRecord() swallows the resulting quota error,
  * which would silently disable resume for the session actually running.
  *
- * Only the age is used: a fingerprint mismatch can be temporary (the config is
- * edited back), so an unexpired record is left alone whether or not it matches
- * the config being served right now.
+ * Each record is judged against its own window - read off its own frozen
+ * config.resume.max_age_ms, never against the window of the experiment doing
+ * the pruning: this runs over every experiment served from the origin, and
+ * one with a short window must not delete a still-resumable session
+ * belonging to an experiment with a long one. A record with no window of its
+ * own (saved before config carried one at all) is dropped outright: it can
+ * never become resumable again either way - isResumable() also needs the
+ * fresh config's window - so there is nothing to gain by guessing at what its
+ * window might have been.
+ *
+ * Only the age is used beyond that: a fingerprint mismatch can be temporary
+ * (the config is edited back), so an unexpired record is left alone whether
+ * or not it matches the config being served right now.
+ *
+ * Returns every surviving record, keyed by its storage key: the scan already
+ * parses each one's JSON to judge its age, so a caller that needs its own
+ * record back (see app.js) can read it from here instead of parsing the same
+ * blob a second time.
+ *
+ * @param {number} now - Date.now().
+ * @returns {Map<string, Object>}
  */
-export function pruneExpiredRecords(now, maxAgeMs = RESUME_MAX_AGE_MS) {
+export function pruneExpiredRecords(now) {
+  const records = new Map();
   try {
     const stale = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key?.startsWith(RECORD_KEY_PREFIX)) continue;
       const record = loadRecord(key);
-      // A record with no usable savedAt can never become resumable either.
-      if (!record || typeof record.savedAt !== 'number' || now - record.savedAt >= maxAgeMs) {
+      const maxAgeMs = record?.config?.resume?.max_age_ms;
+      // A record with no usable savedAt, or no window of its own, can never
+      // become resumable either.
+      if (
+        !record ||
+        typeof record.savedAt !== 'number' ||
+        typeof maxAgeMs !== 'number' ||
+        now - record.savedAt >= maxAgeMs
+      ) {
         stale.push(key);
+      } else {
+        records.set(key, record);
       }
     }
     for (const key of stale) localStorage.removeItem(key);
   } catch {
     // Ignore: pruning is housekeeping, never a correctness requirement.
   }
+  return records;
 }
 
 /**
  * Whether `record` may be offered for resume: it exists, its fingerprint still
  * matches the freshly fetched config_version, and it was saved recently enough.
  *
+ * `maxAgeMs` is the window from the config just fetched rather than the one the
+ * record was saved with, so an edited window takes effect on the next visit in
+ * both directions - a widened one rescues a record that had aged out, and 0
+ * (resume off) stops offering every record immediately.
+ *
  * @param {Object|null} record
  * @param {string} freshVersion - config_version from the current /config fetch.
  * @param {number} now - Date.now().
- * @param {number} [maxAgeMs]
+ * @param {number} maxAgeMs - resume.max_age_ms from the current config (0 = off).
  */
-export function isResumable(record, freshVersion, now, maxAgeMs = RESUME_MAX_AGE_MS) {
+export function isResumable(record, freshVersion, now, maxAgeMs) {
   return (
     !!record &&
     record.fingerprint === freshVersion &&

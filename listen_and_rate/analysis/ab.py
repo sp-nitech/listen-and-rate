@@ -5,8 +5,10 @@ from __future__ import annotations
 from ..storage import OUTCOME_A, OUTCOME_B, OUTCOME_TIE
 from ._render import (
     _binomial_pair_stats,
-    _display_namer,
+    _figure_text,
+    _namers,
     _ordered_pairs,
+    _pair_label,
     _pvalue_header,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
@@ -21,6 +23,7 @@ def _generate_ab_report(
     font_size: int,
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
+    bold_system_names: bool = False,
     height_scale: float = 1.0,
     bar_width_scale: float = 1.0,
     png_scale: float = 2.0,
@@ -42,7 +45,7 @@ def _generate_ab_report(
     OUTCOME_TIE), not system names, so counting is independent of what the
     systems are called.
     """
-    _disp = _display_namer(system_labels)
+    figure_name, table_name = _namers(system_labels, bold_system_names)
     alpha = 1 - confidence
 
     pair_labels: list[str] = []
@@ -64,8 +67,8 @@ def _generate_ab_report(
         n_a, n_b = (n_first, n_second) if system_a == orig_a else (n_second, n_first)
         rate_a, ci_lo, ci_hi, p_value = _binomial_pair_stats(n_a, n_a + n_b, confidence)
 
-        da, db = _disp(system_a), _disp(system_b)
-        pair_labels.append(f"{da} vs {db}")
+        da, db = figure_name(system_a), figure_name(system_b)
+        pair_labels.append(_pair_label(da, db))
         pref_rate_a.append(rate_a)
         pref_errors_upper.append(ci_hi - rate_a)
         pref_errors_lower.append(rate_a - ci_lo)
@@ -81,14 +84,16 @@ def _generate_ab_report(
             # configurable (report-config tie_label); its centered position is
             # not, since it encodes "neither of the flanking systems".
             n_tie = int((sub[outcome_column] == OUTCOME_TIE).sum())
-            count_labels.extend([da, tie_label, db])
+            # tie_label is not a system name, so it bypasses figure_name's
+            # system_labels rename lookup - only the escaping/bolding applies.
+            count_labels.extend([da, _figure_text(tie_label, bold_system_names), db])
             count_values.extend([n_a, n_tie, n_b])
         else:
             count_labels.extend([da, db])
             count_values.extend([n_a, n_b])
         table_rows.append(
             [
-                f"{da} vs {db}",
+                _pair_label(table_name(system_a), table_name(system_b)),
                 f"{p_value:.4f}",
                 "*" if p_value < alpha else "",
             ]

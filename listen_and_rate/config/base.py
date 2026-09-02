@@ -164,6 +164,39 @@ class OutputConfig(_StrictModel):
     path: str = "./results/"
 
 
+class ResumeConfig(_StrictModel):
+    """How long an interrupted session stays resumable in the browser.
+
+    A session the listener leaves mid-test (closed tab, reload, a walk away
+    from the desk) is kept in that browser's localStorage and offered back on
+    return; see frontend/js/resume.js for what is stored and why the whole
+    delivered config rides along with it.
+
+    max_age_hours is measured from the listener's last answer or navigation,
+    not from the start of the session, so an active listener never ages out
+    mid-test. The unit is in the field name, matching the rest of this config
+    (silence_check's *_ms, thresholds in seconds); a float because the useful
+    range spans a fraction of an hour (0.5 for a short lab session) to days
+    (48 to let a remote listener finish tomorrow).
+
+    0 disables resume: nothing is saved and no session is ever offered back.
+    It reads the same way HTTP's `Cache-Control: max-age=0` does - anything
+    saved is already too old to use - rather than as "no expiry".
+    """
+
+    max_age_hours: float = Field(default=2.0, ge=0)
+
+    @property
+    def max_age_ms(self) -> int:
+        """The window in milliseconds, as the browser wants it.
+
+        The config is written in hours for the experimenter; every consumer of
+        this value is JavaScript comparing against Date.now(), so the
+        conversion belongs here rather than in each backend's payload builder.
+        """
+        return round(self.max_age_hours * 3_600_000)
+
+
 class PracticeConfig(_StrictModel):
     """Practice stage settings.
 
@@ -621,6 +654,10 @@ class BaseTestConfig(_StrictModel):
     # nothing is recorded by default. Sits with metadata/survey as the third
     # thing collected from the listener rather than from the systems.
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+    # How long an interrupted session may be resumed for. Always present with
+    # its default (like metrics, unlike practice): resume is on unless the
+    # window is set to 0, so there is no "section absent means off" state.
+    resume: ResumeConfig = Field(default_factory=ResumeConfig)
     practice: PracticeConfig | None = None
     loudness_check: LoudnessCheckConfig | None = None
     silence_check: SilenceCheckConfig | None = None

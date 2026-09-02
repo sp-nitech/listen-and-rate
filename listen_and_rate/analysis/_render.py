@@ -39,15 +39,79 @@ def _reorder_pair(a: str, b: str, system_order: list[str] | None) -> tuple[str, 
     return a, b
 
 
-def _display_namer(system_labels: dict[str, str] | None) -> Callable[[str], str]:
-    """Return a function mapping a raw system name to its display name.
+def _table_namer(system_labels: dict[str, str] | None) -> Callable[[str], str]:
+    """Return a function mapping a raw system name to its display name, as text.
 
-    system_labels renames systems for display only (charts/tables); a name it
-    doesn't mention (or when it's None) passes through unchanged. Shared by all
-    report generators.
+    system_labels renames systems for display only (charts/tables). A name it
+    doesn't mention (or when it's None) passes through unchanged.
+
+    The result is text, not markup: _render_table_html escapes each cell it is
+    given, so escaping here as well would show the entities themselves.
     """
     labels = system_labels or {}
     return lambda name: labels.get(name, name)
+
+
+def _figure_text(text: str, bold: bool = False) -> str:
+    """Escape arbitrary text for Plotly figure text, optionally bolding it.
+
+    Plotly reads a small subset of HTML in figure text, so the text is
+    escaped here - unlike a table cell, there is no single point downstream to
+    do it, and e.g. a system named "A<b>" would otherwise bold the rest of its
+    label. `bold` then wraps the escaped text in <b>, which Plotly renders in
+    the page and in the modebar's PNG alike.
+
+    No renaming happens here: this takes the text to display as-is. Shared by
+    _figure_namer (for system names, via system_labels) and by any other
+    figure-text value - e.g. AB's tie_label - that needs the same
+    escaping/bolding but is not itself a system name, so it must not be run
+    through system_labels' rename lookup.
+    """
+    escaped = _escape_html(text)
+    return f"<b>{escaped}</b>" if bold else escaped
+
+
+def _figure_namer(
+    system_labels: dict[str, str] | None, bold: bool = False
+) -> Callable[[str], str]:
+    """Return the same display name, ready to embed in Plotly figure text.
+
+    See _figure_text for the escaping/bolding; this additionally renames the
+    system first, via system_labels.
+    """
+    as_text = _table_namer(system_labels)
+    return lambda name: _figure_text(as_text(name), bold)
+
+
+def _namers(
+    system_labels: dict[str, str] | None, bold_system_names: bool
+) -> tuple[Callable[[str], str], Callable[[str], str]]:
+    """Return (figure_name, table_name) for one report.
+
+    The figures may carry markup (see _figure_namer's `bold`), the tables
+    never can (_table_namer). Shared by every per-test-type generator (MOS/
+    DMOS/MUSHRA, CMOS, AB/XAB, ABX), which each need both namers under the
+    same system_labels/bold_system_names.
+    """
+    return (
+        _figure_namer(system_labels, bold_system_names),
+        _table_namer(system_labels),
+    )
+
+
+def _pair_label(left: str, right: str) -> str:
+    """Return "left vs right".
+
+    The pair-label format shared by every pair-based figure/table across the
+    report generators (AB/XAB, ABX, CMOS, and MOS's own pairwise significance
+    table).
+
+    Takes the two sides already through whichever namer applies (figure_name
+    or table_name), not raw system names plus a namer to call - the caller
+    already has both names at hand in every case, some of them (e.g. AB's
+    `da`/`db`) reused elsewhere in the same loop iteration.
+    """
+    return f"{left} vs {right}"
 
 
 def _table_heading_html(label: str) -> str:

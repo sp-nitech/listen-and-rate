@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from ._render import (
     _bar_gap,
-    _display_namer,
     _fig_to_html,
+    _namers,
     _ordered_pairs,
+    _pair_label,
     _pvalue_header,
     _render_ci_bar_chart,
     _render_trailing_tables_html,
@@ -70,6 +71,7 @@ def _generate_cmos_report(
     font_size: int,
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
+    bold_system_names: bool = False,
     height_scale: float = 1.0,
     bar_width_scale: float = 1.0,
     png_scale: float = 2.0,
@@ -87,7 +89,7 @@ def _generate_cmos_report(
 
     from scipy import stats
 
-    _disp = _display_namer(system_labels)
+    figure_name, table_name = _namers(system_labels, bold_system_names)
     alpha = 1 - confidence
 
     pair_labels: list[str] = []
@@ -111,7 +113,7 @@ def _generate_cmos_report(
             err = 0.0
             p_value = float("nan")
 
-        pair = f"{_disp(system_a)} vs {_disp(system_b)}"
+        pair = _pair_label(figure_name(system_a), figure_name(system_b))
         pair_labels.append(pair)
         means.append(mean)
         mean_errors.append(err)
@@ -119,7 +121,7 @@ def _generate_cmos_report(
         counts_per_pair.append([int((ratings == v).sum()) for v in _CMOS_CATEGORIES])
         table_rows.append(
             [
-                pair,
+                _pair_label(table_name(system_a), table_name(system_b)),
                 "N/A" if math.isnan(p_value) else f"{p_value:.4f}",
                 "" if math.isnan(p_value) else ("*" if p_value < alpha else ""),
             ]

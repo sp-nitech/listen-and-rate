@@ -842,6 +842,20 @@ final class SaveTest extends TestCase
         validate_cmos_choice($this->abStimulusMap(), ['stimulus_ids' => ['a1', 'a2'], 'rating' => 1]);
     }
 
+    // -- pair_row / pair_row_fields -----------------------------------------
+
+    public function testPairRowFieldsMatchesPairRowKeysWithoutPresentedAsX(): void
+    {
+        $row = pair_row(['system' => 'A', 'item' => 'u1'], ['system' => 'B', 'item' => 'u1']);
+        $this->assertSame(array_keys($row), pair_row_fields());
+    }
+
+    public function testPairRowFieldsMatchesPairRowKeysWithPresentedAsX(): void
+    {
+        $row = pair_row(['system' => 'A', 'item' => 'u1'], ['system' => 'B', 'item' => 'u1'], 'A');
+        $this->assertSame(array_keys($row), pair_row_fields('A'));
+    }
+
     // -- build_cmos_json_result / build_cmos_csv_rows -----------------------
 
     public function testBuildCmosJsonResultProducesItemSystemASystemBRating(): void

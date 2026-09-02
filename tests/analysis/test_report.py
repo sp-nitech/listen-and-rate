@@ -268,10 +268,39 @@ def test_generate_report_escapes_system_name_in_pvalue_table(tmp_path):
         ],
     )
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
-    # The escaped form only ever comes from the table cell; the Plotly chart
-    # embeds the same pair label as JSON (raw '<'), so asserting the escaped
-    # string is present is unambiguous evidence the table cell was escaped.
-    assert "A&lt;b&gt; vs B" in html
+    # Read the cell itself rather than searching the whole page: the figures
+    # escape the same name too, so a bare substring match would no longer say
+    # which of the two produced it. Escaped exactly once - a namer that escaped
+    # before handing the cell over would land here as "A&amp;lt;b&amp;gt;".
+    assert "A&lt;b&gt; vs B" in re.findall(r"<td[^>]*>(.*?)</td>", html)
+
+
+def test_generate_report_escapes_system_name_in_figure_text(tmp_path):
+    # Plotly reads a small HTML subset in figure text, which is what makes
+    # bold_system_names possible - and what makes an unescaped name a bug. A
+    # system called "A<b>" must read as "A<b>" on the axis, not turn the rest
+    # of the label bold.
+    rows = _with_session_meta(
+        "ab",
+        [
+            {"system_a": "A<b>", "system_b": "B", "item": "u1", "winner": "a"},
+            {"system_a": "A<b>", "system_b": "B", "item": "u2", "winner": "b"},
+        ],
+    )
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
+    traces, layout = _plotly_call_args(html)
+    assert "A&lt;b&gt; vs B" in str(traces) + str(layout)
+
+
+def test_bold_wraps_the_escaped_name(tmp_path):
+    # The <b> is ours and stays markup, the name inside it never is.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)],
+        system_labels={"A": "A&B"},
+        bold_system_names=True,
+    )
+    traces, _ = _plotly_call_args(html)
+    assert traces[0]["x"] == ["<b>A&amp;B</b>", "<b>B</b>"]
 
 
 # -- system_labels (rename) -------------------------------------------------
@@ -299,6 +328,81 @@ def test_rename_is_optional(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
     traces, _ = _plotly_call_args(html)
     assert traces[0]["x"] == ["A", "B"]
+
+
+# -- bold_system_names ------------------------------------------------------
+#
+# A figure lifted into a paper or a slide is read on its own, so the names of
+# the systems being compared are worth setting apart from the numbers and axis
+# titles around them. Plotly reads a small HTML subset in figure text, so the
+# option is just a <b> wrapper - but the report's tables escape their cells on
+# purpose (see _render_table_html), so the same string must not reach them.
+#
+# Leaving the names plain by default is covered by test_rename_is_optional
+# above, which renders with no options at all.
+
+
+def test_bold_applied_to_mos_system_labels(tmp_path):
+    # Checked on the axis categories rather than on the whole figure: the hover
+    # template already bolds the value it shows, which is not a system name.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)], bold_system_names=True
+    )
+    traces, _ = _plotly_call_args(html)
+    assert traces[0]["x"] == ["<b>A</b>", "<b>B</b>"]
+
+
+def test_bold_wraps_the_renamed_system(tmp_path):
+    # The label is applied first, so the markup wraps what is actually shown.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)],
+        system_labels={"A": "Proposed"},
+        bold_system_names=True,
+    )
+    traces, _ = _plotly_call_args(html)
+    assert traces[0]["x"] == ["<b>Proposed</b>", "<b>B</b>"]
+
+
+def test_bold_keeps_the_mos_value_annotations_anchored(tmp_path):
+    # The annotations position themselves by category name, so bolding the
+    # axis without bolding the anchor would silently drop every one of them.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)], bold_system_names=True
+    )
+    traces, layout = _plotly_call_args(html)
+    assert [a["x"] for a in layout["annotations"]] == traces[0]["x"]
+
+
+def test_mos_hover_name_follows_bold_system_names(tmp_path):
+    # The hovertemplate itself never hardcodes <b> around %{x} - x already
+    # carries figure_name's own bolding (the <b> from bold_system_names, if
+    # set), so the tooltip's system name matches the axis exactly rather than
+    # forcing its own, unrelated bold state.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)], bold_system_names=True
+    )
+    traces, _ = _plotly_call_args(html)
+    assert "<b>%{x}</b>" not in traces[0]["hovertemplate"]
+
+
+def test_bold_applied_to_ab_pair_label_on_each_side(tmp_path):
+    # Each system separately, so the word between them stays unbolded.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)], bold_system_names=True
+    )
+    traces, layout = _plotly_call_args(html)
+    assert "<b>A</b> vs <b>B</b>" in str(traces) + str(layout)
+
+
+@pytest.mark.parametrize("rows", [CSV_ROWS, AB_CSV_ROWS])
+def test_bold_leaves_the_tables_plain(tmp_path, rows):
+    # The table renderer escapes every cell, so markup would show up as text
+    # rather than as bold. Tables are deliberately left out of this option.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", rows)], bold_system_names=True
+    )
+    cells = re.findall(r"<td[^>]*>(.*?)</td>", html)
+    assert not any("<b>" in cell or "&lt;b&gt;" in cell for cell in cells)
 
 
 # -- height_scale -----------------------------------------------------------

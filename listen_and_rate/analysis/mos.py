@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from ._render import (
     _bar_gap,
-    _display_namer,
     _fig_to_html,
+    _namers,
+    _pair_label,
     _pvalue_header,
     _render_trailing_tables_html,
     _significant_header,
@@ -20,6 +21,7 @@ def _generate_mos_report(
     font_size: int,
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
+    bold_system_names: bool = False,
     height_scale: float = 1.0,
     bar_width_scale: float = 1.0,
     png_scale: float = 2.0,
@@ -50,7 +52,7 @@ def _generate_mos_report(
     import plotly.graph_objects as go
     from scipy import stats
 
-    _disp = _display_namer(system_labels)
+    figure_name, table_name = _namers(system_labels, bold_system_names)
     alpha = 1 - confidence
 
     systems: list[str] = []
@@ -90,7 +92,7 @@ def _generate_mos_report(
 
     mos_fig = go.Figure(
         go.Bar(
-            x=[_disp(s) for s in systems],
+            x=[figure_name(s) for s in systems],
             y=means,
             error_y=dict(
                 type="data",
@@ -105,8 +107,11 @@ def _generate_mos_report(
             # they overlap the bar, without washing out against the background.
             marker_color=mean_bar_color,
             showlegend=False,
+            # %{x} already carries figure_name's own bolding (the <b> from
+            # bold_system_names, if set), so the tooltip follows the axis
+            # exactly rather than forcing its own bold state on top of it.
             hovertemplate=(
-                "<b>%{x}</b><br>"
+                "%{x}<br>"
                 f"{metric_label}: %{{y:.3f}}<br>"
                 f"±%{{error_y.array:.3f}} ({ci_label})"
                 "<extra></extra>"
@@ -119,7 +124,7 @@ def _generate_mos_report(
     # _render_binary_outcome_charts' annotation treatment.
     for sys_name, mean, err in zip(systems, means, errors, strict=True):
         mos_fig.add_annotation(
-            x=_disp(sys_name),
+            x=figure_name(sys_name),
             y=mean + err,
             # The anchor is the whisker's cap, so anchor the box's bottom edge
             # to it and let yshift be the gap. Centred (the default), the gap
@@ -192,7 +197,7 @@ def _generate_mos_report(
         dist_fig.add_trace(
             go.Box(
                 y=raw[sys_name],
-                name=f"{_disp(sys_name)}",
+                name=f"{figure_name(sys_name)}",
                 boxpoints="all",
                 jitter=0.3,
                 pointpos=-1.6,
@@ -218,9 +223,10 @@ def _generate_mos_report(
     n_pairs = math.comb(len(systems), 2)
     table_rows = []
     for sys_i, sys_j in itertools.combinations(systems, 2):
+        pair = _pair_label(table_name(sys_i), table_name(sys_j))
         if len(raw[sys_i]) < 2 or len(raw[sys_j]) < 2:
             # t-test needs at least 2 samples per group to estimate variance.
-            table_rows.append([f"{_disp(sys_i)} vs {_disp(sys_j)}", "N/A", "N/A", ""])
+            table_rows.append([pair, "N/A", "N/A", ""])
             continue
         # Near-identical (or exactly identical) samples make scipy warn about
         # precision loss in its internal variance calculation; we already
@@ -235,16 +241,11 @@ def _generate_mos_report(
             # significant", so show N/A instead of a misleading blank marker
             # (nan < 0.05 is False, which would otherwise read as "not
             # significant").
-            table_rows.append([f"{_disp(sys_i)} vs {_disp(sys_j)}", "N/A", "N/A", ""])
+            table_rows.append([pair, "N/A", "N/A", ""])
             continue
         adj_p = min(raw_p * n_pairs, 1.0) if n_pairs else raw_p
         table_rows.append(
-            [
-                f"{_disp(sys_i)} vs {_disp(sys_j)}",
-                f"{raw_p:.4f}",
-                f"{adj_p:.4f}",
-                "*" if adj_p < alpha else "",
-            ]
+            [pair, f"{raw_p:.4f}", f"{adj_p:.4f}", "*" if adj_p < alpha else ""]
         )
     trailing_tables = _render_trailing_tables_html(
         [

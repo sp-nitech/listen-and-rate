@@ -7,12 +7,13 @@ from fastapi import HTTPException
 from ...config import StimulusConfig, XABConfig, XABTrial, build_xab_trials
 from ...models import SubmitRequest
 from ...rng import rng
-from ...storage import OUTCOME_A, OUTCOME_B, ResultSaver
+from ...storage import ResultSaver
 from ._shared import (
     _all_stimuli,
     _id_to_meta,
     _metrics_row,
     _pair_row,
+    _positional_outcome,
     _practice_extras,
     _require_answered_once,
     _require_non_empty,
@@ -109,7 +110,9 @@ def _submit_xab(body: SubmitRequest, config: XABConfig, saver: ResultSaver) -> d
         # Positional token (which side is closer to the reference), not the
         # system name - matches AB's winner encoding. XAB has no tie.
         chosen = id_to_meta[choice.selected_stimulus_id]["system"]
-        closer = OUTCOME_A if chosen == pair["system_a"] else OUTCOME_B
-        rows.append({**pair, "closer": closer, **_metrics_row(choice, config)})
+        closer = _positional_outcome(chosen, pair)
+        pair["closer"] = closer
+        pair.update(_metrics_row(choice, config))
+        rows.append(pair)
 
     return _save_and_ok(body, config, saver, rows)

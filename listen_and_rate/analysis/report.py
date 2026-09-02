@@ -237,10 +237,10 @@ def generate_report_html(
             (tables keep their natural width).
         system_order: Display order of systems/pairs (e.g. the order written
             in the original config's stimuli_dirs); alphabetical when None.
-        bold_system_names: Wrap the figures' system names in <b>. Figures
-            only - the tables escape their cells (see _render_table_html).
         system_labels: Maps a raw system name to its display name
             (charts/tables only; the stored data keeps its raw names).
+        bold_system_names: Wrap the figures' system names in <b>. Figures
+            only - the tables escape their cells (see _render_table_html).
         height_scale: Multiplier on every chart's height.
         bar_width_scale: Multiplier on every bar's width within its category
             slot; the gap between bars floors at zero once they fill the

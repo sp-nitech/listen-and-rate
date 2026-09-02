@@ -5,13 +5,12 @@ from __future__ import annotations
 from ._render import (
     _bar_gap,
     _fig_to_html,
-    _figure_namer,
+    _namers,
     _ordered_pairs,
     _pvalue_header,
     _render_ci_bar_chart,
     _render_trailing_tables_html,
     _significant_header,
-    _table_namer,
 )
 
 _CMOS_CATEGORIES = [-3, -2, -1, 0, 1, 2, 3]
@@ -89,9 +88,7 @@ def _generate_cmos_report(
 
     from scipy import stats
 
-    # Two namers: the figures may carry markup, the tables never can.
-    figure_name = _figure_namer(system_labels, bold_system_names)
-    table_name = _table_namer(system_labels)
+    figure_name, table_name = _namers(system_labels, bold_system_names)
     alpha = 1 - confidence
 
     pair_labels: list[str] = []

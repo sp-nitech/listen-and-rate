@@ -56,6 +56,8 @@ def _submit_cmos(body: SubmitRequest, config: CMOSConfig, saver: ResultSaver) ->
         # side; presented_first records which way round that was.
         canonical = meta1["system"] == pair["system_a"]
         rating = choice.rating if canonical else -choice.rating
-        rows.append({**pair, "rating": rating, **_metrics_row(choice, config)})
+        pair["rating"] = rating
+        pair.update(_metrics_row(choice, config))
+        rows.append(pair)
 
     return _save_and_ok(body, config, saver, rows)

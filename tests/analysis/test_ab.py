@@ -117,6 +117,20 @@ def test_generate_ab_report_custom_tie_label(tmp_path):
     assert traces[0]["x"] == ["A", "Equal", "B"]
 
 
+def test_generate_ab_report_tie_label_matches_system_name_formatting(tmp_path):
+    # The tie bar sits on the same category axis as the system names, so it
+    # must be HTML-escaped and (when enabled) bolded the same way they are -
+    # otherwise the two system bars would render escaped/bold while the tie
+    # bar renders raw beside them.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)],
+        tie_label="A & B tie",
+        bold_system_names=True,
+    )
+    traces, _ = _plotly_call_args(html, occurrence=1)
+    assert traces[0]["x"] == ["<b>A</b>", "<b>A &amp; B tie</b>", "<b>B</b>"]
+
+
 def test_generate_ab_report_positional_tokens_are_name_agnostic(tmp_path):
     # winner is a positional token (A/B/=), never a system name, so systems
     # named "tie"/"=" - which used to collide with the old "tie" sentinel -

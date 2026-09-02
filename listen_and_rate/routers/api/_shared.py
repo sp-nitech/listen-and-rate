@@ -28,7 +28,7 @@ from ...config import (
 from ...config._utils import _duplicates
 from ...models import SubmitRequest
 from ...rng import rng
-from ...storage import METRIC_DECIMALS, ResultSaver
+from ...storage import METRIC_DECIMALS, OUTCOME_A, OUTCOME_B, ResultSaver
 
 T = TypeVar("T")
 
@@ -341,6 +341,18 @@ def _pair_row(
     if presented_as_x is not None:
         row["presented_as_x"] = presented_as_x
     return row
+
+
+def _positional_outcome(chosen_system: str, pair: dict[str, str]) -> str:
+    """Return OUTCOME_A/OUTCOME_B for which side of `pair` chosen_system is.
+
+    Shared by AB's winner and XAB's closer encoding: both record which SIDE
+    of the sorted pair (pair["system_a"]/["system_b"], from _pair_row) was
+    chosen, not the system name, so any name (including "tie") stays
+    collision-free. A tie (AB only) is the caller's own OUTCOME_TIE, decided
+    before this is reached.
+    """
+    return OUTCOME_A if chosen_system == pair["system_a"] else OUTCOME_B
 
 
 def _build_response_trials(

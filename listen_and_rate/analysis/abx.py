@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from ._render import (
     _binomial_pair_stats,
-    _figure_namer,
+    _namers,
     _ordered_pairs,
     _pvalue_header,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
     _significant_header,
-    _table_namer,
 )
 
 
@@ -34,9 +33,7 @@ def _generate_abx_report(
     - the same binomtest mechanism as AB's win-rate test, but answering "can
     listeners tell A and B apart?" instead of "which do they prefer?".
     """
-    # Two namers: the figures may carry markup, the tables never can.
-    figure_name = _figure_namer(system_labels, bold_system_names)
-    table_name = _table_namer(system_labels)
+    figure_name, table_name = _namers(system_labels, bold_system_names)
     alpha = 1 - confidence
 
     pair_labels: list[str] = []

@@ -70,6 +70,22 @@ def _figure_namer(
     return lambda name: _escape_html(as_text(name))
 
 
+def _namers(
+    system_labels: dict[str, str] | None, bold_system_names: bool
+) -> tuple[Callable[[str], str], Callable[[str], str]]:
+    """Return (figure_name, table_name) for one report.
+
+    The figures may carry markup (see _figure_namer's `bold`), the tables
+    never can (_table_namer). Shared by every per-test-type generator (MOS/
+    DMOS/MUSHRA, CMOS, AB/XAB, ABX), which each need both namers under the
+    same system_labels/bold_system_names.
+    """
+    return (
+        _figure_namer(system_labels, bold_system_names),
+        _table_namer(system_labels),
+    )
+
+
 def _table_heading_html(label: str) -> str:
     """Render a centered h3 heading sitting just above a report table.
 

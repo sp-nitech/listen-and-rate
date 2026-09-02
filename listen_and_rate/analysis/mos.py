@@ -5,12 +5,11 @@ from __future__ import annotations
 from ._render import (
     _bar_gap,
     _fig_to_html,
-    _figure_namer,
+    _namers,
     _pvalue_header,
     _render_trailing_tables_html,
     _significant_header,
     _system_sort_key,
-    _table_namer,
 )
 
 
@@ -52,9 +51,7 @@ def _generate_mos_report(
     import plotly.graph_objects as go
     from scipy import stats
 
-    # Two namers: the figures may carry markup, the tables never can.
-    figure_name = _figure_namer(system_labels, bold_system_names)
-    table_name = _table_namer(system_labels)
+    figure_name, table_name = _namers(system_labels, bold_system_names)
     alpha = 1 - confidence
 
     systems: list[str] = []
@@ -109,8 +106,11 @@ def _generate_mos_report(
             # they overlap the bar, without washing out against the background.
             marker_color=mean_bar_color,
             showlegend=False,
+            # %{x} already carries figure_name's own bolding (the <b> from
+            # bold_system_names, if set) - wrapping it in another <b> here
+            # would double it up in the rendered tooltip.
             hovertemplate=(
-                "<b>%{x}</b><br>"
+                "%{x}<br>"
                 f"{metric_label}: %{{y:.3f}}<br>"
                 f"±%{{error_y.array:.3f}} ({ci_label})"
                 "<extra></extra>"

@@ -601,6 +601,14 @@ function prepend_tool_version_columns(array $fields, array $rows, string $versio
 }
 
 /**
+ * Column names pair_row() always contributes, in order - the single source
+ * of truth both pair_row() and pair_row_fields() build from, so the two can
+ * never drift apart the way deriving one from a fabricated call to the other
+ * could.
+ */
+const PAIR_ROW_FIELDS = ['system_a', 'system_b', 'item', 'presented_first'];
+
+/**
  * The row fields every pair-based type shares, given the submitted pair.
  *
  * The systems are sorted so that a trial aggregates with every other trial of
@@ -623,12 +631,10 @@ function pair_row(array $meta1, array $meta2, ?string $presentedAsX = null): arr
 {
     $sorted = [$meta1['system'], $meta2['system']];
     sort($sorted, SORT_STRING);
-    $row = [
-        'system_a'        => $sorted[0],
-        'system_b'        => $sorted[1],
-        'item'            => $meta1['item'],
-        'presented_first' => $meta1['system'],
-    ];
+    $row = array_combine(
+        PAIR_ROW_FIELDS,
+        [$sorted[0], $sorted[1], $meta1['item'], $meta1['system']]
+    );
     if ($presentedAsX !== null) {
         $row['presented_as_x'] = $presentedAsX;
     }
@@ -638,9 +644,11 @@ function pair_row(array $meta1, array $meta2, ?string $presentedAsX = null): arr
 /** The column names pair_row() contributes, in order. */
 function pair_row_fields(?string $presentedAsX = null): array
 {
-    return array_keys(
-        pair_row(['system' => '', 'item' => ''], ['system' => ''], $presentedAsX)
-    );
+    $fields = PAIR_ROW_FIELDS;
+    if ($presentedAsX !== null) {
+        $fields[] = 'presented_as_x';
+    }
+    return $fields;
 }
 
 /**
@@ -825,13 +833,17 @@ function validate_ab_choices(array $choices, array $stimulusMap, bool $allowTie)
  * Positional outcome token for an AB choice: OUTCOME_TIE when nothing was
  * selected, else OUTCOME_A/OUTCOME_B for the chosen side of the sorted pair.
  * Mirrors listen_and_rate/routers/api/ab.py so any system name is safe.
+ *
+ * $pairRow is the row pair_row() returned for this choice - taken as-is
+ * (system_a read directly off it) rather than a positional [a, b] array the
+ * caller would otherwise have to rebuild from it every time.
  */
-function ab_winner_token(?string $selected, array $stimulusMap, array $pair): string
+function ab_winner_token(?string $selected, array $stimulusMap, array $pairRow): string
 {
     if ($selected === null) {
         return OUTCOME_TIE;
     }
-    return $stimulusMap[$selected]['system'] === $pair[0] ? OUTCOME_A : OUTCOME_B;
+    return $stimulusMap[$selected]['system'] === $pairRow['system_a'] ? OUTCOME_A : OUTCOME_B;
 }
 
 /** Build the assoc array to json_encode for JSON-format AB output. */
@@ -843,11 +855,7 @@ function build_ab_json_result(array $data, array $meta, array $stimulusMap, stri
         $pair = pair_row($meta1, $meta2);
         $selected   = $c['selected_stimulus_id'] ?? null;
         $enriched[] = $pair + [
-            'winner' => ab_winner_token(
-                $selected,
-                $stimulusMap,
-                [$pair['system_a'], $pair['system_b']]
-            ),
+            'winner' => ab_winner_token($selected, $stimulusMap, $pair),
         ];
     }
     return [
@@ -877,7 +885,7 @@ function build_ab_csv_rows(array $data, array $meta, array $metaKeys, array $sti
             $row[] = $meta[$k] ?? '';
         }
         $row    = array_merge($row, array_values($pair));
-        $row[]  = ab_winner_token($selected, $stimulusMap, [$pair['system_a'], $pair['system_b']]);
+        $row[]  = ab_winner_token($selected, $stimulusMap, $pair);
         $rows[] = $row;
     }
     return [$fields, $rows];
@@ -994,10 +1002,14 @@ function validate_xab_choice(array $stimulusMap, array $c, string $referenceSyst
  * Positional outcome token for an XAB choice: OUTCOME_A/OUTCOME_B for the
  * side of the sorted pair judged closer to the reference (XAB has no tie).
  * Mirrors listen_and_rate/routers/api/xab.py.
+ *
+ * $pairRow is the row pair_row() returned for this choice - taken as-is
+ * (system_a read directly off it) rather than a positional [a, b] array the
+ * caller would otherwise have to rebuild from it every time.
  */
-function xab_closer_token(string $selected, array $stimulusMap, array $pair): string
+function xab_closer_token(string $selected, array $stimulusMap, array $pairRow): string
 {
-    return $stimulusMap[$selected]['system'] === $pair[0] ? OUTCOME_A : OUTCOME_B;
+    return $stimulusMap[$selected]['system'] === $pairRow['system_a'] ? OUTCOME_A : OUTCOME_B;
 }
 
 /** Build the assoc array to json_encode for JSON-format XAB output. */
@@ -1008,11 +1020,7 @@ function build_xab_json_result(array $data, array $meta, array $stimulusMap, str
         [$meta1, $meta2] = validate_xab_choice($stimulusMap, $c, $referenceSystem);
         $pair = pair_row($meta1, $meta2);
         $enriched[] = $pair + [
-            'closer' => xab_closer_token(
-                $c['selected_stimulus_id'],
-                $stimulusMap,
-                [$pair['system_a'], $pair['system_b']]
-            ),
+            'closer' => xab_closer_token($c['selected_stimulus_id'], $stimulusMap, $pair),
         ];
     }
     return [
@@ -1041,11 +1049,7 @@ function build_xab_csv_rows(array $data, array $meta, array $metaKeys, array $st
             $row[] = $meta[$k] ?? '';
         }
         $row    = array_merge($row, array_values($pair));
-        $row[]  = xab_closer_token(
-            $c['selected_stimulus_id'],
-            $stimulusMap,
-            [$pair['system_a'], $pair['system_b']]
-        );
+        $row[]  = xab_closer_token($c['selected_stimulus_id'], $stimulusMap, $pair);
         $rows[] = $row;
     }
     return [$fields, $rows];

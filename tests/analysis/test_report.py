@@ -373,6 +373,19 @@ def test_bold_keeps_the_mos_value_annotations_anchored(tmp_path):
     assert [a["x"] for a in layout["annotations"]] == traces[0]["x"]
 
 
+def test_bold_does_not_double_wrap_the_mos_hover_name(tmp_path):
+    # traces[0]["x"] is already "<b>A</b>" when bold_system_names is set
+    # (Plotly substitutes it into %{x} client-side), so a hovertemplate that
+    # additionally hardcodes "<b>%{x}</b>" would render "<b><b>A</b></b>" in
+    # the tooltip. Since %{x} already carries whatever bolding applies, the
+    # template itself must not wrap it again.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)], bold_system_names=True
+    )
+    traces, _ = _plotly_call_args(html)
+    assert "<b>%{x}</b>" not in traces[0]["hovertemplate"]
+
+
 def test_bold_applied_to_ab_pair_label_on_each_side(tmp_path):
     # Each system separately, so the word between them stays unbolded.
     html = generate_report_html(

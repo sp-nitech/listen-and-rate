@@ -5,13 +5,12 @@ from __future__ import annotations
 from ..storage import OUTCOME_A, OUTCOME_B, OUTCOME_TIE
 from ._render import (
     _binomial_pair_stats,
-    _figure_namer,
+    _namers,
     _ordered_pairs,
     _pvalue_header,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
     _significant_header,
-    _table_namer,
 )
 
 
@@ -44,9 +43,7 @@ def _generate_ab_report(
     OUTCOME_TIE), not system names, so counting is independent of what the
     systems are called.
     """
-    # Two namers: the figures may carry markup, the tables never can.
-    figure_name = _figure_namer(system_labels, bold_system_names)
-    table_name = _table_namer(system_labels)
+    figure_name, table_name = _namers(system_labels, bold_system_names)
     alpha = 1 - confidence
 
     pair_labels: list[str] = []
@@ -85,7 +82,7 @@ def _generate_ab_report(
             # configurable (report-config tie_label); its centered position is
             # not, since it encodes "neither of the flanking systems".
             n_tie = int((sub[outcome_column] == OUTCOME_TIE).sum())
-            count_labels.extend([da, tie_label, db])
+            count_labels.extend([da, figure_name(tie_label), db])
             count_values.extend([n_a, n_tie, n_b])
         else:
             count_labels.extend([da, db])

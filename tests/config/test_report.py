@@ -21,6 +21,7 @@ def test_defaults_when_empty():
     assert rc.font.size == 13
     assert rc.order is None
     assert rc.labels is None
+    assert rc.bold_system_names is False
     assert rc.tie_label == "No preference"
     assert rc.color.mean_bar == "#72b7b2"
     assert rc.color.count_bar == "#cd5c5c"
@@ -33,6 +34,7 @@ def test_parses_all_fields():
         font={"family": "Georgia", "size": 20},
         order=["A", "B"],
         labels={"A": "Proposed", "B": "Baseline"},
+        bold_system_names=True,
         tie_label="Equal",
         color={"mean_bar": "#4c78a8", "count_bar": "#e45756"},
     )
@@ -45,6 +47,7 @@ def test_parses_all_fields():
     assert rc.font.size == 20
     assert rc.order == ["A", "B"]
     assert rc.labels == {"A": "Proposed", "B": "Baseline"}
+    assert rc.bold_system_names is True
     assert rc.tie_label == "Equal"
     assert rc.color.mean_bar == "#4c78a8"
     assert rc.color.count_bar == "#e45756"

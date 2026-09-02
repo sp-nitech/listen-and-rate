@@ -40,6 +40,9 @@ confidence: 0.95
 #   A: Proposed
 #   B: Baseline
 
+# Set the system names in bold wherever the figures show them.
+# bold_system_names: false
+
 # Name of the centered "no preference" bar in the AB count chart (its position
 # is always centered between the two systems). Ignored by the other test types.
 # tie_label: "No preference"

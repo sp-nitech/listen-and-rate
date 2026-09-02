@@ -189,6 +189,7 @@ def _render(paths, report, system_order, require_full_order, form_labels) -> str
         width=round(BASE_WIDTH * report.scale.width),
         system_order=system_order,
         system_labels=report.labels,
+        bold_system_names=report.bold_system_names,
         height_scale=report.scale.height,
         bar_width_scale=report.scale.bar_width,
         png_scale=report.scale.png,

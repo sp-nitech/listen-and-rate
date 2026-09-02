@@ -5,12 +5,13 @@ from __future__ import annotations
 from ..storage import OUTCOME_A, OUTCOME_B, OUTCOME_TIE
 from ._render import (
     _binomial_pair_stats,
-    _display_namer,
+    _figure_namer,
     _ordered_pairs,
     _pvalue_header,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
     _significant_header,
+    _table_namer,
 )
 
 
@@ -21,6 +22,7 @@ def _generate_ab_report(
     font_size: int,
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
+    bold_system_names: bool = False,
     height_scale: float = 1.0,
     bar_width_scale: float = 1.0,
     png_scale: float = 2.0,
@@ -42,7 +44,9 @@ def _generate_ab_report(
     OUTCOME_TIE), not system names, so counting is independent of what the
     systems are called.
     """
-    _disp = _display_namer(system_labels)
+    # Two namers: the figures may carry markup, the tables never can.
+    figure_name = _figure_namer(system_labels, bold_system_names)
+    table_name = _table_namer(system_labels)
     alpha = 1 - confidence
 
     pair_labels: list[str] = []
@@ -64,7 +68,7 @@ def _generate_ab_report(
         n_a, n_b = (n_first, n_second) if system_a == orig_a else (n_second, n_first)
         rate_a, ci_lo, ci_hi, p_value = _binomial_pair_stats(n_a, n_a + n_b, confidence)
 
-        da, db = _disp(system_a), _disp(system_b)
+        da, db = figure_name(system_a), figure_name(system_b)
         pair_labels.append(f"{da} vs {db}")
         pref_rate_a.append(rate_a)
         pref_errors_upper.append(ci_hi - rate_a)
@@ -88,7 +92,7 @@ def _generate_ab_report(
             count_values.extend([n_a, n_b])
         table_rows.append(
             [
-                f"{da} vs {db}",
+                f"{table_name(system_a)} vs {table_name(system_b)}",
                 f"{p_value:.4f}",
                 "*" if p_value < alpha else "",
             ]

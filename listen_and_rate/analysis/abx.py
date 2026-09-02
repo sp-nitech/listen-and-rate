@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from ._render import (
     _binomial_pair_stats,
-    _display_namer,
+    _figure_namer,
     _ordered_pairs,
     _pvalue_header,
     _render_binary_outcome_charts,
     _render_trailing_tables_html,
     _significant_header,
+    _table_namer,
 )
 
 
@@ -20,6 +21,7 @@ def _generate_abx_report(
     font_size: int,
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
+    bold_system_names: bool = False,
     height_scale: float = 1.0,
     bar_width_scale: float = 1.0,
     png_scale: float = 2.0,
@@ -32,7 +34,9 @@ def _generate_abx_report(
     - the same binomtest mechanism as AB's win-rate test, but answering "can
     listeners tell A and B apart?" instead of "which do they prefer?".
     """
-    _disp = _display_namer(system_labels)
+    # Two namers: the figures may carry markup, the tables never can.
+    figure_name = _figure_namer(system_labels, bold_system_names)
+    table_name = _table_namer(system_labels)
     alpha = 1 - confidence
 
     pair_labels: list[str] = []
@@ -53,7 +57,7 @@ def _generate_abx_report(
             n_correct, n_total, confidence
         )
 
-        pair_labels.append(f"{_disp(system_a)} vs {_disp(system_b)}")
+        pair_labels.append(f"{figure_name(system_a)} vs {figure_name(system_b)}")
         accuracy.append(rate)
         accuracy_errors_upper.append(ci_hi - rate)
         accuracy_errors_lower.append(rate - ci_lo)
@@ -70,7 +74,7 @@ def _generate_abx_report(
         count_values.extend([n_correct, n_incorrect])
         table_rows.append(
             [
-                f"{_disp(system_a)} vs {_disp(system_b)}",
+                f"{table_name(system_a)} vs {table_name(system_b)}",
                 f"{p_value:.4f}",
                 "*" if p_value < alpha else "",
             ]

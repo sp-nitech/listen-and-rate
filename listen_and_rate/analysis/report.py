@@ -205,6 +205,7 @@ def generate_report_html(
     width: int = 900,
     system_order: list[str] | None = None,
     system_labels: dict[str, str] | None = None,
+    bold_system_names: bool = False,
     height_scale: float = 1.0,
     bar_width_scale: float = 1.0,
     png_scale: float = 2.0,
@@ -236,6 +237,8 @@ def generate_report_html(
             (tables keep their natural width).
         system_order: Display order of systems/pairs (e.g. the order written
             in the original config's stimuli_dirs); alphabetical when None.
+        bold_system_names: Wrap the figures' system names in <b>. Figures
+            only - the tables escape their cells (see _render_table_html).
         system_labels: Maps a raw system name to its display name
             (charts/tables only; the stored data keeps its raw names).
         height_scale: Multiplier on every chart's height.
@@ -319,6 +322,7 @@ def generate_report_html(
         font_size=font_size,
         system_order=system_order,
         system_labels=system_labels,
+        bold_system_names=bold_system_names,
         height_scale=height_scale,
         bar_width_scale=bar_width_scale,
         png_scale=png_scale,

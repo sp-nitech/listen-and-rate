@@ -39,15 +39,35 @@ def _reorder_pair(a: str, b: str, system_order: list[str] | None) -> tuple[str, 
     return a, b
 
 
-def _display_namer(system_labels: dict[str, str] | None) -> Callable[[str], str]:
-    """Return a function mapping a raw system name to its display name.
+def _table_namer(system_labels: dict[str, str] | None) -> Callable[[str], str]:
+    """Return a function mapping a raw system name to its display name, as text.
 
-    system_labels renames systems for display only (charts/tables); a name it
-    doesn't mention (or when it's None) passes through unchanged. Shared by all
-    report generators.
+    system_labels renames systems for display only (charts/tables). A name it
+    doesn't mention (or when it's None) passes through unchanged.
+
+    The result is text, not markup: _render_table_html escapes each cell it is
+    given, so escaping here as well would show the entities themselves.
     """
     labels = system_labels or {}
     return lambda name: labels.get(name, name)
+
+
+def _figure_namer(
+    system_labels: dict[str, str] | None, bold: bool = False
+) -> Callable[[str], str]:
+    """Return the same display name, ready to embed in Plotly figure text.
+
+    Plotly reads a small subset of HTML in figure text, so the name is escaped
+    here - unlike a table cell, there is no single point downstream to do it,
+    and a system named "A<b>" would otherwise bold the rest of its label.
+
+    `bold` then wraps the escaped name in <b>, which Plotly renders in the page
+    and in the modebar's PNG alike.
+    """
+    as_text = _table_namer(system_labels)
+    if bold:
+        return lambda name: f"<b>{_escape_html(as_text(name))}</b>"
+    return lambda name: _escape_html(as_text(name))
 
 
 def _table_heading_html(label: str) -> str:

@@ -99,8 +99,12 @@ def _submit_abx(
         # cannot say which side the listener picked, and that is where a
         # position bias shows up.
         pair = _pair_row(meta1, meta2, id_to_meta[ground_truth]["system"])
-        pair["correct"] = choice.selected_stimulus_id == ground_truth
-        pair.update(_metrics_row(choice, config))
-        rows.append(pair)
+        rows.append(
+            {
+                **pair,
+                "correct": choice.selected_stimulus_id == ground_truth,
+                **_metrics_row(choice, config),
+            }
+        )
 
     return _save_and_ok(body, config, saver, rows)

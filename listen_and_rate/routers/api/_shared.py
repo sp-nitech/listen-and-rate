@@ -184,6 +184,10 @@ def _test_config_response(config: Config, **extras: object) -> dict:
         # Which per-answer measurements to take; the frontend measures only
         # what is enabled here, and the submit handlers store only that too.
         "metrics": config.metrics.model_dump(),
+        # How long a session interrupted mid-test may be resumed for, in the
+        # milliseconds the browser compares against Date.now() (the config is
+        # written in hours). 0 means resume is off; see frontend/js/resume.js.
+        "resume": {"max_age_ms": config.resume.max_age_ms},
         "shortcuts": config.shortcuts.browser_dict(),
         **extras,
     }

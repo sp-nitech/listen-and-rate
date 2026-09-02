@@ -111,8 +111,6 @@ def _submit_xab(body: SubmitRequest, config: XABConfig, saver: ResultSaver) -> d
         # system name - matches AB's winner encoding. XAB has no tie.
         chosen = id_to_meta[choice.selected_stimulus_id]["system"]
         closer = _positional_outcome(chosen, pair)
-        pair["closer"] = closer
-        pair.update(_metrics_row(choice, config))
-        rows.append(pair)
+        rows.append({**pair, "closer": closer, **_metrics_row(choice, config)})
 
     return _save_and_ok(body, config, saver, rows)

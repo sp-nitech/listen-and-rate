@@ -163,17 +163,20 @@ function promptRetry(container, err) {
 async function main() {
   const freshConfig = await fetchConfig();
   const container = document.getElementById('app');
+  // How long an interrupted session stays resumable (resume.max_age_hours,
+  // converted by the backend); 0 turns resume off entirely.
+  const resumeMaxAgeMs = freshConfig.resume.max_age_ms;
   // Records from experiments this browser saw earlier are dropped once they
   // are too old to be offered, so they cannot fill the quota this session
   // needs (see resume.js).
-  pruneExpiredRecords(Date.now());
+  pruneExpiredRecords(Date.now(), resumeMaxAgeMs);
   const key = recordKey(freshConfig.experiment_id);
 
   // Offer resume only when a saved session still matches the current config
-  // (fingerprint) and hasn't gone stale (>2h since the last activity).
+  // (fingerprint) and hasn't gone stale (no activity for max_age_ms).
   const saved = loadRecord(key);
   let resume = false;
-  if (isResumable(saved, freshConfig.config_version, Date.now())) {
+  if (isResumable(saved, freshConfig.config_version, Date.now(), resumeMaxAgeMs)) {
     resume = await promptResume(container, saved);
     if (!resume) clearRecord(key);
   }
@@ -249,11 +252,17 @@ async function main() {
 
   // Persist the whole delivered config plus current answers/position after
   // every state change, so the session can be resumed if the tab is closed.
+  // With the window set to 0 nothing is written at all: a record that will
+  // never be offered would only take up the listener's storage quota.
   const persist = (test) => {
+    if (resumeMaxAgeMs <= 0) return;
     saveRecord(key, {
       v: 1,
       fingerprint: config.config_version,
       savedAt: Date.now(),
+      // Carried so pruning judges this record by the window of the experiment
+      // that saved it, not by whichever experiment prunes next (see resume.js).
+      maxAgeMs: resumeMaxAgeMs,
       sessionId,
       config,
       metadata: listenerMetadata,

@@ -984,3 +984,26 @@ def test_export_php_deploy_config_data_includes_metrics(
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
     assert "'metrics' => ['response_time' => true]" in text
+
+
+def test_export_php_deploy_config_data_includes_resume_window(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """Baked in already converted: config.php never sees the hours.
+
+    The bundle is the only place the value can come from - there is no YAML on
+    the PHP host - so the export is what carries the setting across.
+    """
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "resume": {"max_age_hours": 0.5},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    config_yaml = write_config(tmp_path, config)
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    assert "'resume' => ['max_age_ms' => 1800000]" in text

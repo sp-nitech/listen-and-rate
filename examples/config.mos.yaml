@@ -188,3 +188,12 @@ stimuli_dirs:
 #                   rushed or fatigued listeners), not a measure of the test.
 # metrics:
 #   response_time: false
+
+# -- Resume (optional) --------------------------------------------------------
+# A session interrupted mid-test (closed tab, reload, a walk away from the
+# desk) is kept in that browser and offered back when the listener returns
+# within max_age_hours of their last answer or navigation - so an active
+# listener never ages out mid-test. Use a fraction for a short window (0.5 is
+# 30 minutes), or 0 to disable resume entirely.
+# resume:
+#   max_age_hours: 2

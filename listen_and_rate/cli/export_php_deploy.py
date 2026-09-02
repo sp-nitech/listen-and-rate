@@ -368,6 +368,11 @@ def _build_config_data(
         # Which per-answer measurements save.php should keep; mirrors the
         # FastAPI config response (see _test_config_response).
         "metrics": config.metrics.model_dump(),
+        # How long an interrupted session may be resumed for, in browser
+        # milliseconds; mirrors the FastAPI config response. Converted here
+        # rather than in config.php because the hours only ever exist in the
+        # YAML, which the PHP host never sees.
+        "resume": {"max_age_ms": config.resume.max_age_ms},
         "test_type": config.test_type,
         "title": config.title,
         "instructions": config.instructions,

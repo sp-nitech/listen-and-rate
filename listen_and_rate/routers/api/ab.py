@@ -61,8 +61,6 @@ def _submit_ab(body: SubmitRequest, config: ABConfig, saver: ResultSaver) -> dic
         else:
             chosen = id_to_meta[choice.selected_stimulus_id]["system"]
             winner = _positional_outcome(chosen, pair)
-        pair["winner"] = winner
-        pair.update(_metrics_row(choice, config))
-        rows.append(pair)
+        rows.append({**pair, "winner": winner, **_metrics_row(choice, config)})
 
     return _save_and_ok(body, config, saver, rows)

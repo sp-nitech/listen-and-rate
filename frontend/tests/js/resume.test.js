@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { isResumable, pruneExpiredRecords, RESUME_MAX_AGE_MS, recordKey } from '../../js/resume.js';
+import { isResumable, pruneExpiredRecords, recordKey } from '../../js/resume.js';
 
 const realLocalStorage = globalThis.localStorage;
 
@@ -59,15 +59,11 @@ test('a missing or unusable record is not resumable', () => {
   assert.equal(isResumable({ fingerprint: 'v1', savedAt: '0' }, 'v1', 0, 500), false);
 });
 
-test('the age limit defaults to two hours', () => {
-  // Stated outright rather than through the constant, which would let the
-  // limit be changed without the test noticing. Two hours is long enough to
-  // survive a break and short enough that the config is unlikely to have
-  // moved under the saved trials.
-  assert.equal(RESUME_MAX_AGE_MS, 2 * 60 * 60 * 1000);
+test('maxAgeMs of 0 makes every record unresumable', () => {
+  // How resume.max_age_hours: 0 turns resume off - even a record saved this
+  // instant must not be offered back.
   const record = { fingerprint: 'v1', savedAt: 0 };
-  assert.equal(isResumable(record, 'v1', RESUME_MAX_AGE_MS - 1), true);
-  assert.equal(isResumable(record, 'v1', RESUME_MAX_AGE_MS), false);
+  assert.equal(isResumable(record, 'v1', 0, 0), false);
 });
 
 // -- recordKey ---------------------------------------------------------------
@@ -120,4 +116,24 @@ test('pruning ignores a config change on its own', () => {
   const store = fakeLocalStorage([[recordKey('other-config'), fresh(900, 'v2')]]);
   pruneExpiredRecords(1000, 500);
   assert.deepEqual([...store.keys()], [recordKey('other-config')]);
+});
+
+test("pruning judges a record by its own window, not the pruning experiment's", () => {
+  // A long-window experiment's record must survive a short-window
+  // experiment's prune sweep, and vice versa - each origin serves several
+  // experiments that may configure resume differently.
+  const store = fakeLocalStorage([
+    [recordKey('long-window'), JSON.stringify({ savedAt: 900, fingerprint: 'v1', maxAgeMs: 2000 })],
+    [recordKey('short-window'), JSON.stringify({ savedAt: 900, fingerprint: 'v1', maxAgeMs: 50 })],
+  ]);
+  // fallbackMaxAgeMs (500) would keep both if it were applied uniformly.
+  pruneExpiredRecords(1000, 500);
+  assert.deepEqual([...store.keys()], [recordKey('long-window')]);
+});
+
+test('pruning falls back to the given window for a record with no window of its own', () => {
+  // A record saved before the window became configurable carries no maxAgeMs.
+  const store = fakeLocalStorage([[recordKey('legacy'), fresh(900)]]);
+  pruneExpiredRecords(1000, 50);
+  assert.deepEqual([...store.keys()], []);
 });

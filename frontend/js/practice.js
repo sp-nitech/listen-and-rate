@@ -11,6 +11,7 @@
  */
 
 import { proseHtml } from './dom.js';
+import { t } from './strings.js';
 
 /** " <span…>Practice</span>" to append inside the header's h1; '' for the real test. */
 export function practiceBadgeHtml(config) {
@@ -38,14 +39,19 @@ export function practiceBannerHtml(config) {
  * "Finish" says exactly that, where "Next" would imply a Prev counterpart.
  */
 export function finalButtonLabel(config) {
-  if (config.isPractice) return 'Start';
-  return config.survey?.fields?.length > 0 ? 'Finish' : 'Submit';
+  if (config.isPractice) return t('practice_startButton');
+  return config.survey?.fields?.length > 0 ? t('practice_finishButton') : t('submit_label');
 }
 
-/** The final page's confirm-shortcut hint, matching finalButtonLabel(). */
+/**
+ * The final page's confirm-shortcut hint, matching finalButtonLabel().
+ *
+ * Derived by lowercasing rather than a second set of translated strings:
+ * ja has no case distinction, so this is a no-op there and the hint reads
+ * identically to the button, exactly as the en wording always intended.
+ */
 export function finalConfirmHint(config) {
-  if (config.isPractice) return 'start';
-  return config.survey?.fields?.length > 0 ? 'finish' : 'submit';
+  return finalButtonLabel(config).toLowerCase();
 }
 
 /**

@@ -1,4 +1,5 @@
 import { escapeHtml } from './dom.js';
+import { t } from './strings.js';
 
 /**
  * Shared submit flow for every test-type class: disable the Submit button,
@@ -21,7 +22,7 @@ export async function submitPayload(test, buildPayload) {
   const btn = test._pageSlot.querySelector('#btn-next');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Submitting\u2026';
+    btn.textContent = t('submit_busyLabel');
   }
   document.removeEventListener('keydown', test._boundKeydown);
 
@@ -30,7 +31,7 @@ export async function submitPayload(test, buildPayload) {
   } catch (err) {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = 'Submit';
+      btn.textContent = t('submit_label');
     }
     document.addEventListener('keydown', test._boundKeydown);
     test._pageSlot.insertAdjacentHTML(

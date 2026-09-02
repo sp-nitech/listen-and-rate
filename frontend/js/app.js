@@ -9,6 +9,7 @@ import { MetadataPage } from './metadata.js';
 import { runPracticeStage } from './practice.js';
 import { clearRecord, isResumable, pruneExpiredRecords, recordKey, saveRecord } from './resume.js';
 import { generateSessionId } from './session.js';
+import { currentLanguage, setLanguage, t } from './strings.js';
 import { ABTest } from './test-types/ab.js';
 import { ABXTest } from './test-types/abx.js';
 import { CMOSTest } from './test-types/cmos.js';
@@ -29,16 +30,18 @@ function flatStimuli(config) {
   // below), fetched through a different resolver URL, so probing it
   // separately would be redundant.
   if (config.test_type === 'dmos') {
-    return config.trials.flatMap((t) => [t.reference, t.test]);
+    return config.trials.flatMap((trial) => [trial.reference, trial.test]);
   }
   if (config.test_type === 'cmos' || config.test_type === 'ab' || config.test_type === 'abx') {
-    return config.trials.flatMap((t) => t.stimuli);
+    return config.trials.flatMap((trial) => trial.stimuli);
   }
   if (config.test_type === 'xab') {
-    return config.trials.flatMap((t) => [t.reference, ...t.stimuli]);
+    return config.trials.flatMap((trial) => [trial.reference, ...trial.stimuli]);
   }
   if (config.test_type === 'mushra') {
-    return config.trials.flatMap((t) => [t.reference, ...t.systems, t.anchor].filter(Boolean));
+    return config.trials.flatMap((trial) =>
+      [trial.reference, ...trial.systems, trial.anchor].filter(Boolean)
+    );
   }
   return config.stimuli;
 }
@@ -106,16 +109,16 @@ function promptResume(container, record) {
   const total = (record.config?.stimuli ?? record.config?.trials ?? []).length;
   const page = (record.progress?.currentIndex ?? 0) + 1;
   const progressHint =
-    total > 0 ? `<p>You were on item ${Math.min(page, total)} of ${total}.</p>` : '';
+    total > 0 ? `<p>${t('resume_progress', { page: Math.min(page, total), total })}</p>` : '';
 
   container.innerHTML = `
     <div class="resume-screen">
-      <h2>Resume previous session?</h2>
-      <p>An unfinished session was found on this device.</p>
+      <h2>${t('resume_title')}</h2>
+      <p>${t('resume_body')}</p>
       ${progressHint}
       <div class="resume-actions">
-        <button class="btn btn-primary" id="btn-resume" type="button">Resume</button>
-        <button class="btn btn-secondary" id="btn-restart" type="button">Start over</button>
+        <button class="btn btn-primary" id="btn-resume" type="button">${t('resume_resumeButton')}</button>
+        <button class="btn btn-secondary" id="btn-restart" type="button">${t('resume_startOverButton')}</button>
       </div>
     </div>
   `;
@@ -155,6 +158,11 @@ function promptRetry(container, err) {
 
 async function main() {
   const freshConfig = await fetchConfig();
+  // Set before any DOM is touched - promptResume() below needs translated
+  // strings too. Re-set once `config` is chosen (see below): a resumed
+  // session's own frozen ui_language governs its own re-render, the same way
+  // the rest of its config is treated as frozen.
+  setLanguage(freshConfig.ui_language);
   const container = document.getElementById('app');
   // How long an interrupted session stays resumable (resume.max_age_hours,
   // converted by the backend); 0 turns resume off entirely.
@@ -181,7 +189,9 @@ async function main() {
   // On resume, use the frozen config the session was started with - re-fetching
   // would re-sample and re-shuffle into a different test (and re-mint x tokens).
   const config = resume ? saved.config : freshConfig;
+  setLanguage(config.ui_language);
   document.title = config.title;
+  document.documentElement.lang = currentLanguage();
 
   // Practice stimuli/trials are sampled independently of the session's, so
   // they may reference audio files the session list doesn't - preflight them
@@ -276,10 +286,10 @@ async function main() {
       const surveyPage = new MetadataPage(config.survey.fields, {
         title: config.survey.title,
         description: config.survey.description,
-        submitLabel: 'Submit',
+        submitLabel: t('submit_label'),
         // Same wording as the test page's own button (see submit.js): from
         // here the submission is what is in flight.
-        busyLabel: 'Submitting\u2026',
+        busyLabel: t('submit_busyLabel'),
       });
       container.innerHTML = '';
       surveyAnswers = await surveyPage.collect(container);
@@ -313,8 +323,8 @@ async function main() {
     document.getElementById('app').innerHTML = `
       <div class="complete-screen">
         <div class="complete-icon">✓</div>
-        <h2>Thank you!</h2>
-        <p>Your ratings have been saved successfully.</p>
+        <h2>${t('complete_title')}</h2>
+        <p>${t('complete_body')}</p>
       </div>
     `;
   }

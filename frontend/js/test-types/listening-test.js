@@ -34,6 +34,7 @@ import {
   practiceBadgeHtml,
   practiceBannerHtml,
 } from '../practice.js';
+import { t } from '../strings.js';
 
 export class ListeningTest {
   /**
@@ -131,9 +132,12 @@ export class ListeningTest {
    */
   _syncChrome() {
     const isLast = this.currentIndex === this._trialCount() - 1;
-    this._el.counter.textContent = `Trial ${this.currentIndex + 1} / ${this._trialCount()}`;
+    this._el.counter.textContent = t('trial_counter', {
+      n: this.currentIndex + 1,
+      total: this._trialCount(),
+    });
     this._el.prev.disabled = this.currentIndex === 0;
-    this._el.next.textContent = isLast ? finalButtonLabel(this.config) : 'Next →';
+    this._el.next.textContent = isLast ? finalButtonLabel(this.config) : t('trial_next');
     this._el.hint.innerHTML = this._shortcutHintHtml(isLast);
     this._syncNextEnabled();
     this._updateProgressBar();
@@ -269,11 +273,11 @@ export class ListeningTest {
     const nextKey = shortcuts.next === 'ArrowRight' ? '→' : escapeHtml(shortcuts.next);
     const confirmKey = shortcuts.confirm === 'Enter' ? 'Enter' : escapeHtml(shortcuts.confirm);
     const segments = [
-      `<kbd>${playKey}</kbd> play/pause`,
-      ...(this._supportsResume() ? [`<kbd>${rewindKey}</kbd> rewind`] : []),
+      `<kbd>${playKey}</kbd> ${t('trial_hint_playPause')}`,
+      ...(this._supportsResume() ? [`<kbd>${rewindKey}</kbd> ${t('trial_hint_rewind')}`] : []),
       this._choiceHintHtml(),
-      `<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> navigate`,
-      `<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : 'next'}`,
+      `<kbd>${prevKey}</kbd><kbd>${nextKey}</kbd> ${t('trial_hint_navigate')}`,
+      `<kbd>${confirmKey}</kbd> ${isLast ? finalConfirmHint(this.config) : t('trial_hint_next')}`,
     ];
     return segments.join(' &nbsp;·&nbsp;');
   }

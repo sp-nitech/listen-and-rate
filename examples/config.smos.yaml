@@ -33,6 +33,10 @@ output:
 # instead of silently modifying the name.
 # experiment_id: null
 
+# Which language the built-in UI chrome (buttons, headings, hints) renders in.
+# Only "en" and "ja" are supported.
+# ui_language: en
+
 # How much of each page's audio to fetch up front (default: auto).
 #   none - fetch nothing until the listener first presses play
 #   auto - fetch the whole clip on show so playback is instant (a hint,

@@ -626,6 +626,15 @@ class BaseTestConfig(_StrictModel):
     # a plain str; the empty string is not a valid id, so it cannot collide
     # with a real value.
     experiment_id: str = ""
+    # Which language the built-in UI chrome (buttons, headings, hints)
+    # renders in. Does not affect admin-authored content (title,
+    # instructions, metadata/survey field text, rating_labels, ...), which
+    # the researcher writes directly in whichever language they choose -
+    # this only covers the fixed strings the app itself renders around that
+    # content (see frontend/js/strings.js). Exactly two locales are
+    # supported; anything else is a config error, not a silent fallback, so
+    # a typo is caught at load time rather than shipped silently as English.
+    ui_language: Literal["en", "ja"] = "en"
     # How the per-session stimuli/trials are ordered. "random" (default)
     # shuffles the presentation order per listener to cancel order effects;
     # "fixed" keeps the configured order (systems as listed, files by name).

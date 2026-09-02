@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 
+import { STRINGS } from '../../js/strings.js';
 import { stubDocument } from './_helpers.js';
 
 // practiceBannerHtml renders prose, which reaches for document via escapeHtml.
@@ -21,21 +22,24 @@ after(restore);
 const SURVEY = { fields: [{ key: 'trial_count' }] };
 
 test('the practice round ends by starting the real test', () => {
-  assert.equal(finalButtonLabel({ isPractice: true }), 'Start');
+  assert.equal(finalButtonLabel({ isPractice: true }), STRINGS.en.practice_startButton);
   // Practice wins even where a survey is configured: the survey comes after
   // the real test, not after the practice round.
-  assert.equal(finalButtonLabel({ isPractice: true, survey: SURVEY }), 'Start');
+  assert.equal(
+    finalButtonLabel({ isPractice: true, survey: SURVEY }),
+    STRINGS.en.practice_startButton
+  );
 });
 
 test('a survey makes the last button finish rather than submit', () => {
   // "Submit" would be a lie with a questionnaire still to come.
-  assert.equal(finalButtonLabel({ survey: SURVEY }), 'Finish');
-  assert.equal(finalButtonLabel({}), 'Submit');
+  assert.equal(finalButtonLabel({ survey: SURVEY }), STRINGS.en.practice_finishButton);
+  assert.equal(finalButtonLabel({}), STRINGS.en.submit_label);
 });
 
 test('an empty survey block is not a survey', () => {
   // A survey with a title but no fields shows nothing, so nothing follows.
-  assert.equal(finalButtonLabel({ survey: { title: 'Q', fields: [] } }), 'Submit');
+  assert.equal(finalButtonLabel({ survey: { title: 'Q', fields: [] } }), STRINGS.en.submit_label);
 });
 
 test('the shortcut hint says the same thing as the button', () => {

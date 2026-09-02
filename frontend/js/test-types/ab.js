@@ -10,6 +10,7 @@
  */
 
 import { escapeHtml } from '../dom.js';
+import { t } from '../strings.js';
 import { submitPayload } from '../submit.js';
 import { PairedTrialTest } from './paired-trial-test.js';
 
@@ -109,7 +110,12 @@ export class ABTest extends PairedTrialTest {
   }
 
   _choiceHintHtml() {
-    const tieHint = this.allowTie ? `, <kbd>${escapeHtml(this.shortcuts.tie)}</kbd> same` : '';
+    // The hint word is translated even though the "Same" choice button
+    // itself is left in English (see _choiceButtonsHtml) - the two are
+    // judged independently, unlike most other test types' hint/button pairs.
+    const tieHint = this.allowTie
+      ? `, <kbd>${escapeHtml(this.shortcuts.tie)}</kbd> ${t('trial_hint_same')}`
+      : '';
     return `${super._choiceHintHtml()}${tieHint}`;
   }
 

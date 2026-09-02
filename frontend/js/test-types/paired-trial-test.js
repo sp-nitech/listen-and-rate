@@ -22,6 +22,7 @@ import {
   rewindAudio,
 } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
+import { t } from '../strings.js';
 import { ListeningTest } from './listening-test.js';
 
 export class PairedTrialTest extends ListeningTest {
@@ -81,7 +82,7 @@ export class PairedTrialTest extends ListeningTest {
           <div class="rating-buttons ${this._ratingButtonsClass()}">${this._choiceButtonsHtml()}</div>
         </div>
         <div class="navigation">
-          <button class="btn btn-secondary" id="btn-prev" type="button">← Prev</button>
+          <button class="btn btn-secondary" id="btn-prev" type="button">${t('trial_prev')}</button>
           <button class="btn btn-primary" id="btn-next" type="button"></button>
         </div>
         <p class="shortcut-hint"></p>
@@ -343,6 +344,6 @@ export class PairedTrialTest extends ListeningTest {
   /** The type-specific middle segment of the shortcut hint; default matches _handleChoiceKey's choose-A/B keys. */
   _choiceHintHtml() {
     const { shortcuts } = this;
-    return `<kbd>${escapeHtml(shortcuts.choose_a)}</kbd> choose A, <kbd>${escapeHtml(shortcuts.choose_b)}</kbd> choose B`;
+    return `<kbd>${escapeHtml(shortcuts.choose_a)}</kbd> ${t('trial_hint_chooseA')}, <kbd>${escapeHtml(shortcuts.choose_b)}</kbd> ${t('trial_hint_chooseB')}`;
   }
 }

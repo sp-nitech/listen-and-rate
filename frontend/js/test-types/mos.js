@@ -17,6 +17,7 @@ import {
 } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
 import { ratingKeysHint } from '../hints.js';
+import { t } from '../strings.js';
 import { submitPayload } from '../submit.js';
 import { ListeningTest } from './listening-test.js';
 
@@ -90,7 +91,7 @@ export class MOSTest extends ListeningTest {
           <div class="rating-buttons">${ratingButtons}</div>
         </div>
         <div class="navigation">
-          <button class="btn btn-secondary" id="btn-prev" type="button">← Prev</button>
+          <button class="btn btn-secondary" id="btn-prev" type="button">${t('trial_prev')}</button>
           <button class="btn btn-primary" id="btn-next" type="button"></button>
         </div>
         <p class="shortcut-hint"></p>
@@ -248,7 +249,7 @@ export class MOSTest extends ListeningTest {
 
   /** The rating-key segment of ListeningTest's shortcut hint. */
   _choiceHintHtml() {
-    return `${ratingKeysHint(this.shortcuts.rating)} rate`;
+    return `${ratingKeysHint(this.shortcuts.rating)} ${t('trial_hint_rate')}`;
   }
 
   async _submit() {

@@ -149,6 +149,11 @@ function base_config_response(array $data, array $extras): array
 {
     return array_merge([
         'experiment_id' => $data['experiment_id'],
+        // Which language the built-in UI chrome renders in ('en'/'ja'). Falls
+        // back to 'en' for a bundle exported before this existed - mirrors
+        // 'resume''s '?? [...]' fallback just below (same reasoning: this
+        // file upgraded without re-running lar-export).
+        'ui_language' => $data['ui_language'] ?? 'en',
         // Which per-answer measurements the frontend should take.
         'metrics' => $data['metrics'],
         // How long an interrupted session may be resumed for, in the

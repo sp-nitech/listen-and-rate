@@ -65,6 +65,25 @@ def test_config_includes_clip_durations(client):
     assert durations["s002"] == 0.1
 
 
+def test_config_includes_ui_language_default_en(client):
+    assert client.get("/api/config").json()["ui_language"] == "en"
+
+
+def test_config_reflects_the_configured_ui_language(
+    tmp_path, test_audio_file, monkeypatch
+):
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "ui_language": "ja",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert tc.get("/api/config").json()["ui_language"] == "ja"
+
+
 def test_config_includes_resume_window_in_milliseconds(client):
     # The browser compares it against Date.now(), so the hours the config is
     # written in are converted before they reach it.

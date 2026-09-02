@@ -13,6 +13,7 @@
  */
 
 import { escapeHtml, proseHtml } from './dom.js';
+import { t } from './strings.js';
 
 const _TEXT_PATTERN = /^[a-zA-Z0-9.-]+$/;
 
@@ -26,7 +27,7 @@ export class MetadataPage {
     this.fields = fields;
     this.title = options.title ?? 'Listener Information';
     this.description = options.description ?? null;
-    this.submitLabel = options.submitLabel ?? 'Start Test';
+    this.submitLabel = options.submitLabel ?? t('metadata_startButton');
     // Shown on the button while the caller is busy with what this page
     // collected; null leaves the label alone (the pre-test form's caller
     // replaces the page immediately, so there is nothing to report).
@@ -79,7 +80,7 @@ export class MetadataPage {
           <label class="metadata-label" for="meta-${escapeHtml(f.key)}">${labelHtml}</label>
           <input class="metadata-input" type="text" id="meta-${escapeHtml(f.key)}"
                  data-key="${escapeHtml(f.key)}" autocomplete="off" spellcheck="false"
-                 placeholder="Letters, digits, hyphens, dots only">
+                 placeholder="${escapeHtml(t('metadata_textPlaceholder'))}">
         </div>`;
     }
 

@@ -635,11 +635,15 @@ audio {
    container, 26px (its padding-top) above each column's own top edge, so
    the tab needs to move up by that same amount to land on that border
    instead of just the column's top. Also re-centered horizontally on
-   MUSHRA's narrow columns instead of the fixed left offset. */
+   MUSHRA's narrow columns instead of the fixed left offset. The default
+   font-size (0.7rem) was tuned for those same wide DMOS/ABX cards too - it
+   reads small next to MUSHRA's own tick/band labels (0.78rem), so this
+   bumps it up for legibility without touching DMOS/ABX's own sizing. */
 .mushra-col .audio-card-label {
   left: 50%;
   top: -26px;
   transform: translate(-50%, -50%);
+  font-size: 0.8rem;
 }
 
 .mushra-track-row {

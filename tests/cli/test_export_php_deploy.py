@@ -986,6 +986,24 @@ def test_export_php_deploy_config_data_includes_metrics(
     assert "'metrics' => ['response_time' => true]" in text
 
 
+def test_export_php_deploy_config_data_includes_ui_language(
+    tmp_path, test_audio_file, monkeypatch
+):
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "ui_language": "ja",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    config_yaml = write_config(tmp_path, config)
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    assert "'ui_language' => 'ja'" in text
+
+
 def test_export_php_deploy_config_data_includes_resume_window(
     tmp_path, test_audio_file, monkeypatch
 ):

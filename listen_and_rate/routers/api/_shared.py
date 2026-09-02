@@ -159,6 +159,7 @@ def _test_config_response(config: Config, **extras: object) -> dict:
     """
     return {
         "experiment_id": config.experiment_id,
+        "ui_language": config.ui_language,
         "config_version": _config_version(config),
         "test_type": config.test_type,
         "title": config.title,

@@ -916,3 +916,28 @@ def test_resume_rejects_an_unknown_key(tmp_path, test_audio_file):
     data["resume"] = {"max_age": 2}  # the unit belongs in the field name
     with pytest.raises(ValidationError, match="Unknown field"):
         load_config(write_config(tmp_path, data))
+
+
+# -- ui_language --------------------------------------------------------------
+
+
+def test_ui_language_defaults_to_en(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    result = load_config(write_config(tmp_path, data))
+    assert result.ui_language == "en"
+
+
+def test_ui_language_accepts_ja(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["ui_language"] = "ja"
+    result = load_config(write_config(tmp_path, data))
+    assert result.ui_language == "ja"
+
+
+def test_ui_language_rejects_an_unknown_value(tmp_path, test_audio_file):
+    # Only en/ja are supported - a typo must fail loudly at load time rather
+    # than ship silently as English.
+    data = minimal_config(str(test_audio_file))
+    data["ui_language"] = "fr"
+    with pytest.raises(ValidationError, match="ui_language"):
+        load_config(write_config(tmp_path, data))

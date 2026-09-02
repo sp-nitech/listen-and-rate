@@ -14,6 +14,7 @@
 
 import { escapeHtml } from '../dom.js';
 import { ratingKeysHint } from '../hints.js';
+import { t } from '../strings.js';
 import { submitPayload } from '../submit.js';
 import { PairedTrialTest } from './paired-trial-test.js';
 
@@ -125,7 +126,7 @@ export class CMOSTest extends PairedTrialTest {
   }
 
   _choiceHintHtml() {
-    return `${ratingKeysHint(this.shortcuts.rating)} rate`;
+    return `${ratingKeysHint(this.shortcuts.rating)} ${t('trial_hint_rate')}`;
   }
 
   async _submit() {

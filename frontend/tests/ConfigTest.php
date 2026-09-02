@@ -88,6 +88,7 @@ final class ConfigTest extends TestCase
                 'test_type' => $testType,
                 'title' => 'T',
                 'instructions' => 'I',
+                'ui_language' => 'en',
                 'presentation_order' => 'random',
                 'audio_preload' => 'auto',
                 'durations' => ['A__u1' => 1.5, 'A__u2' => 1.5, 'B__u1' => 1.5, 'B__u2' => 1.5],
@@ -166,6 +167,30 @@ final class ConfigTest extends TestCase
         ]);
         $response = build_config_response($data);
         $this->assertSame(['response_time' => true], $response['metrics']);
+    }
+
+    public function testBuildConfigResponseExposesTheUiLanguage(): void
+    {
+        $data = $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+            'ui_language' => 'ja',
+        ]);
+        $response = build_config_response($data);
+        $this->assertSame('ja', $response['ui_language']);
+    }
+
+    public function testBuildConfigResponseDefaultsUiLanguageToEnForABundleFromBeforeTheFeature(): void
+    {
+        // Same reasoning as the resume backward-compat test just below: a
+        // bundle exported before ui_language existed carries no key at all.
+        $data = $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+        ]);
+        unset($data['ui_language']);
+        $response = build_config_response($data);
+        $this->assertSame('en', $response['ui_language']);
     }
 
     public function testBuildConfigResponseExposesTheResumeWindow(): void

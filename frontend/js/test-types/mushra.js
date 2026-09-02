@@ -30,6 +30,7 @@
 
 import { PAUSE_SVG, PLAY_SVG, pauseOtherAudio } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
+import { t } from '../strings.js';
 import { submitPayload } from '../submit.js';
 import { PairedTrialTest } from './paired-trial-test.js';
 
@@ -114,7 +115,7 @@ export class MUSHRATest extends PairedTrialTest {
     // on .mushra-track-row (also percentage-based) regardless of the track's
     // actual height (220px desktop, shorter on mobile).
     const tickHtml = MUSHRA_TICKS.map(
-      (t, i) => `<span style="top:${(i * 100) / (MUSHRA_TICKS.length - 1)}%">${t}</span>`
+      (tick, i) => `<span style="top:${(i * 100) / (MUSHRA_TICKS.length - 1)}%">${tick}</span>`
     ).join('');
     const bandHtml = MUSHRA_BAND_ORDER.map((k, i) => {
       const bandPct = 100 / MUSHRA_BAND_ORDER.length;
@@ -208,7 +209,7 @@ export class MUSHRATest extends PairedTrialTest {
           ${sliderColsHtml}
         </div>
         <div class="navigation">
-          <button class="btn btn-secondary" id="btn-prev" type="button">← Prev</button>
+          <button class="btn btn-secondary" id="btn-prev" type="button">${t('trial_prev')}</button>
           <button class="btn btn-primary" id="btn-next" type="button"></button>
         </div>
         <p class="shortcut-hint"></p>
@@ -589,9 +590,10 @@ export class MUSHRATest extends PairedTrialTest {
     const { shortcuts } = this;
     const rateUpKey = shortcuts.rate_up === 'ArrowUp' ? '↑' : escapeHtml(shortcuts.rate_up);
     const rateDownKey = shortcuts.rate_down === 'ArrowDown' ? '↓' : escapeHtml(shortcuts.rate_down);
-    const base = `<kbd>${rateUpKey}</kbd><kbd>${rateDownKey}</kbd> rate`;
+    const base = `<kbd>${rateUpKey}</kbd><kbd>${rateDownKey}</kbd> ${t('trial_hint_rate')}`;
     // Advertise the x10 modifier only when it actually works for BOTH keys
     // (see shiftIsFree) - the hint must never promise an unreachable step.
+    // Left untranslated (both "Shift" the key name and ": ±10)" around it).
     return shiftIsFree(shortcuts.rate_up) && shiftIsFree(shortcuts.rate_down)
       ? `${base} (<kbd>Shift</kbd>: ±10)`
       : base;

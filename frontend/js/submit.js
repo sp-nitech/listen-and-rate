@@ -22,7 +22,7 @@ export async function submitPayload(test, buildPayload) {
   const btn = test._pageSlot.querySelector('#btn-next');
   if (btn) {
     btn.disabled = true;
-    btn.textContent = t('submit_busyLabel');
+    btn.textContent = t('submit_busy');
   }
   document.removeEventListener('keydown', test._boundKeydown);
 
@@ -31,7 +31,7 @@ export async function submitPayload(test, buildPayload) {
   } catch (err) {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = t('submit_label');
+      btn.textContent = t('submit_idle');
     }
     document.addEventListener('keydown', test._boundKeydown);
     test._pageSlot.insertAdjacentHTML(

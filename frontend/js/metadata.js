@@ -27,7 +27,7 @@ export class MetadataPage {
     this.fields = fields;
     this.title = options.title ?? 'Listener Information';
     this.description = options.description ?? null;
-    this.submitLabel = options.submitLabel ?? t('metadata_startButton');
+    this.submitLabel = options.submitLabel ?? t('metadata_startTest');
     // Shown on the button while the caller is busy with what this page
     // collected; null leaves the label alone (the pre-test form's caller
     // replaces the page immediately, so there is nothing to report).

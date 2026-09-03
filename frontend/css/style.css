@@ -188,6 +188,8 @@ body {
 /* -- Practice stage ----------------------------------------------------- */
 .practice-badge {
   display: inline-block;
+  position: relative;
+  top: -3px;
   vertical-align: middle;
   font-size: 0.7rem;
   font-weight: 700;
@@ -593,7 +595,12 @@ audio {
   align-items: flex-start;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 4px;
+  /* No column gap: the gridlines are painted per column (see
+     .mushra-track-row), so any gap between them cuts every line once per
+     system - which is what "packed edge to edge" above depends on. The
+     columns are fixed-width with centred content, so they stay just as far
+     apart without it. The row gap still separates wrapped rows. */
+  gap: 4px 0;
   /* Sized to its columns, but allowed out of #app's 680px reading column and
      centred on the viewport instead (margin-left 50% + the translate below).
      That width is right for prose and wrong here: it caps the panel at five
@@ -783,7 +790,7 @@ audio {
   position: absolute;
   left: 0;
   right: 0;
-  transform: translateY(-50%);
+  transform: translateY(calc(-50% + 1px));
 }
 
 .mushra-tick-col {
@@ -848,7 +855,7 @@ audio {
   width: 8px;
   transform: translateX(-50%);
   background: var(--color-border);
-  border-radius: 4px;
+  border-radius: 4px 4px 2px 2px;
 }
 
 /* Solid "filled" indicator from the bottom up to the current value -
@@ -862,7 +869,7 @@ audio {
   width: 8px;
   transform: translateX(-50%);
   background: var(--color-primary);
-  border-radius: 4px;
+  border-radius: 4px 4px 2px 2px;
   pointer-events: none;
 }
 

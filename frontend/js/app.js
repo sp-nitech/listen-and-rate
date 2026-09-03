@@ -117,8 +117,8 @@ function promptResume(container, record) {
       <p>${t('resume_body')}</p>
       ${progressHint}
       <div class="resume-actions">
-        <button class="btn btn-primary" id="btn-resume" type="button">${t('resume_resumeButton')}</button>
-        <button class="btn btn-secondary" id="btn-restart" type="button">${t('resume_startOverButton')}</button>
+        <button class="btn btn-primary" id="btn-resume" type="button">${t('resume_resume')}</button>
+        <button class="btn btn-secondary" id="btn-restart" type="button">${t('resume_startOver')}</button>
       </div>
     </div>
   `;
@@ -286,10 +286,10 @@ async function main() {
       const surveyPage = new MetadataPage(config.survey.fields, {
         title: config.survey.title,
         description: config.survey.description,
-        submitLabel: t('submit_label'),
+        submitLabel: t('submit_idle'),
         // Same wording as the test page's own button (see submit.js): from
         // here the submission is what is in flight.
-        busyLabel: t('submit_busyLabel'),
+        busyLabel: t('submit_busy'),
       });
       container.innerHTML = '';
       surveyAnswers = await surveyPage.collect(container);

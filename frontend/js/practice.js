@@ -39,8 +39,8 @@ export function practiceBannerHtml(config) {
  * "Finish" says exactly that, where "Next" would imply a Prev counterpart.
  */
 export function finalButtonLabel(config) {
-  if (config.isPractice) return t('practice_startButton');
-  return config.survey?.fields?.length > 0 ? t('practice_finishButton') : t('submit_label');
+  if (config.isPractice) return t('practice_startTest');
+  return config.survey?.fields?.length > 0 ? t('trial_finish') : t('submit_idle');
 }
 
 /**

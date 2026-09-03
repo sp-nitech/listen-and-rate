@@ -94,20 +94,20 @@ test('currentLanguage() reflects what setLanguage() actually resolved to', () =>
 test('the resume prompt is translated', () => {
   setLanguage('ja');
   assert.equal(t('resume_title'), '前回の続きから再開しますか？');
-  assert.equal(t('resume_resumeButton'), '再開する');
+  assert.equal(t('resume_resume'), '再開する');
   assert.equal(t('resume_progress', { page: 3, total: 10 }), '3 / 10 件目まで進んでいます。');
   setLanguage('en');
   assert.equal(t('resume_title'), 'Resume previous session?');
-  assert.equal(t('resume_resumeButton'), 'Resume');
+  assert.equal(t('resume_resume'), 'Resume');
   assert.equal(t('resume_progress', { page: 3, total: 10 }), 'You were on item 3 of 10.');
 });
 
 test('the survey submit button and completion screen are translated', () => {
   setLanguage('ja');
-  assert.equal(t('submit_label'), '送信');
+  assert.equal(t('submit_idle'), '送信');
   assert.equal(t('complete_title'), 'ありがとうございました！');
   setLanguage('en');
-  assert.equal(t('submit_label'), 'Submit');
+  assert.equal(t('submit_idle'), 'Submit');
   assert.equal(t('complete_title'), 'Thank you!');
 });
 
@@ -115,10 +115,10 @@ test('the survey submit button and completion screen are translated', () => {
 
 test('the metadata form submit button and placeholder are translated', () => {
   setLanguage('ja');
-  assert.equal(t('metadata_startButton'), 'テストを開始');
+  assert.equal(t('metadata_startTest'), 'テストを開始');
   assert.equal(t('metadata_textPlaceholder'), '半角英数字・ハイフン・ピリオドのみ使用可');
   setLanguage('en');
-  assert.equal(t('metadata_startButton'), 'Start Test');
+  assert.equal(t('metadata_startTest'), 'Start Test');
   assert.equal(t('metadata_textPlaceholder'), 'Letters, digits, hyphens, dots only');
 });
 
@@ -168,11 +168,11 @@ test('the trial counter and Next button are translated', () => {
 
 test('the practice final-button labels are translated', () => {
   setLanguage('ja');
-  assert.equal(t('practice_startButton'), '開始');
-  assert.equal(t('practice_finishButton'), '終了');
+  assert.equal(t('practice_startTest'), '本番を開始');
+  assert.equal(t('trial_finish'), '終了');
   setLanguage('en');
-  assert.equal(t('practice_startButton'), 'Start');
-  assert.equal(t('practice_finishButton'), 'Finish');
+  assert.equal(t('practice_startTest'), 'Start');
+  assert.equal(t('trial_finish'), 'Finish');
 });
 
 test('the shortcut hint words are translated', () => {

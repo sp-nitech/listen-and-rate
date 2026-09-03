@@ -22,24 +22,24 @@ after(restore);
 const SURVEY = { fields: [{ key: 'trial_count' }] };
 
 test('the practice round ends by starting the real test', () => {
-  assert.equal(finalButtonLabel({ isPractice: true }), STRINGS.en.practice_startButton);
+  assert.equal(finalButtonLabel({ isPractice: true }), STRINGS.en.practice_startTest);
   // Practice wins even where a survey is configured: the survey comes after
   // the real test, not after the practice round.
   assert.equal(
     finalButtonLabel({ isPractice: true, survey: SURVEY }),
-    STRINGS.en.practice_startButton
+    STRINGS.en.practice_startTest
   );
 });
 
 test('a survey makes the last button finish rather than submit', () => {
   // "Submit" would be a lie with a questionnaire still to come.
-  assert.equal(finalButtonLabel({ survey: SURVEY }), STRINGS.en.practice_finishButton);
-  assert.equal(finalButtonLabel({}), STRINGS.en.submit_label);
+  assert.equal(finalButtonLabel({ survey: SURVEY }), STRINGS.en.trial_finish);
+  assert.equal(finalButtonLabel({}), STRINGS.en.submit_idle);
 });
 
 test('an empty survey block is not a survey', () => {
   // A survey with a title but no fields shows nothing, so nothing follows.
-  assert.equal(finalButtonLabel({ survey: { title: 'Q', fields: [] } }), STRINGS.en.submit_label);
+  assert.equal(finalButtonLabel({ survey: { title: 'Q', fields: [] } }), STRINGS.en.submit_idle);
 });
 
 test('the shortcut hint says the same thing as the button', () => {

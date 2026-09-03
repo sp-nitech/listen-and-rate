@@ -61,13 +61,18 @@ def _figure_text(text: str, bold: bool = False) -> str:
     label. `bold` then wraps the escaped text in <b>, which Plotly renders in
     the page and in the modebar's PNG alike.
 
+    quote=False because that subset is a fixed entity list - mu, amp, lt, gt,
+    nbsp, times, plusmn, deg - that &quot; is not on, so escaping a double
+    quote would put the entity itself on the axis. Figure text is never a tag
+    attribute, which is the only thing that escape would have protected.
+
     No renaming happens here: this takes the text to display as-is. Shared by
     _figure_namer (for system names, via system_labels) and by any other
     figure-text value - e.g. AB's tie_label - that needs the same
     escaping/bolding but is not itself a system name, so it must not be run
     through system_labels' rename lookup.
     """
-    escaped = _escape_html(text)
+    escaped = _escape_html(text, quote=False)
     return f"<b>{escaped}</b>" if bold else escaped
 
 

@@ -641,11 +641,20 @@ function pair_row(array $meta1, array $meta2, ?string $presentedAsX = null): arr
     return $row;
 }
 
-/** The column names pair_row() contributes, in order. */
-function pair_row_fields(?string $presentedAsX = null): array
+/**
+ * The column names pair_row() contributes, in order.
+ *
+ * $withPresentedAsX says whether the caller passes pair_row() a
+ * $presentedAsX, i.e. whether it is ABX. It is a flag rather than the system
+ * name pair_row() takes, because a CSV header is built once before the loop
+ * that knows which system X duplicated - so the name would have to be
+ * fabricated here, and then this function and pair_row() would be deciding
+ * the same column from two different tests of one made-up value.
+ */
+function pair_row_fields(bool $withPresentedAsX = false): array
 {
     $fields = PAIR_ROW_FIELDS;
-    if ($presentedAsX !== null) {
+    if ($withPresentedAsX) {
         $fields[] = 'presented_as_x';
     }
     return $fields;
@@ -945,7 +954,7 @@ function build_abx_csv_rows(array $data, array $meta, array $metaKeys, array $st
     $fields = array_merge(
         ['session_id', 'timestamp', 'test_type'],
         $metaKeys,
-        array_merge(pair_row_fields(''), ['correct'])
+        array_merge(pair_row_fields(true), ['correct'])
     );
     $rows = [];
     foreach ($data['choices'] as $c) {

@@ -114,10 +114,13 @@ export function pruneExpiredRecords(now) {
  * Whether `record` may be offered for resume: it exists, its fingerprint still
  * matches the freshly fetched config_version, and it was saved recently enough.
  *
- * `maxAgeMs` is the window from the config just fetched rather than the one the
- * record was saved with, so an edited window takes effect on the next visit in
- * both directions - a widened one rescues a record that had aged out, and 0
- * (resume off) stops offering every record immediately.
+ * `maxAgeMs` is the window from the config just fetched. It can only differ
+ * from the one the record was saved with if the config changed, and
+ * resume.max_age_hours is part of the fingerprint, so such a record fails the
+ * check above before its age is ever compared - editing the window neither
+ * rescues an aged-out record nor strands a fresh one. pruneExpiredRecords()
+ * has separately dropped anything past its own saved window by this point, so
+ * the age check here is the second of two, not the only one.
  *
  * @param {Object|null} record
  * @param {string} freshVersion - config_version from the current /config fetch.

@@ -78,10 +78,15 @@ def measure_silence(
     own setting.
 
     A clip that never reaches the upper threshold, or never holds it for
-    `debounce_ms` (including one shorter than that), is silent throughout.
-    Reporting it as unmeasurable would let a broken stimulus past every
-    threshold, so both ends are reported as the clip's full length instead,
-    which fails any cap.
+    `debounce_ms`, is silent throughout. Reporting it as unmeasurable would let
+    a broken stimulus past every threshold, so both ends are reported as the
+    clip's full length instead, which fails any cap.
+
+    A clip too short to hold an onset that long counts as silent throughout the
+    same way, however loud it is: qualifying needs `debounce_ms` / `hop_ms` + 1
+    frame readings (see below), and a short enough clip yields fewer. At the
+    defaults the cutoff is just over 45 ms, so a 40 ms stimulus of full-scale
+    tone still reports 0.04 s of silence at each end and fails any cap.
     """
     import numpy as np
 

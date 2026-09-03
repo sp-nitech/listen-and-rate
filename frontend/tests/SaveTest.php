@@ -853,7 +853,7 @@ final class SaveTest extends TestCase
     public function testPairRowFieldsMatchesPairRowKeysWithPresentedAsX(): void
     {
         $row = pair_row(['system' => 'A', 'item' => 'u1'], ['system' => 'B', 'item' => 'u1'], 'A');
-        $this->assertSame(array_keys($row), pair_row_fields('A'));
+        $this->assertSame(array_keys($row), pair_row_fields(true));
     }
 
     // -- build_cmos_json_result / build_cmos_csv_rows -----------------------

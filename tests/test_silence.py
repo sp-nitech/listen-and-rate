@@ -358,6 +358,15 @@ def test_a_clip_shorter_than_the_debounce_reads_as_silent(tmp_path):
     assert measure_silence(path, **DEFAULTS) == pytest.approx((0.02, 0.02))
 
 
+def test_a_clip_past_the_debounce_but_too_short_to_frame_reads_as_silent(tmp_path):
+    # The cutoff is not debounce_ms alone: qualifying needs debounce/hop + 1
+    # readings, and a clip this short yields fewer however loud it is. Pinned
+    # separately from the case above because 40 ms is past the 30 ms debounce,
+    # so only the framing explains it.
+    path = write_signal(tmp_path / "a.wav", [(0.04, 0.9)])
+    assert measure_silence(path, **DEFAULTS) == pytest.approx((0.04, 0.04))
+
+
 def test_a_noise_floor_above_the_threshold_leaves_no_silence_to_find(tmp_path):
     # An absolute floor assumes the recordings sit below it when nothing is
     # sounding. Room tone above it holds the sound open, so every clip reads

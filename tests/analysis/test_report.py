@@ -292,6 +292,20 @@ def test_generate_report_escapes_system_name_in_figure_text(tmp_path):
     assert "A&lt;b&gt; vs B" in str(traces) + str(layout)
 
 
+def test_quote_in_figure_text_is_left_alone(tmp_path):
+    # Only the markup-bearing characters may be escaped. Plotly decodes a
+    # fixed entity list - mu, amp, lt, gt, nbsp, times, plusmn, deg - and
+    # &quot; is not on it, so an escaped double quote would reach the axis
+    # verbatim. Figure text never lands in an attribute, so there is nothing
+    # for that escape to protect.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", CSV_ROWS)],
+        system_labels={"A": 'The "proposed" system'},
+    )
+    traces, _ = _plotly_call_args(html)
+    assert traces[0]["x"] == ['The "proposed" system', "B"]
+
+
 def test_bold_wraps_the_escaped_name(tmp_path):
     # The <b> is ours and stays markup, the name inside it never is.
     html = generate_report_html(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+import pandas as pd
 import pytest
 
 from ._helpers import (
@@ -843,7 +844,6 @@ _TIMED_ROWS = [
 
 
 def _timed_df(tmp_path):
-    pd = pytest.importorskip("pandas")
     return pd.read_csv(_write_csv(tmp_path / "timed.csv", _TIMED_ROWS))
 
 

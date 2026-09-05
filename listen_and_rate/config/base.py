@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import ClassVar, Literal, Self
 
@@ -215,15 +216,69 @@ class PracticeConfig(_StrictModel):
     instructions: str | None = None
 
 
+class DurationCriterion(_StrictModel):
+    """The duration-check criterion (`per_item`).
+
+    The check exceeds when the clip lengths of one item, compared across
+    systems, differ by more than `threshold` seconds. `verbose` prints the
+    lengths every run, regardless of whether the threshold was exceeded -
+    useful for picking a threshold in the first place.
+
+    Like SilenceCriterion and unlike LoudnessCriterion, 0 is allowed:
+    "identical length" is a meaningful requirement for clips cut from one
+    source recording, while a loudness difference of exactly 0 is not.
+
+    `threshold` defaults to infinity, so a criterion written without one is
+    enabled but never exceeded. What counts as too wide a gap depends on the
+    material, and a finite default would be obeyed as though it had been
+    chosen; this way `verbose` alone reports the figures every run and lets
+    the experimenter pick a number from them.
+    """
+
+    threshold: float = Field(default=math.inf, ge=0)  # seconds
+    verbose: bool = False
+
+
+class DurationCheckConfig(_StrictModel):
+    """Optional pre-test check that one item's clips agree in length.
+
+    This one guards against the wrong file, not against the systems. Systems
+    are matched up item by item on filename alone (see loader.py's
+    _expand_stimuli_dirs), so a clip holding a different utterance than its
+    name claims is paired with the others regardless, and the listener is then
+    asked to compare two unrelated recordings. Nothing else catches it:
+    loudness_check looks at level and silence_check at the ends, and neither
+    says anything about what was said.
+
+    Two renderings of one utterance run to about the same length, so a large
+    gap is the signal that one of them is a different recording. Set
+    `threshold` loosely enough that the natural speaking-rate differences
+    between systems stay under it - this is a sieve for mix-ups, not a
+    measure of the systems.
+
+    `include_reference` decides whether the reference system is measured at
+    all. A natural recording is not paced like a synthesized one, so keeping
+    it in tends to force the threshold wide enough to let real mix-ups
+    through. No effect on the test types without a reference. See
+    listen_and_rate/duration.py.
+    """
+
+    include_reference: bool = True
+    per_item: DurationCriterion | None = None
+
+
 class LoudnessCriterion(_StrictModel):
     """One loudness-check criterion (`per_system` or `per_item`).
 
     The check exceeds when the relevant loudness difference (in LU) is greater
-    than `threshold`; `verbose` prints the loudness figures every run,
+    than `threshold`. `verbose` prints the loudness figures every run,
     regardless of whether the threshold was exceeded.
+
+    `threshold` defaults to infinity, for the reason given on
+    DurationCriterion.
     """
 
-    threshold: float = Field(default=1.0, gt=0)
+    threshold: float = Field(default=math.inf, gt=0)
     verbose: bool = False
 
 
@@ -249,9 +304,12 @@ class SilenceCriterion(_StrictModel):
     regardless of whether the threshold was exceeded. Unlike
     LoudnessCriterion, 0 is allowed: "no leading silence at all" is a
     meaningful requirement, while a loudness difference of exactly 0 is not.
+
+    `threshold` defaults to infinity, for the reason given on
+    DurationCriterion.
     """
 
-    threshold: float = Field(default=0.3, ge=0)  # seconds
+    threshold: float = Field(default=math.inf, ge=0)  # seconds
     verbose: bool = False
 
 
@@ -668,6 +726,7 @@ class BaseTestConfig(_StrictModel):
     # window is set to 0, so there is no "section absent means off" state.
     resume: ResumeConfig = Field(default_factory=ResumeConfig)
     practice: PracticeConfig | None = None
+    duration_check: DurationCheckConfig | None = None
     loudness_check: LoudnessCheckConfig | None = None
     silence_check: SilenceCheckConfig | None = None
     loudness_normalization: LoudnessNormalizationConfig | None = None

@@ -8,8 +8,6 @@ from .._helpers import write_config, write_sine
 
 
 def test_audio_served_is_loudness_normalized_when_configured(tmp_path, monkeypatch):
-    pytest.importorskip("soundfile")
-
     from listen_and_rate.loudness import measure_loudness
     from listen_and_rate.main import create_app
 
@@ -38,7 +36,6 @@ def test_normalization_cache_is_cleaned_up_when_startup_fails(tmp_path, monkeypa
     """If normalization itself fails during startup, the freshly created temp
     cache must not be orphaned (it would otherwise accumulate a full copy of
     the stimuli under /tmp on every failed start)."""
-    pytest.importorskip("soundfile")
     import tempfile
 
     from listen_and_rate import main as main_module

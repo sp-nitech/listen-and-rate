@@ -21,8 +21,9 @@ from .audio_qa import (
     check_per_stimulus,
     measure_per_stimulus,
     measured_rows,
+    stimuli_under_check,
 )
-from .config import Config, DMOSConfig, MUSHRAConfig, XABConfig
+from .config import Config
 from .config.base import SilenceSideConfig, StimulusConfig
 
 _UNIT = "s"
@@ -177,7 +178,7 @@ def run_configured_silence_check(config: Config) -> None:
     if check is None:
         return
 
-    stimuli = _measured_stimuli(config, check.include_reference)
+    stimuli = stimuli_under_check(config, check.include_reference)
     measured = measure_per_stimulus(
         stimuli,
         lambda path: measure_silence(
@@ -201,22 +202,6 @@ def run_configured_silence_check(config: Config) -> None:
 
     if failed:
         raise SystemExit(1)
-
-
-def _measured_stimuli(config: Config, include_reference: bool) -> list[StimulusConfig]:
-    """Return the clips this check covers, less the reference when excluded."""
-    stimuli = config.stimuli_list.entries if config.stimuli_list else []
-    if include_reference:
-        return stimuli
-    # Only these test types have one, and only when a system is flagged.
-    reference = (
-        config.reference_system
-        if isinstance(config, (DMOSConfig, XABConfig, MUSHRAConfig))
-        else None
-    )
-    if not reference:
-        return stimuli
-    return [s for s in stimuli if s.system != reference]
 
 
 def _check_side(

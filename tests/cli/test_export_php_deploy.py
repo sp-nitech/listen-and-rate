@@ -110,12 +110,17 @@ def test_export_invalid_config_exits_without_pydantic_url(
     assert expected_substring in message
 
 
-def test_export_checks_loudness_before_silence(config_yaml, tmp_path, monkeypatch):
+def test_export_runs_the_audio_checks_in_order(config_yaml, tmp_path, monkeypatch):
     # Same gate and same order as the serve path, so an experiment cannot pass
     # QA on one backend and fail it on the other.
     from listen_and_rate.cli import export_php_deploy
 
     called: list[str] = []
+    monkeypatch.setattr(
+        export_php_deploy,
+        "run_configured_duration_check",
+        lambda c: called.append("duration"),
+    )
     monkeypatch.setattr(
         export_php_deploy,
         "run_configured_loudness_check",
@@ -127,7 +132,7 @@ def test_export_checks_loudness_before_silence(config_yaml, tmp_path, monkeypatc
         lambda c: called.append("silence"),
     )
     _run_export(config_yaml, tmp_path / "deploy", monkeypatch)
-    assert called == ["loudness", "silence"]
+    assert called == ["duration", "loudness", "silence"]
 
 
 def test_export_php_deploy_bakes_in_the_version_that_exported_the_bundle(
@@ -756,7 +761,6 @@ def test_export_php_deploy_overwrite_regenerates_copied_audio(
 
 
 def test_export_normalizes_audio_into_bundle_as_real_wav(tmp_path, monkeypatch):
-    pytest.importorskip("soundfile")
     from listen_and_rate.loudness import measure_loudness
 
     sine = write_sine(tmp_path / "clip.wav")
@@ -780,7 +784,6 @@ def test_export_normalizes_audio_into_bundle_as_real_wav(tmp_path, monkeypatch):
 
 
 def test_export_normalize_converts_non_wav_input_to_wav(tmp_path, monkeypatch):
-    pytest.importorskip("soundfile")
     import soundfile as sf
 
     if "MP3" not in sf.available_formats():

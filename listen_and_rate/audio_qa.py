@@ -1,10 +1,14 @@
-"""Shared machinery for the pre-test audio checks (loudness, silence).
+"""Shared machinery for the pre-test audio checks (duration, loudness, silence).
 
-Each check measures one number per clip and then judges it on the axes of the
-system x item grid whose cells are the stimuli. Nothing here knows what the
+Each check puts one number against each clip and then judges it on the axes of
+the system x item grid whose cells are the stimuli. Nothing here knows what the
 number means, so the aggregation, the threshold comparison and the printed
 report are written once and the unit is passed in: `loudness.py` reads them as
-LUFS, `silence.py` as seconds.
+LUFS, `silence.py` and `duration.py` as seconds.
+
+`stimuli_under_check` is the exception to that indifference. Which clips a
+check covers depends on whether the test type has a reference system, so it
+knows the config types that declare one - the one place here that does.
 """
 
 from __future__ import annotations
@@ -14,6 +18,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TypeVar
 
+from .config import Config, DMOSConfig, MUSHRAConfig, XABConfig
 from .config.base import StimulusConfig
 
 # What one measurement yields per clip: a float for loudness, a (leading,
@@ -22,6 +27,16 @@ _Measured = TypeVar("_Measured")
 
 # One measured clip: system, item, and the measured value.
 MeasuredRow = tuple[str, str, float]
+
+# How far past a threshold a figure must sit to count as over it. Both checks
+# subtract or compare decimal quantities, and binary floats land a hair either
+# side of the decimal answer: 1.6 - 1.5 is 0.100000000000000089 while 3.3 - 3.2
+# is 0.099999999999999645. A bare `>` therefore calls one of those spreads over
+# a threshold of 0.1 and the other under it, and since every figure is printed
+# to two decimals the report reads as "0.10 exceeds 0.10" for one item and not
+# the next. This sits far below the resolution of anything measured here -
+# durations are rounded to a millisecond - so it only ever absorbs that noise.
+_TOLERANCE = 1e-9
 
 
 def per_system_stats(rows: list[MeasuredRow]) -> dict[str, tuple[float, float, int]]:
@@ -61,6 +76,24 @@ def per_item_spreads(
         values = by_system.values()
         spreads[item] = (max(values) - min(values), by_system)
     return spreads
+
+
+def stimuli_under_check(
+    config: Config, include_reference: bool
+) -> list[StimulusConfig]:
+    """Return the clips a check covers, less the reference when excluded."""
+    stimuli = config.stimuli_list.entries if config.stimuli_list else []
+    if include_reference:
+        return stimuli
+    # Only these test types have one, and only when a system is flagged.
+    reference = (
+        config.reference_system
+        if isinstance(config, (DMOSConfig, XABConfig, MUSHRAConfig))
+        else None
+    )
+    if not reference:
+        return stimuli
+    return [s for s in stimuli if s.system != reference]
 
 
 def measure_per_stimulus(
@@ -122,7 +155,7 @@ def check_per_item(
     offenders = {
         item: by_system
         for item, (spread, by_system) in spreads.items()
-        if spread > threshold
+        if spread > threshold + _TOLERANCE
     }
     if verbose:
         _print_per_item(spreads, unit, label)
@@ -151,7 +184,7 @@ def check_per_stimulus(
     offenders = {
         stimulus_id: value
         for stimulus_id, value in value_by_id.items()
-        if value > threshold
+        if value > threshold + _TOLERANCE
     }
     if verbose:
         _print_per_stimulus(value_by_id, unit, label)

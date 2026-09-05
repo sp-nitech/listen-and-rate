@@ -56,7 +56,6 @@ def test_analyze_failure_names_the_version_difference_as_a_possible_cause(
 ):
     # A break on results from another release is exactly when the version is
     # worth knowing, so the note rides along with whatever error was raised.
-    pytest.importorskip("plotly")
     rows = [{"tool_version": "9.9.0", **r, "test_type": "nonsense"} for r in CSV_ROWS]
     csv_path = _write_csv(tmp_path / "s1.csv", rows)
     with pytest.raises(Exception) as excinfo:
@@ -66,7 +65,6 @@ def test_analyze_failure_names_the_version_difference_as_a_possible_cause(
 
 
 def test_analyze_failure_on_matching_versions_adds_no_note(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     rows = [
         {"tool_version": __version__, **r, "test_type": "nonsense"} for r in CSV_ROWS
     ]
@@ -77,7 +75,6 @@ def test_analyze_failure_on_matching_versions_adds_no_note(tmp_path, monkeypatch
 
 
 def test_analyze_results_writes_html(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
     _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
@@ -90,7 +87,6 @@ def test_analyze_report_saved_hint_is_logged_not_printed(
 ):
     """The 'Report saved' hint goes through logging.info, so it stays out of
     stdout/stderr and off-screen in tests (which don't emit INFO logs)."""
-    pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
     with caplog.at_level(logging.INFO, logger="listen_and_rate"):
@@ -103,7 +99,6 @@ def test_analyze_report_saved_hint_is_logged_not_printed(
 
 
 def test_analyze_results_with_directory(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     results_dir = tmp_path / "results"
     results_dir.mkdir()
     _write_csv(results_dir / "s1.csv", CSV_ROWS)
@@ -113,7 +108,6 @@ def test_analyze_results_with_directory(tmp_path, monkeypatch):
 
 
 def test_analyze_results_missing_file_raises(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     with pytest.raises(FileNotFoundError):
         _run_analyze(monkeypatch, str(tmp_path / "none.csv"))
 
@@ -121,7 +115,6 @@ def test_analyze_results_missing_file_raises(tmp_path, monkeypatch):
 def test_analyze_results_default_output_next_to_results_dir(tmp_path, monkeypatch):
     """Without --output the report lands inside the results directory itself,
     so `make report-php` needs no explicit --output path."""
-    pytest.importorskip("plotly")
     results_dir = tmp_path / "results"
     results_dir.mkdir()
     _write_csv(results_dir / "s1.csv", CSV_ROWS)
@@ -130,7 +123,6 @@ def test_analyze_results_default_output_next_to_results_dir(tmp_path, monkeypatc
 
 
 def test_analyze_results_default_output_next_to_result_files(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
     _run_analyze(monkeypatch, str(csv_path))
     assert (tmp_path / "report.html").exists()
@@ -142,7 +134,6 @@ def test_analyze_results_derives_results_dir_from_config(
     """With no positional results argument, the results directory (and the
     default report location) come from --config's output.path - the FastAPI
     deployment's layout, where `make report CONFIG=...` should just work."""
-    pytest.importorskip("plotly")
     config_yaml = write_config(
         tmp_path,
         {
@@ -197,7 +188,6 @@ def test_analyze_results_root_resolves_output_path_under_root(
     resolved against it, so results are read from <root>/<output.path>/<config
     name> - the layout both deployments share now that save.php honors
     output.path too."""
-    pytest.importorskip("plotly")
     config_yaml = write_config(
         tmp_path,
         {
@@ -282,8 +272,6 @@ def test_analyze_results_config_flag_orders_systems(
 ):
     """--config's stimuli_dirs.systems order should drive the report's
     system order, not alphabetical, when the two disagree."""
-    pytest.importorskip("plotly")
-
     # Directories named so that ALPHABETICAL dir/system-name order would put
     # Alpha before Zebra - but the config lists Zebra first, and that's the
     # order the report should honor.
@@ -351,7 +339,6 @@ def _write_report_config(tmp_path, data: dict) -> Path:
 
 
 def test_report_config_applies_labels_order_and_confidence(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
     report_yaml = _write_report_config(
         tmp_path,
@@ -376,7 +363,6 @@ def test_report_config_applies_labels_order_and_confidence(tmp_path, monkeypatch
 
 
 def test_report_config_scale_applies(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
     report_yaml = _write_report_config(tmp_path, {"scale": {"width": 0.5}})
     out_path = tmp_path / "report.html"
@@ -392,7 +378,6 @@ def test_report_config_scale_applies(tmp_path, monkeypatch):
 
 
 def test_report_config_order_missing_system_raises(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
     report_yaml = _write_report_config(tmp_path, {"order": ["A"]})  # missing B
     out_path = tmp_path / "report.html"
@@ -408,7 +393,6 @@ def test_report_config_order_missing_system_raises(tmp_path, monkeypatch):
 
 
 def test_report_config_is_optional(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     csv_path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
     _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
@@ -418,7 +402,6 @@ def test_report_config_is_optional(tmp_path, monkeypatch):
 
 
 def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):
-    pytest.importorskip("plotly")
     rows = [
         {
             "session_id": sid,

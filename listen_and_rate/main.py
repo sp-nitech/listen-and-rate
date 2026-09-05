@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_config_or_exit
+from .duration import run_configured_duration_check
 from .loudness import (
     run_configured_loudness_check,
     run_configured_loudness_normalization,
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     """
     config_path = os.environ.get("LISTEN_AND_RATE_CONFIG", "./config.yaml")
     config = load_config_or_exit(config_path)
+    run_configured_duration_check(config)
     run_configured_loudness_check(config)
     run_configured_silence_check(config)
     app.state.config = config

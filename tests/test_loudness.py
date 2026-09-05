@@ -13,11 +13,6 @@ import pytest
 
 from ._helpers import write_config, write_sine
 
-# -- measurement + runner (require the optional audio libraries) --------------
-
-pytest.importorskip("soundfile")
-pytest.importorskip("pyloudnorm")
-
 
 def test_measure_loudness_excludes_clips_under_one_second(tmp_path):
     from listen_and_rate.loudness import measure_loudness

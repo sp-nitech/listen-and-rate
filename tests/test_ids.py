@@ -1,4 +1,4 @@
-"""The shared identifier rule (listen_and_rate/ids.py)."""
+"""Tests for the shared identifier rule."""
 
 from __future__ import annotations
 

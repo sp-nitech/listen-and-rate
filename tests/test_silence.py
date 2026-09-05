@@ -4,16 +4,10 @@ from __future__ import annotations
 
 import pytest
 
+from listen_and_rate.config import load_config
+from listen_and_rate.silence import measure_silence, run_configured_silence_check
+
 from ._helpers import write_config, write_sine
-
-pytest.importorskip("soundfile")
-pytest.importorskip("numpy")
-
-from listen_and_rate.config import load_config  # noqa: E402
-from listen_and_rate.silence import (  # noqa: E402
-    measure_silence,
-    run_configured_silence_check,
-)
 
 
 def write_padded_sine(path, lead=0.0, trail=0.0, tone=1.0, rate=16000, amplitude=0.3):
@@ -432,17 +426,9 @@ def _dmos_config(tmp_path, silence_check, lead_by_system):
     return load_config(write_config(tmp_path, data))
 
 
-def test_silence_check_measures_the_reference_by_default(tmp_path):
-    config = _dmos_config(
-        tmp_path,
-        {"leading": {"per_item": {"threshold": 0.1}}},
-        {"Ref": 0.6, "Test": 0.05},
-    )
-    with pytest.raises(SystemExit):
-        run_configured_silence_check(config)
-
-
-def test_silence_check_can_leave_the_reference_out(tmp_path, capsys):
+def test_silence_check_passes_include_reference_through(tmp_path, capsys):
+    # What the flag selects is stimuli_under_check's business (covered in
+    # tests/test_audio_qa.py); this only pins that the check hands it over.
     # The reference is disclosed in every test type that has one, so its
     # silence cannot give away which clip it is - the risk per_item exists
     # for. A natural recording also tends to carry silence nobody can edit.
@@ -532,22 +518,28 @@ def test_silence_check_verbose_prints_even_when_nothing_is_exceeded(tmp_path, ca
     assert "A__i1" in capsys.readouterr().out
 
 
-def test_serve_startup_checks_loudness_before_silence(tmp_path, monkeypatch):
-    # Order matters: the floor is absolute, so silence figures taken from
-    # clips whose levels disagree may say more about the level difference.
+def test_serve_startup_runs_the_audio_checks_in_order(tmp_path, monkeypatch):
+    # Order matters twice over. Duration goes first because its lengths are
+    # already read and it does not depend on playback level, so the cheapest
+    # and coarsest check fails fast. Silence goes after loudness because its
+    # floor is absolute, so silence figures taken from clips whose levels
+    # disagree may say more about the level difference.
     from fastapi.testclient import TestClient
 
     from listen_and_rate import main
 
     called: list[str] = []
     monkeypatch.setattr(
+        main, "run_configured_duration_check", lambda c: called.append("duration")
+    )
+    monkeypatch.setattr(
         main, "run_configured_loudness_check", lambda c: called.append("loudness")
     )
     monkeypatch.setattr(
         main, "run_configured_silence_check", lambda c: called.append("silence")
     )
-    _config(tmp_path, {"leading": {"per_stimulus": {}}}, {"A": 0.05})
+    _config(tmp_path, {"leading": {"per_stimulus": {"threshold": 0.1}}}, {"A": 0.05})
     monkeypatch.setenv("LISTEN_AND_RATE_CONFIG", str(tmp_path / "config.yaml"))
     with TestClient(main.create_app()):
         pass
-    assert called == ["loudness", "silence"]
+    assert called == ["duration", "loudness", "silence"]

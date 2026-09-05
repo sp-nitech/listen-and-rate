@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import csv
 
-import pytest
-
 
 def test_report_no_results_returns_no_data_page(client):
     res = client.get("/report")
@@ -14,7 +12,6 @@ def test_report_no_results_returns_no_data_page(client):
 
 
 def test_report_with_results_returns_html(client, config_yaml):
-    pytest.importorskip("plotly")
     results_dir = config_yaml.parent / "results" / "config"
     results_dir.mkdir(parents=True, exist_ok=True)
     rows = [

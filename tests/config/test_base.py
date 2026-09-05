@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import shutil
 
 import pytest
@@ -435,17 +436,70 @@ def test_unknown_form_block_field_rejected(tmp_path, test_audio_file):
         load_config(write_config(tmp_path, data))
 
 
+def test_duration_check_defaults_to_none(tmp_path, test_audio_file):
+    result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
+    assert result.duration_check is None
+
+
+def test_duration_check_threshold_defaults_to_never_exceeded(tmp_path, test_audio_file):
+    # No number is a sensible cap here: what counts as too wide a gap is the
+    # experimenter's call, and a finite default would be obeyed as though it
+    # had been chosen. Infinity enables the criterion without judging it, so
+    # `verbose` alone reports the figures and nothing ever fails on them.
+    data = minimal_config(str(test_audio_file))
+    data["duration_check"] = {"per_item": {}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.duration_check.per_item.threshold == math.inf
+    assert result.duration_check.per_item.verbose is False
+    assert result.duration_check.include_reference is True
+
+
+def test_duration_check_parses_its_criterion(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["duration_check"] = {
+        "include_reference": False,
+        "per_item": {"threshold": 1.5, "verbose": True},
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.duration_check.include_reference is False
+    assert result.duration_check.per_item.threshold == 1.5
+    assert result.duration_check.per_item.verbose is True
+
+
+def test_duration_check_accepts_a_zero_threshold(tmp_path, test_audio_file):
+    # Unlike a loudness difference, "identical length" is a meaningful
+    # requirement: clips cut from one source recording should match exactly.
+    data = minimal_config(str(test_audio_file))
+    data["duration_check"] = {"per_item": {"threshold": 0}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.duration_check.per_item.threshold == 0
+
+
+def test_duration_check_rejects_a_negative_threshold(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["duration_check"] = {"per_item": {"threshold": -0.1}}
+    with pytest.raises(ValidationError):
+        load_config(write_config(tmp_path, data))
+
+
+def test_duration_check_rejects_unknown_field(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["duration_check"] = {"per_item": {"bogus": 1}}
+    with pytest.raises(ValidationError, match="bogus"):
+        load_config(write_config(tmp_path, data))
+
+
 def test_loudness_check_defaults_to_none(tmp_path, test_audio_file):
     result = load_config(write_config(tmp_path, minimal_config(str(test_audio_file))))
     assert result.loudness_check is None
 
 
-def test_loudness_check_empty_subblock_enables_with_defaults(tmp_path, test_audio_file):
+def test_loudness_check_threshold_defaults_to_never_exceeded(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
     data["loudness_check"] = {"per_system": {}}
     result = load_config(write_config(tmp_path, data))
     assert result.loudness_check.per_system is not None
-    assert result.loudness_check.per_system.threshold == 1.0
+    assert result.loudness_check.per_system.threshold == math.inf
     assert result.loudness_check.per_system.verbose is False
     assert result.loudness_check.per_item is None
 
@@ -482,11 +536,18 @@ def test_silence_check_defaults_to_none(tmp_path, test_audio_file):
     assert result.silence_check is None
 
 
-def test_silence_check_sides_are_independent(tmp_path, test_audio_file):
+def test_silence_check_threshold_defaults_to_never_exceeded(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
     data["silence_check"] = {"leading": {"per_stimulus": {}}}
     result = load_config(write_config(tmp_path, data))
-    assert result.silence_check.leading.per_stimulus.threshold == 0.3
+    assert result.silence_check.leading.per_stimulus.threshold == math.inf
+
+
+def test_silence_check_sides_are_independent(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["silence_check"] = {"leading": {"per_stimulus": {"threshold": 0.1}}}
+    result = load_config(write_config(tmp_path, data))
+    assert result.silence_check.leading.per_stimulus.threshold == 0.1
     assert result.silence_check.leading.per_item is None
     assert result.silence_check.trailing is None
     assert result.silence_check.floor_db == -50.0
@@ -520,7 +581,7 @@ def test_silence_check_accepts_a_zero_threshold(tmp_path, test_audio_file):
 
 def test_silence_check_window_and_hop_defaults(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
-    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    data["silence_check"] = {"leading": {"per_stimulus": {"threshold": 0.1}}}
     result = load_config(write_config(tmp_path, data))
     assert result.silence_check.window_ms == 25.0
     assert result.silence_check.hop_ms == 10.0
@@ -530,7 +591,7 @@ def test_silence_check_measures_the_reference_unless_told_otherwise(
     tmp_path, test_audio_file
 ):
     data = minimal_config(str(test_audio_file))
-    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    data["silence_check"] = {"leading": {"per_stimulus": {"threshold": 0.1}}}
     result = load_config(write_config(tmp_path, data))
     assert result.silence_check.include_reference is True
     assert result.silence_check.hysteresis_db == 5.0
@@ -543,7 +604,7 @@ def test_silence_check_rejects_a_hop_longer_than_the_window(tmp_path, test_audio
     data["silence_check"] = {
         "window_ms": 20.0,
         "hop_ms": 30.0,
-        "leading": {"per_stimulus": {}},
+        "leading": {"per_stimulus": {"threshold": 0.1}},
     }
     with pytest.raises(ValidationError, match="hop_ms"):
         load_config(write_config(tmp_path, data))
@@ -554,14 +615,17 @@ def test_silence_check_allows_a_hop_equal_to_the_window(tmp_path, test_audio_fil
     data["silence_check"] = {
         "window_ms": 20.0,
         "hop_ms": 20.0,
-        "leading": {"per_stimulus": {}},
+        "leading": {"per_stimulus": {"threshold": 0.1}},
     }
     assert load_config(write_config(tmp_path, data)).silence_check.hop_ms == 20.0
 
 
 def test_silence_check_rejects_a_non_negative_floor(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
-    data["silence_check"] = {"floor_db": 0.0, "leading": {"per_stimulus": {}}}
+    data["silence_check"] = {
+        "floor_db": 0.0,
+        "leading": {"per_stimulus": {"threshold": 0.1}},
+    }
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
 
@@ -577,8 +641,8 @@ def test_silence_check_can_be_combined_with_loudness_check(tmp_path, test_audio_
     # Pure observation, so unlike loudness_check/loudness_normalization there
     # is nothing for it to conflict with.
     data = minimal_config(str(test_audio_file))
-    data["loudness_check"] = {"per_system": {}}
-    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    data["loudness_check"] = {"per_system": {"threshold": 1.0}}
+    data["silence_check"] = {"leading": {"per_stimulus": {"threshold": 0.1}}}
     result = load_config(write_config(tmp_path, data))
     assert result.loudness_check is not None and result.silence_check is not None
 
@@ -588,7 +652,7 @@ def test_silence_check_can_be_combined_with_loudness_normalization(
 ):
     data = minimal_config(str(test_audio_file))
     data["loudness_normalization"] = {"target": -23.0}
-    data["silence_check"] = {"leading": {"per_stimulus": {}}}
+    data["silence_check"] = {"leading": {"per_stimulus": {"threshold": 0.1}}}
     result = load_config(write_config(tmp_path, data))
     assert result.loudness_normalization is not None
     assert result.silence_check is not None
@@ -644,7 +708,7 @@ def test_loudness_check_and_normalization_are_mutually_exclusive(
     tmp_path, test_audio_file
 ):
     data = minimal_config(str(test_audio_file))
-    data["loudness_check"] = {"per_system": {}}
+    data["loudness_check"] = {"per_system": {"threshold": 1.0}}
     data["loudness_normalization"] = {}
     with pytest.raises(ValidationError, match="loudness_normalization"):
         load_config(write_config(tmp_path, data))

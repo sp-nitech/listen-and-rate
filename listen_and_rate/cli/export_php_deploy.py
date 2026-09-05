@@ -20,6 +20,7 @@ from listen_and_rate.config import (
     XABConfig,
     load_config_or_exit,
 )
+from listen_and_rate.duration import run_configured_duration_check
 from listen_and_rate.loudness import (
     run_configured_loudness_check,
     run_configured_loudness_normalization,
@@ -506,6 +507,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config_or_exit(args.config)
+    run_configured_duration_check(config)
     run_configured_loudness_check(config)
     run_configured_silence_check(config)
     if config.stimuli_list is None:

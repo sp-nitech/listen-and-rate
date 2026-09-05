@@ -27,9 +27,8 @@ def write_config(tmp_path: Path, data: dict, name: str = "config.yaml") -> Path:
 def write_sine(path, seconds=1.5, amplitude=0.3, rate=16000, freq=440.0):
     """Write a mono sine WAV to `path` (a real, non-silent clip for loudness tests).
 
-    soundfile/numpy are imported lazily so importing this module stays
-    cheap and dependency-free; callers that need audio already guard with
-    importorskip.
+    soundfile/numpy are imported lazily so importing this module stays cheap
+    for the callers that only want write_config.
     """
     import numpy as np
     import soundfile as sf

@@ -73,6 +73,15 @@ stimuli_dirs:
 #   instructions: | # shown in a banner above the regular instructions
 #     This is a practice session. Your ratings will not be recorded.
 
+# -- Duration check (optional) ------------------------------------------------
+# When configured, the clip lengths of one item are compared across systems and
+# the run aborts if they differ by more than the threshold.
+# duration_check:
+#   include_reference: true
+#   per_item:
+#     threshold: 0.1
+#     verbose: false
+
 # -- Loudness check (optional) ------------------------------------------------
 # When configured, each stimulus's integrated loudness (LUFS) are measured. If
 # a threshold is exceeded, the offending values are shown and the run aborts.

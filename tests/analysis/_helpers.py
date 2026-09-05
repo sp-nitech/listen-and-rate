@@ -1,8 +1,4 @@
-"""Shared fixtures, builders, and row constants for the analysis report tests.
-
-Importing this module runs the optional-dependency guard, so every analysis
-test module is skipped as a group when plotly/pandas/scipy aren't installed.
-"""
+"""Shared fixtures, builders, and row constants for the analysis report tests."""
 
 from __future__ import annotations
 
@@ -11,13 +7,7 @@ import json
 import re
 from pathlib import Path
 
-import pytest
-
-pytest.importorskip("plotly")
-pytest.importorskip("pandas")
-pytest.importorskip("scipy")
-
-from listen_and_rate.analysis import generate_report_html  # noqa: E402
+from listen_and_rate.analysis import generate_report_html
 
 __all__ = [
     "ABX_CSV_ROWS",

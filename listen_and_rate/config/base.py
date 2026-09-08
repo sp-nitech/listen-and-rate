@@ -139,15 +139,33 @@ class MetricsConfig(_StrictModel):
     each field is opt-in (nothing is recorded by default) because it is data
     about the listener rather than about the systems under test.
 
-    `response_time` is the seconds between the listener first playing audio on
-    a page and moving on from it, minus the clip time they had to sit through
-    to be allowed to move on (see frontend/js/test-types/listening-test.js).
-    It is a quality-control aid - spotting rushed or fatigued listeners - and
-    not a measure of the systems: browser wall-clock includes tab switches,
-    interruptions, and thinking about something else entirely.
+    `dwell_time` is the seconds the listener spent on the page an answer came
+    from - every visit to it added up, since going back to reconsider is time
+    the test took (see frontend/js/test-types/listening-test.js). Added up
+    over a session it is how long the test itself took, which is the number
+    behind "how long should I tell listeners this takes" and "is fatigue
+    plausible by trial 40".
+
+    Add it up per page, not per row. One MUSHRA page rates every system at
+    once and writes a row for each, all carrying that page's one reading, so
+    summing the column there multiplies the answer by the number of systems.
+    Every other test type answers one page with one row, which makes the
+    column sum and the page sum the same number.
+
+    That total covers the trial pages and nothing else. The metadata form,
+    the practice stage and the post-test survey have no answer rows to carry
+    a reading, so their time is not in it - which is what makes the total a
+    measure of rating rather than of form filling.
+
+    Time while the tab is closed is left out: the clock only runs on a page
+    the listener has open, so a session resumed the next day is not charged
+    for the night. A tab switched away from but left open still counts, as
+    does any other interruption in front of the screen, so this is a
+    quality-control aid - spotting rushed or fatigued listeners - and not a
+    measure of the systems.
     """
 
-    response_time: bool = False
+    dwell_time: bool = False
 
     def enabled_keys(self) -> list[str]:
         """Return the metric names to record, in declaration (column) order.
@@ -717,7 +735,7 @@ class BaseTestConfig(_StrictModel):
     # page). Same shape as metadata; no fields (the default) means no
     # survey page.
     survey: SurveyFormConfig = Field(default_factory=SurveyFormConfig)
-    # Per-answer measurements of how the listener produced it (response time);
+    # Per-answer measurements of how the listener produced it (dwell time);
     # nothing is recorded by default. Sits with metadata/survey as the third
     # thing collected from the listener rather than from the systems.
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)

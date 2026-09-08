@@ -104,21 +104,21 @@ final class SaveTest extends TestCase
     public function testEnabledMetricsKeepsOnlyWhatWasOptedInto(): void
     {
         $this->assertSame([], enabled_metrics([]));
-        $this->assertSame([], enabled_metrics(['metrics' => ['response_time' => false]]));
+        $this->assertSame([], enabled_metrics(['metrics' => ['dwell_time' => false]]));
         $this->assertSame(
-            ['response_time'],
-            enabled_metrics(['metrics' => ['response_time' => true]])
+            ['dwell_time'],
+            enabled_metrics(['metrics' => ['dwell_time' => true]])
         );
     }
 
     public function testAnswerMetricsRoundsToTwoDecimalsAndDropsNonNumbers(): void
     {
-        $keys = ['response_time'];
+        $keys = ['dwell_time'];
         $this->assertSame(
-            ['response_time' => 2.5],
-            answer_metrics(['response_time' => 2.50449], $keys)
+            ['dwell_time' => 2.5],
+            answer_metrics(['dwell_time' => 2.50449], $keys)
         );
-        $this->assertSame([], answer_metrics(['response_time' => null], $keys));
+        $this->assertSame([], answer_metrics(['dwell_time' => null], $keys));
         $this->assertSame([], answer_metrics([], $keys));
     }
 
@@ -127,10 +127,10 @@ final class SaveTest extends TestCase
         [$fields, $rows] = append_metrics_columns(
             ['session_id', 'system', 'rating'],
             [['s1', 'A', 4], ['s1', 'B', 3]],
-            [['response_time' => 2.5], ['response_time' => 9.0]],
-            ['response_time']
+            [['dwell_time' => 2.5], ['dwell_time' => 9.0]],
+            ['dwell_time']
         );
-        $this->assertSame(['session_id', 'system', 'rating', 'metrics_response_time'], $fields);
+        $this->assertSame(['session_id', 'system', 'rating', 'metrics_dwell_time'], $fields);
         // Fixed decimals, so a whole number keeps them instead of PHP's own
         // float-to-string collapsing 9.0 to "9" - see METRIC_DECIMALS.
         $this->assertSame([['s1', 'A', 4, '2.50'], ['s1', 'B', 3, '9.00']], $rows);
@@ -138,7 +138,7 @@ final class SaveTest extends TestCase
 
     public function testAppendMetricsColumnsIsANoOpWhenNothingIsCollected(): void
     {
-        [$fields, $rows] = append_metrics_columns(['a'], [['x']], [['response_time' => 1]], []);
+        [$fields, $rows] = append_metrics_columns(['a'], [['x']], [['dwell_time' => 1]], []);
         $this->assertSame(['a'], $fields);
         $this->assertSame([['x']], $rows);
     }
@@ -147,11 +147,11 @@ final class SaveTest extends TestCase
     {
         $entries = append_metrics_json(
             [['system' => 'A', 'rating' => 4], ['system' => 'B', 'rating' => 3]],
-            [['response_time' => 2.5], ['response_time' => 9.0]],
-            ['response_time']
+            [['dwell_time' => 2.5], ['dwell_time' => 9.0]],
+            ['dwell_time']
         );
-        $this->assertSame(['response_time' => 2.5], $entries[0]['metrics']);
-        $this->assertSame(['response_time' => 9.0], $entries[1]['metrics']);
+        $this->assertSame(['dwell_time' => 2.5], $entries[0]['metrics']);
+        $this->assertSame(['dwell_time' => 9.0], $entries[1]['metrics']);
     }
 
     public function testSubmittedAnswersReadsTheKeyEachTestTypeSends(): void
@@ -168,7 +168,7 @@ final class SaveTest extends TestCase
         // json_encode drops the fraction of 9.0 without this flag, so the PHP
         // deployment would write 9 where the FastAPI one writes 9.0.
         $path = $this->tmpDir . '/r.json';
-        write_json_file($path, ['records' => [['metrics' => ['response_time' => 9.0]]]]);
+        write_json_file($path, ['records' => [['metrics' => ['dwell_time' => 9.0]]]]);
         $this->assertStringContainsString('9.0', file_get_contents($path));
     }
 

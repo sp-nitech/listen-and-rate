@@ -174,12 +174,14 @@ stimuli_dirs:
 # -- Per-answer metrics (optional) --------------------------------------------
 # Measurements of how each answer was produced, rather than of the systems
 # under test. Each is opt-in. Omit this section to record nothing.
-#   response_time - seconds from the listener first playing audio on a page to
-#                   moving on from it, minus the clip time they had to sit
-#                   through to get there. A quality-control aid (spotting
-#                   rushed or fatigued listeners), not a measure of the test.
+#   dwell_time - seconds spent on the page an answer came from, every visit to
+#                it added up. Added up per page over a session it is how long
+#                the trials took. One MUSHRA page writes a row per system, all
+#                carrying that page's one reading, so do not sum the column
+#                there. Time while the tab is closed is left out, so a resumed
+#                session is not charged for the gap.
 # metrics:
-#   response_time: false
+#   dwell_time: false
 
 # -- Resume (optional) --------------------------------------------------------
 # A session interrupted mid-test (closed tab, reload, a walk away from the

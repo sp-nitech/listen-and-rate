@@ -820,7 +820,7 @@ _TIMED_ROWS = [
         "system": "A",
         "item": "u1",
         "rating": 4,
-        "metrics_response_time": 0.4,
+        "metrics_dwell_time": 0.4,
     },
     {
         "session_id": "s1",
@@ -829,7 +829,7 @@ _TIMED_ROWS = [
         "system": "A",
         "item": "u2",
         "rating": 5,
-        "metrics_response_time": 8.0,
+        "metrics_dwell_time": 8.0,
     },
     {
         "session_id": "s2",
@@ -838,7 +838,7 @@ _TIMED_ROWS = [
         "system": "B",
         "item": "u1",
         "rating": 3,
-        "metrics_response_time": "",
+        "metrics_dwell_time": "",
     },
 ]
 
@@ -851,7 +851,7 @@ def _kept_items(tmp_path, bounds):
     from listen_and_rate.analysis.report import _filter_group_rows
 
     kept = _filter_group_rows(
-        _timed_df(tmp_path), {"label": "L", "metrics_filter": {"response_time": bounds}}
+        _timed_df(tmp_path), {"label": "L", "metrics_filter": {"dwell_time": bounds}}
     )
     return list(kept["item"])
 

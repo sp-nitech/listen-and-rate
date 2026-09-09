@@ -548,13 +548,13 @@ def _metrics_config(tmp_path, test_audio_file, fmt="csv", **metrics):
     }
 
 
-def _submit_with_response_time(tc, value=2.5):
+def _submit_with_dwell_time(tc, value=2.5):
     return tc.post(
         "/api/submit",
         json={
             "session_id": "s1",
             "test_type": "mos",
-            "ratings": [{"stimulus_id": "s001", "rating": 4, "response_time": value}],
+            "ratings": [{"stimulus_id": "s001", "rating": 4, "dwell_time": value}],
         },
     )
 
@@ -563,31 +563,31 @@ def test_config_reports_which_metrics_are_collected(
     tmp_path, test_audio_file, monkeypatch
 ):
     """The frontend only measures what the config asked for."""
-    config = _metrics_config(tmp_path, test_audio_file, response_time=True)
+    config = _metrics_config(tmp_path, test_audio_file, dwell_time=True)
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
-        assert tc.get("/api/config").json()["metrics"] == {"response_time": True}
+        assert tc.get("/api/config").json()["metrics"] == {"dwell_time": True}
 
 
-def test_submit_stores_response_time_as_a_prefixed_csv_column(
+def test_submit_stores_dwell_time_as_a_prefixed_csv_column(
     tmp_path, test_audio_file, monkeypatch
 ):
-    config = _metrics_config(tmp_path, test_audio_file, response_time=True)
+    config = _metrics_config(tmp_path, test_audio_file, dwell_time=True)
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
-        assert _submit_with_response_time(tc).status_code == 200
+        assert _submit_with_dwell_time(tc).status_code == 200
     path = next((tmp_path / "results").rglob("*.csv"))
     row = next(csv.DictReader(path.open(encoding="utf-8")))
-    assert row["metrics_response_time"] == "2.50"
+    assert row["metrics_dwell_time"] == "2.50"
 
 
-def test_submit_stores_response_time_nested_in_json(
+def test_submit_stores_dwell_time_nested_in_json(
     tmp_path, test_audio_file, monkeypatch
 ):
-    config = _metrics_config(tmp_path, test_audio_file, "json", response_time=True)
+    config = _metrics_config(tmp_path, test_audio_file, "json", dwell_time=True)
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
-        assert _submit_with_response_time(tc).status_code == 200
+        assert _submit_with_dwell_time(tc).status_code == 200
     path = next((tmp_path / "results").rglob("*.json"))
     data = json.loads(path.read_text(encoding="utf-8"))
-    assert data["records"][0]["metrics"] == {"response_time": 2.5}
+    assert data["records"][0]["metrics"] == {"dwell_time": 2.5}
 
 
 def test_submit_discards_a_metric_the_config_did_not_ask_for(
@@ -596,23 +596,23 @@ def test_submit_discards_a_metric_the_config_did_not_ask_for(
     """A client that measures anyway must not get it into the results."""
     config = _metrics_config(tmp_path, test_audio_file)  # nothing enabled
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
-        assert _submit_with_response_time(tc).status_code == 200
+        assert _submit_with_dwell_time(tc).status_code == 200
     path = next((tmp_path / "results").rglob("*.csv"))
     row = next(csv.DictReader(path.open(encoding="utf-8")))
     assert not [k for k in row if k.startswith("metrics")]
 
 
-def test_submit_rounds_response_time_to_two_decimals(
+def test_submit_rounds_dwell_time_to_two_decimals(
     tmp_path, test_audio_file, monkeypatch
 ):
     """Browser timers are coarsened and click latency is tens of ms, so the
     digits below this are noise rather than measurement."""
-    config = _metrics_config(tmp_path, test_audio_file, response_time=True)
+    config = _metrics_config(tmp_path, test_audio_file, dwell_time=True)
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
-        assert _submit_with_response_time(tc, 2.50449).status_code == 200
+        assert _submit_with_dwell_time(tc, 2.50449).status_code == 200
     path = next((tmp_path / "results").rglob("*.csv"))
     row = next(csv.DictReader(path.open(encoding="utf-8")))
-    assert row["metrics_response_time"] == "2.50"
+    assert row["metrics_dwell_time"] == "2.50"
 
 
 def test_submit_ignores_an_experiment_id_from_the_client(client, tmp_path):

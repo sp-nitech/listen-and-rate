@@ -979,14 +979,14 @@ def test_export_php_deploy_config_data_includes_metrics(
         "title": "T",
         "instructions": "I",
         "output": {"format": "csv", "path": str(tmp_path / "results")},
-        "metrics": {"response_time": True},
+        "metrics": {"dwell_time": True},
         "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
     }
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
-    assert "'metrics' => ['response_time' => true]" in text
+    assert "'metrics' => ['dwell_time' => true]" in text
 
 
 def test_export_php_deploy_config_data_includes_ui_language(

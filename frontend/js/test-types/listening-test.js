@@ -23,7 +23,6 @@
  *   _handleChoiceKey(e)      type-specific answer keys; true when consumed
  *   _choiceHintHtml()        that key group's segment of the shortcut hint
  *   _supportsResume()        false drops mid-clip resume and the rewind key
- *   _gatedSeconds(index)     clip time the listener must sit through there
  *   _submit()                post the collected answers
  */
 
@@ -48,10 +47,10 @@ export class ListeningTest {
     this.onSubmit = onSubmit;
     this.currentIndex = 0;
     this._boundKeydown = this._handleKeydown.bind(this);
-    // Response-time measurement (config.metrics.response_time); see
-    // _startResponseClock/_stopResponseClock for what the numbers mean.
-    this._playStartedAt = new Map(); // trial index -> ms at its first play
-    this._responseTime = new Map(); // trial index -> seconds, once settled
+    // Dwell-time measurement (config.metrics.dwell_time); see _flushDwell for
+    // what the numbers mean.
+    this._dwell = new Map(); // trial index -> seconds accumulated so far
+    this._enteredAt = null; // ms the running clock started, null while stopped
   }
 
   /** Mount the header, build the page DOM once, then sync it to the first trial. */
@@ -59,52 +58,59 @@ export class ListeningTest {
     this.container = container;
     this._renderHeader();
     this._buildPage();
-    // Capture phase: media events do not bubble, so an ancestor only sees
-    // them this way - which lets one listener here cover every test type
-    // rather than each one wiring its own clips.
-    this._pageSlot.addEventListener('play', () => this._startResponseClock(), true);
     this._syncPage();
+    this._startDwellClock();
     document.addEventListener('keydown', this._boundKeydown);
   }
 
   /**
-   * Note when the listener first played audio on the current page.
+   * Start the clock on whichever page is now the live one.
    *
-   * The clock starts here rather than on arrival so that reading the page,
-   * or stepping away before engaging with it, is not counted as deciding.
+   * Called wherever a page becomes current: the first render, every
+   * navigation, and a resume. Nothing runs while the tab is closed, which is
+   * what keeps a session picked up the next day from being charged for the
+   * night in between.
    */
-  _startResponseClock() {
-    if (!this._measuresResponseTime()) return;
-    if (!this._playStartedAt.has(this.currentIndex)) {
-      this._playStartedAt.set(this.currentIndex, performance.now());
-    }
+  _startDwellClock() {
+    if (!this._measuresDwellTime()) return;
+    this._enteredAt = performance.now();
+  }
+
+  /** Settle the current page and leave the clock stopped. */
+  _stopDwellClock() {
+    this._flushDwell();
+    this._enteredAt = null;
   }
 
   /**
-   * Settle the current page's response time, once, on the way forward.
+   * Add the time since the clock started to the current page's running total.
    *
-   * Time on the page, less the clip time the listener had to sit through to
-   * be allowed to leave it (_gatedSeconds) - so what remains is deciding, not
-   * listening. Only a forward move settles it, and only the first one:
-   * forward is gated on having answered, which is what makes the result
-   * non-negative, and a later revisit is re-reading rather than answering.
+   * Every settling point goes through here and the clock restarts as it
+   * leaves, so a second call straight after the first adds nothing. That is
+   * what lets one method serve both the navigation boundary and the resume
+   * record's mid-page flush.
+   *
+   * The total accumulates across visits rather than being fixed on the way
+   * out. Navigation backwards is allowed, and time spent reconsidering an
+   * earlier page is still time the test took - which is what makes the sum
+   * over a session's answers the length of the test itself.
    */
-  _stopResponseClock() {
-    if (!this._measuresResponseTime()) return;
+  _flushDwell() {
+    if (!this._measuresDwellTime() || this._enteredAt === null) return;
+    const now = performance.now();
     const index = this.currentIndex;
-    const startedAt = this._playStartedAt.get(index);
-    if (startedAt === undefined || this._responseTime.has(index)) return;
-    const elapsed = (performance.now() - startedAt) / 1000;
-    this._responseTime.set(index, elapsed - this._gatedSeconds(index));
+    const seconds = (now - this._enteredAt) / 1000;
+    this._dwell.set(index, (this._dwell.get(index) ?? 0) + seconds);
+    this._enteredAt = now;
   }
 
-  _measuresResponseTime() {
-    return !!this.config.metrics?.response_time;
+  _measuresDwellTime() {
+    return !!this.config.metrics?.dwell_time;
   }
 
-  /** The settled response time for a trial, or null when it has none. */
-  _responseTimeOf(index) {
-    return this._responseTime.get(index) ?? null;
+  /** The seconds accumulated on a page, or null when it has none. */
+  _dwellOf(index) {
+    return this._dwell.get(index) ?? null;
   }
 
   _renderHeader() {
@@ -163,30 +169,39 @@ export class ListeningTest {
     if (delta > 0 && !this._isAnswered(this.currentIndex)) return;
     const next = this.currentIndex + delta;
     if (next < 0 || next >= this._trialCount()) return;
-    if (delta > 0) this._stopResponseClock();
+    // Settle before the index moves, in both directions: the elapsed time
+    // belongs to the page being left, not the one being opened.
+    this._flushDwell();
     this.currentIndex = next;
     this._syncPage();
+    this._startDwellClock();
   }
 
   _nextOrSubmit() {
     if (this.currentIndex < this._trialCount() - 1) {
       this._navigate(1);
     } else if (this._answeredCount() === this._trialCount()) {
-      // The last page has no forward navigation to settle it.
-      this._stopResponseClock();
+      // The last page has no forward navigation to settle it, and the clock
+      // stays stopped from here: a rejected POST hands the page back so the
+      // listener can press Finish again (see submit.js), and the wait in
+      // between is the network's rather than theirs.
+      this._stopDwellClock();
       this._submit();
     }
   }
 
   /** Serialize progress for resume: current page, answers, and what was heard. */
   getProgress() {
+    // Bank the running clock first, so the record carries the time already
+    // spent on the current page. This runs on each state change (app.js wires
+    // it to _onChange), so a stretch with no answer, no playback and no
+    // navigation in it is the one thing a closed tab can still lose.
+    this._flushDwell();
     return {
       currentIndex: this.currentIndex,
       answers: this._serializeAnswers(),
       played: this._serializePlayed(),
-      // Settled response times only: a page whose clock is still running is
-      // one the listener has not answered, and it restarts on resume anyway.
-      metrics: [...this._responseTime],
+      metrics: [...this._dwell],
     };
   }
 
@@ -194,9 +209,10 @@ export class ListeningTest {
   restoreProgress(saved) {
     this._restoreAnswers(saved.answers ?? []);
     this._restorePlayed(saved.played ?? []);
-    this._responseTime = new Map(saved.metrics ?? []);
+    this._dwell = new Map(saved.metrics ?? []);
     this.currentIndex = Math.min(saved.currentIndex ?? 0, this._trialCount() - 1);
     this._syncPage();
+    this._startDwellClock();
   }
 
   // -- keyboard shortcuts ----------------------------------------------------

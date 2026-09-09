@@ -136,7 +136,7 @@ export class CMOSTest extends PairedTrialTest {
         return {
           stimulus_ids,
           rating,
-          response_time: this._responseTimeOf(trialIndex),
+          dwell_time: this._dwellOf(trialIndex),
         };
       }),
     }));

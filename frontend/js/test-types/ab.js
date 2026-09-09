@@ -127,7 +127,7 @@ export class ABTest extends PairedTrialTest {
         return {
           stimulus_ids,
           selected_stimulus_id,
-          response_time: this._responseTimeOf(trialIndex),
+          dwell_time: this._dwellOf(trialIndex),
         };
       }),
     }));

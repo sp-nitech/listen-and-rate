@@ -118,7 +118,7 @@ export class DMOSTest extends PairedTrialTest {
           stimulus_id: trial.test.id,
           reference_id: trial.reference.id,
           rating,
-          response_time: this._responseTimeOf(trialIndex),
+          dwell_time: this._dwellOf(trialIndex),
         };
       }),
     }));

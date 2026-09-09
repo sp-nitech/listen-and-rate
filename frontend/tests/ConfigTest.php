@@ -94,7 +94,7 @@ final class ConfigTest extends TestCase
                 'durations' => ['A__u1' => 1.5, 'A__u2' => 1.5, 'B__u1' => 1.5, 'B__u2' => 1.5],
                 'metadata' => ['title' => 'Listener Information', 'fields' => []],
                 'survey' => ['title' => 'Questionnaire', 'fields' => []],
-                'metrics' => ['response_time' => false],
+                'metrics' => ['dwell_time' => false],
                 'resume' => ['max_age_ms' => 7200000],
                 'stimuli_per_session' => null,
                 'items_per_session' => 1,
@@ -163,10 +163,10 @@ final class ConfigTest extends TestCase
         $data = $this->baseFakeConfigData('mos', [
             'shortcuts' => ['play' => 'Space'],
             'rating_labels' => null,
-            'metrics' => ['response_time' => true],
+            'metrics' => ['dwell_time' => true],
         ]);
         $response = build_config_response($data);
-        $this->assertSame(['response_time' => true], $response['metrics']);
+        $this->assertSame(['dwell_time' => true], $response['metrics']);
     }
 
     public function testBuildConfigResponseExposesTheUiLanguage(): void

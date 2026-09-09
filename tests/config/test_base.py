@@ -880,19 +880,31 @@ def test_metrics_defaults_to_collecting_nothing(tmp_path, test_audio_file):
     """Opt-in, like the metadata and survey forms."""
     data = minimal_config(str(test_audio_file))
     result = load_config(write_config(tmp_path, data))
-    assert result.metrics.response_time is False
+    assert result.metrics.dwell_time is False
+    assert result.metrics.enabled_keys() == []
 
 
-def test_metrics_response_time_can_be_enabled(tmp_path, test_audio_file):
+def test_metrics_dwell_time_can_be_enabled(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
-    data["metrics"] = {"response_time": True}
+    data["metrics"] = {"dwell_time": True}
     result = load_config(write_config(tmp_path, data))
-    assert result.metrics.response_time is True
+    assert result.metrics.dwell_time is True
+    assert result.metrics.enabled_keys() == ["dwell_time"]
 
 
 def test_metrics_rejects_an_unknown_key(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
-    data["metrics"] = {"respones_time": True}  # typo
+    data["metrics"] = {"dwel_time": True}  # typo
+    with pytest.raises(ValidationError, match="Unknown field"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_metrics_rejects_the_retired_response_time_key(tmp_path, test_audio_file):
+    # dwell_time replaced it and measures something else (the whole time on
+    # the page, every visit), so a config asking for the old name must stop
+    # rather than quietly collect the new number under the old assumptions.
+    data = minimal_config(str(test_audio_file))
+    data["metrics"] = {"response_time": True}
     with pytest.raises(ValidationError, match="Unknown field"):
         load_config(write_config(tmp_path, data))
 

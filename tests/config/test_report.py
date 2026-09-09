@@ -193,24 +193,24 @@ def test_metrics_filter_accepts_a_min_max_range():
         groups=[
             {
                 "label": "Deliberated",
-                "metrics_filter": {"response_time": {"min": 1.0, "max": 60.0}},
+                "metrics_filter": {"dwell_time": {"min": 1.0, "max": 60.0}},
             }
         ]
     )
-    bounds = rc.groups[0].metrics_filter["response_time"]
+    bounds = rc.groups[0].metrics_filter["dwell_time"]
     assert (bounds.min, bounds.max) == (1.0, 60.0)
 
 
 def test_metrics_filter_accepts_one_sided_bounds():
     rc = ReportConfig(
-        groups=[{"label": "L", "metrics_filter": {"response_time": {"min": 1}}}]
+        groups=[{"label": "L", "metrics_filter": {"dwell_time": {"min": 1}}}]
     )
-    bounds = rc.groups[0].metrics_filter["response_time"]
+    bounds = rc.groups[0].metrics_filter["dwell_time"]
     assert (bounds.min, bounds.max) == (1.0, None)
 
 
 def test_metrics_filter_rejects_an_unknown_bound():
     with pytest.raises(ValidationError, match="Unknown field"):
         ReportConfig(
-            groups=[{"label": "L", "metrics_filter": {"response_time": {"over": 1}}}]
+            groups=[{"label": "L", "metrics_filter": {"dwell_time": {"over": 1}}}]
         )

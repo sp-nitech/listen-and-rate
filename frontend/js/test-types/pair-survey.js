@@ -218,18 +218,19 @@ export class PairSurveyTest extends PairedTrialTest {
     if (this._saving) return;
     if (this.currentIndex < this._trialCount() - 1) {
       if (!this._isAnswered(this.currentIndex)) return;
-      this._stopResponseClock();
+      this._stopDwellClock();
       this._saving = true;
       try {
         await saveProgressPayload(this, () => this._choicesPayload());
         this._navigate(1);
       } catch {
-        // Error already shown; stay on this pair.
+        // Error already shown; stay on this pair and keep measuring dwell.
+        this._startDwellClock();
       } finally {
         this._saving = false;
       }
     } else if (this._answeredCount() === this._trialCount()) {
-      this._stopResponseClock();
+      this._stopDwellClock();
       this._submit();
     }
   }

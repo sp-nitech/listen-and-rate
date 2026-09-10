@@ -26,6 +26,8 @@ from ...config import (
     build_ab_trials,
 )
 from ...config._utils import _duplicates
+from ...config.base import RATER_METADATA_KEY
+from ...ids import is_valid_id
 from ...models import SubmitRequest
 from ...rng import rng
 from ...storage import METRIC_DECIMALS, OUTCOME_A, OUTCOME_B, ResultSaver
@@ -206,11 +208,14 @@ def _practice_extras(
     independently of the session sampling, so overlap with the real session
     is allowed; rng.sample also randomizes their order. Returns {} when no
     practice stage is configured, keeping the response unchanged.
-    load_config guarantees practice.count <= len(pool).
+
+    load_config checks practice.count against the FULL pool, so the count is
+    clamped here: a per-rater assignment can leave this listener with fewer
+    trials than that, and a short practice round beats refusing to start.
     """
     if config.practice is None or config.practice.count == 0:
         return {}
-    sampled = rng.sample(pool, config.practice.count)
+    sampled = rng.sample(pool, min(config.practice.count, len(pool)))
     extras: dict[str, object] = {key: to_response(sampled)}
     # Omitted rather than sent empty when unset, so the frontend can tell
     # "no banner" from "an empty one"; mirrors config.php's practice_extras().
@@ -268,23 +273,38 @@ def _require_answered_once(keys: list[str], name: str, unit: str) -> None:
 
 
 def _save_and_ok(
-    body: SubmitRequest, config: Config, saver: ResultSaver, rows: list[dict]
+    body: SubmitRequest,
+    config: Config,
+    saver: ResultSaver,
+    rows: list[dict],
+    *,
+    overwrite: bool = False,
+    complete: bool = True,
 ) -> dict:
     """Validate form answers, persist one session's rows, and return ok.
 
     The shared tail of every _submit_* handler - rows are the already
     validated, storage-shaped dicts built by the type-specific validator.
     The metadata and survey forms share one validator (same field schema,
-    different collection timing).
+    different collection timing). Incomplete pair_survey saves skip the
+    post-test survey: that form is not shown until Finish.
     """
     metadata = _validate_metadata(config.metadata.fields, body.metadata)
-    survey = _validate_metadata(config.survey.fields, body.survey)
+    survey = _validate_metadata(config.survey.fields, body.survey) if complete else {}
+    if getattr(config, "assignments", None) is not None:
+        # Re-checked here and not trusted from the request: without it a
+        # session could be filed under a rater who was never assigned these
+        # items, which is exactly the attribution the split exists to keep.
+        _assigned_items(config, body.rater)
+        metadata = {**metadata, RATER_METADATA_KEY: body.rater or ""}
     saver.save(
         session_id=body.session_id,
         test_type=config.test_type,
         records=rows,
         metadata=metadata,
         survey=survey,
+        overwrite=overwrite,
+        complete=complete,
     )
     return {"status": "ok", "session_id": body.session_id}
 
@@ -360,13 +380,62 @@ def _positional_outcome(chosen_system: str, pair: dict[str, str]) -> str:
     return OUTCOME_A if chosen_system == pair["system_a"] else OUTCOME_B
 
 
-def _build_response_trials(
-    config: CMOSConfig | ABConfig | ABXConfig, all_stimuli: list[StimulusConfig]
-) -> list[ABTrial]:
-    """Pair and sample the trial list shared by CMOS's, AB's, and ABX's /api/config."""
-    trials = build_ab_trials(all_stimuli)
+def _assigned_items(config: Config, rater: str | None) -> set[str] | None:
+    """Return the items `rater` is assigned, or None when no filtering applies.
 
-    # Per-session sampling (trial = one item's pair of stimuli)
+    None means "serve the whole pool", which is both the no-assignments case
+    and the deliberate `require_known_rater: false` fallback for an
+    unrecognized visitor. Raises HTTPException(400) instead when the config
+    asks for known raters only - see AssignmentsConfig on why that is the
+    default.
+    """
+    assignments = getattr(config, "assignments", None)
+    if assignments is None:
+        return None
+
+    def _refuse(detail: str) -> None:
+        if assignments.require_known_rater:
+            raise HTTPException(status_code=400, detail=detail)
+
+    if rater is None:
+        _refuse(
+            "This experiment assigns tasks per rater. Open the URL with your "
+            "rater id, e.g. ?rater=alice"
+        )
+        return None
+    # Checked rather than just missed in the lookup so a malformed id gets the
+    # same message wherever it appears (see ids.is_valid_id).
+    if not is_valid_id(rater):
+        raise HTTPException(
+            status_code=400,
+            detail="rater must contain only letters, digits, '.', '-', or '_'",
+        )
+    items = config.rater_items.get(rater)
+    if items is None:
+        _refuse(f"Unknown rater: {rater!r}")
+        return None
+    return set(items)
+
+
+def _filter_assigned(trials: list[TrialT], items: set[str] | None) -> list[TrialT]:
+    """Keep only the trials whose item is assigned; all of them when None."""
+    if items is None:
+        return trials
+    return [t for t in trials if t.item in items]
+
+
+def _build_response_trials(
+    config: CMOSConfig | ABConfig | ABXConfig,
+    all_stimuli: list[StimulusConfig],
+    assigned: set[str] | None = None,
+) -> list[ABTrial]:
+    """Pair and sample the trial list shared by CMOS, AB, and ABX."""
+    trials = _filter_assigned(build_ab_trials(all_stimuli), assigned)
+
+    # Per-session sampling (trial = one item's pair of stimuli). Applied after
+    # the assignment filter, so items_per_session thins a rater's own list
+    # rather than the whole pool - otherwise sampling the pool first would
+    # usually leave nothing of theirs behind.
     n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
     if n is not None:
         trials = _sample_keep_order(trials, n)
@@ -393,16 +462,29 @@ def _pair_trials_to_response(
     return response_trials
 
 
-def _pair_config_response(config: CMOSConfig | ABConfig, **type_extras: object) -> dict:
+def _pair_config_response(
+    config: CMOSConfig | ABConfig,
+    rater: str | None = None,
+    **type_extras: object,
+) -> dict:
     """Build the full /api/config response shared by CMOS and AB."""
     all_stimuli = _all_stimuli(config)
     id_to_label = {s.id: s.label for s in all_stimuli}
+    assigned = _assigned_items(config, rater)
     trials = _pair_trials_to_response(
-        _build_response_trials(config, all_stimuli), id_to_label
+        _build_response_trials(config, all_stimuli, assigned), id_to_label
     )
+    if not trials:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No trials are assigned to rater {rater!r}",
+        )
     extras = _practice_extras(
         config,
-        build_ab_trials(all_stimuli),
+        # Practice is drawn from this rater's own items, not the whole pool:
+        # a warm-up on clips they will never rate is a worse rehearsal, and
+        # with a per-rater split it may not even be theirs to hear.
+        _filter_assigned(build_ab_trials(all_stimuli), assigned),
         lambda ts: _pair_trials_to_response(ts, id_to_label),
     )
     return _test_config_response(config, trials=trials, **type_extras, **extras)

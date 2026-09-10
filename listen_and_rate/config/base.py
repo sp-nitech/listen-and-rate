@@ -408,6 +408,39 @@ class LoudnessNormalizationConfig(_StrictModel):
     scope: Literal["stimulus", "system"] = "stimulus"
 
 
+# Metadata key the rater id is stored under, so results say whose task list a
+# session came from. It goes through metadata rather than becoming a column of
+# its own because that is already the channel for "who this listener was", and
+# it inherits the metadata_ prefix in the saved output for free.
+RATER_METADATA_KEY = "rater"
+
+
+class AssignmentsConfig(_StrictModel):
+    """Maps each named rater to the items they are asked to evaluate.
+
+    Upstream samples a listener's trials at random (stimuli_dirs.
+    items_per_session), which is right when listeners are interchangeable and
+    wrong when the workload has been divided up deliberately - a fixed split
+    across annotators, or a shared subset used to measure inter-rater
+    agreement. `path` points at a JSON object of {rater: [item, ...]}, where
+    an item is the filename (without extension) shared by the two systems.
+
+    The rater identifies themselves in the URL (`?rater=alice`), because the
+    trial list has to be chosen before the browser has shown anything - the
+    pre-test metadata form comes after /api/config, too late to select on.
+    That makes the id a routing key and not a credential: anyone who guesses
+    another rater's name gets their list. Put the app behind whatever
+    authentication the study needs if that matters.
+    """
+
+    path: str
+    # Whether a request with no `?rater=` (or an unrecognized one) is refused
+    # rather than served the full stimulus set. On by default: silently
+    # handing an unknown visitor every item is how an assignment split gets
+    # quietly undone, and the failure is invisible until analysis.
+    require_known_rater: bool = True
+
+
 class StimulusConfig(_StrictModel):
     """A single audio stimulus."""
 
@@ -678,12 +711,18 @@ def _merge_rating_shortcuts(
 # Test types where a stimuli_dirs.systems entry's 'reference: true' flag is
 # meaningful (the system is compared against a designated reference
 # stimulus).
-_REFERENCE_AWARE_TEST_TYPES = {"dmos", "xab", "mushra"}
+_REFERENCE_AWARE_TEST_TYPES = {"dmos", "xab", "mushra", "pair_survey"}
 
 # Test types where a stimuli_dirs.systems entry's 'anchor: true' flag is
 # meaningful (the system is rated like a normal system but disclosed to the
 # listener as the anchor, always shown last).
 _ANCHOR_AWARE_TEST_TYPES = {"mushra"}
+
+# Test types that honor per-rater `assignments`. All four pair one item's two
+# stimuli into a trial and share the same sampling path, so filtering by
+# assigned item means the same thing in each; the MOS family and MUSHRA
+# sample differently and would need their own filter.
+_ASSIGNMENT_AWARE_TEST_TYPES = {"cmos", "ab", "abx", "pair_survey"}
 
 
 class BaseTestConfig(_StrictModel):
@@ -726,6 +765,10 @@ class BaseTestConfig(_StrictModel):
     audio_preload: Literal["none", "auto"] = "auto"
     stimuli_list: StimuliListConfig | None = None
     stimuli_dirs: StimuliDirsConfig | None = None
+    # Per-rater task lists; absent means every listener draws from the full
+    # pool as upstream does. Only the pair-based test types honor it (see
+    # check_assignments_supported).
+    assignments: AssignmentsConfig | None = None
     shortcuts: KeyboardShortcuts = Field(default_factory=KeyboardShortcuts)
     # Pre-test listener-information form ({title, fields}); no fields (the
     # default) means the page is skipped.
@@ -753,6 +796,10 @@ class BaseTestConfig(_StrictModel):
     # load_config(); served to the browser so the time bar shows clip length
     # without a per-clip metadata fetch. Private so it can't be set via YAML.
     _durations: dict[str, float] = PrivateAttr(default_factory=dict)
+    # {rater: [item, ...]} read from assignments.path by load_config(), which
+    # also checks every item exists. Private for the same reason as
+    # _durations: it comes from a file the config points at, not from YAML.
+    _rater_items: dict[str, list[str]] = PrivateAttr(default_factory=dict)
 
     @field_validator("experiment_id", mode="before")
     @classmethod
@@ -783,6 +830,11 @@ class BaseTestConfig(_StrictModel):
     def durations(self) -> dict[str, float]:
         """{stimulus_id: duration_seconds} measured at load time."""
         return self._durations
+
+    @property
+    def rater_items(self) -> dict[str, list[str]]:
+        """{rater: [item, ...]} read from assignments.path at load time."""
+        return self._rater_items
 
     @property
     def shuffle_order(self) -> bool:
@@ -839,6 +891,34 @@ class BaseTestConfig(_StrictModel):
                 "loudness_check_normalization_conflict",
                 "set only one of 'loudness_check' / 'loudness_normalization'. "
                 "Normalization makes the check redundant",
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_assignments_supported(self) -> BaseTestConfig:
+        """Reject `assignments` on a test type that would silently ignore it."""
+        if self.assignments is None:
+            return self
+        test_type = getattr(self, "test_type", None)
+        if test_type not in _ASSIGNMENT_AWARE_TEST_TYPES:
+            raise PydanticCustomError(
+                "assignments_unsupported",
+                "'assignments' is not supported by test type {test_type}. "
+                "Supported: {supported}",
+                {
+                    "test_type": repr(test_type),
+                    "supported": sorted(_ASSIGNMENT_AWARE_TEST_TYPES),
+                },
+            )
+        # The rater id is stored as a metadata answer, so a form field of the
+        # same name would be overwritten by it.
+        if any(f.key == RATER_METADATA_KEY for f in self.metadata.fields):
+            raise PydanticCustomError(
+                "assignments_metadata_key_conflict",
+                "metadata cannot declare a field named {key} while "
+                "'assignments' is in use: the rater id is stored under that "
+                "key already",
+                {"key": repr(RATER_METADATA_KEY)},
             )
         return self
 

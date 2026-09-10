@@ -1,12 +1,12 @@
-"""API routes: /api/status, /api/config, /api/submit.
+"""API routes: /api/status, /api/config, /api/progress, /api/submit.
 
 Each endpoint dispatches to the per-test-type handler module in the project's
-canonical order: MOS, DMOS, CMOS, AB, ABX, XAB, MUSHRA.
+canonical order: MOS, DMOS, CMOS, AB, ABX, XAB, MUSHRA, pair_survey.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...config import (
     ABConfig,
@@ -15,10 +15,12 @@ from ...config import (
     Config,
     DMOSConfig,
     MOSConfig,
+    PairSurveyConfig,
     XABConfig,
 )
 from ...dependencies import get_config, get_result_saver, get_x_secret
 from ...models import SubmitRequest
+from ...progress import collect_progress
 from ...storage import ResultExistsError, ResultSaver
 from .ab import _get_ab_test_config, _submit_ab
 from .abx import _get_abx_test_config, _submit_abx
@@ -26,6 +28,7 @@ from .cmos import _get_cmos_test_config, _submit_cmos
 from .dmos import _get_dmos_test_config, _submit_dmos
 from .mos import _get_mos_test_config, _submit_mos
 from .mushra import _get_mushra_test_config, _submit_mushra
+from .pair_survey import _get_pair_survey_test_config, _submit_pair_survey
 from .xab import _get_xab_test_config, _submit_xab
 
 router = APIRouter()
@@ -37,27 +40,47 @@ def status(config: Config = Depends(get_config)):
     return {"status": "ok", "test_type": config.test_type}
 
 
+@router.get("/progress")
+def get_progress(config: Config = Depends(get_config)):
+    """Per-rater assignment coverage vs saved ratings."""
+    return collect_progress(config)
+
+
 @router.get("/config")
 def get_test_config(
-    config: Config = Depends(get_config), x_secret: bytes = Depends(get_x_secret)
+    config: Config = Depends(get_config),
+    x_secret: bytes = Depends(get_x_secret),
+    rater: str | None = Query(
+        default=None,
+        description=(
+            "Who is taking the test. Selects their task list when the config "
+            "has an `assignments` section; ignored otherwise."
+        ),
+    ),
 ):
     """Return test parameters for the frontend.
 
     Only id and label are sent per stimulus - path, system, and item are
     withheld to keep listeners blind to the underlying system under test.
+
+    `rater` is read here rather than from the pre-test metadata form because
+    it decides which trials to build, and the form is not shown until after
+    this response has been delivered.
     """
     if isinstance(config, MOSConfig):
         return _get_mos_test_config(config)
     if isinstance(config, DMOSConfig):
         return _get_dmos_test_config(config)
     if isinstance(config, CMOSConfig):
-        return _get_cmos_test_config(config)
+        return _get_cmos_test_config(config, rater)
     if isinstance(config, ABConfig):
-        return _get_ab_test_config(config)
+        return _get_ab_test_config(config, rater)
     if isinstance(config, ABXConfig):
-        return _get_abx_test_config(config, x_secret)
+        return _get_abx_test_config(config, x_secret, rater)
     if isinstance(config, XABConfig):
         return _get_xab_test_config(config)
+    if isinstance(config, PairSurveyConfig):
+        return _get_pair_survey_test_config(config, rater)
     return _get_mushra_test_config(config)
 
 
@@ -68,10 +91,11 @@ def submit(
     saver: ResultSaver = Depends(get_result_saver),
     x_secret: bytes = Depends(get_x_secret),
 ):
-    """Validate and persist a complete set of listener responses.
+    """Validate and persist listener responses.
 
-    Returns 409 when results for the session_id already exist - collected
-    data is never overwritten (see storage.ResultExistsError).
+    pair_survey may POST the same session_id more than once (each Next, then
+    Finish) and overwrites that session's file. Other test types return 409
+    when results for the session_id already exist (see storage.ResultExistsError).
     """
     try:
         if isinstance(config, MOSConfig):
@@ -86,6 +110,8 @@ def submit(
             return _submit_abx(body, config, saver, x_secret)
         if isinstance(config, XABConfig):
             return _submit_xab(body, config, saver)
+        if isinstance(config, PairSurveyConfig):
+            return _submit_pair_survey(body, config, saver)
         return _submit_mushra(body, config, saver)
     except ResultExistsError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None

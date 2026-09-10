@@ -1,0 +1,28 @@
+# Production reverse proxy for the rating app.
+# Certificates come from Let's Encrypt via the HTTP-01 challenge on :80.
+# Set ACME_EMAIL and ADMIN_PASSWORD_HASH in the project-root .env
+# (see deploy/env.example).
+{
+	email {$ACME_EMAIL}
+}
+
+rate.ramsalab.ae {
+	encode gzip
+
+	# Progress and report leak every rater's status. Keep them off the
+	# public rating URLs. /api/progress is the same data as JSON.
+	@admin {
+		path /progress* /report* /api/progress*
+	}
+
+	handle @admin {
+		basic_auth {
+			admin {$ADMIN_PASSWORD_HASH}
+		}
+		reverse_proxy rate-app:8000
+	}
+
+	handle {
+		reverse_proxy rate-app:8000
+	}
+}

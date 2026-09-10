@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_config_or_exit
+from .config.base import RATER_METADATA_KEY
 from .duration import run_configured_duration_check
 from .loudness import (
     run_configured_loudness_check,
@@ -20,6 +21,7 @@ from .loudness import (
 )
 from .routers import api
 from .routers import audio as audio_router
+from .routers import progress as progress_router
 from .routers import report as report_router
 from .routers.api import get_test_config, submit
 from .routers.audio import serve_abx_x_php_alias
@@ -41,11 +43,17 @@ async def lifespan(app: FastAPI):
     run_configured_loudness_check(config)
     run_configured_silence_check(config)
     app.state.config = config
+    # The rater id rides along as a metadata answer (see _save_and_ok), so the
+    # CSV saver has to know about the column up front - it writes only the
+    # keys it was given, and would otherwise drop it.
+    metadata_keys = [f.key for f in config.metadata.fields]
+    if config.assignments is not None:
+        metadata_keys = [RATER_METADATA_KEY, *metadata_keys]
     app.state.result_saver = make_result_saver(
         config.output.format,
         config.output.path,
         config.experiment_id,
-        [f.key for f in config.metadata.fields],
+        metadata_keys,
         [f.key for f in config.survey.fields],
         config.metrics.enabled_keys(),
     )
@@ -82,6 +90,21 @@ async def lifespan(app: FastAPI):
         shutil.rmtree(normalized_cache, ignore_errors=True)
 
 
+class NoStoreStaticFiles(StaticFiles):
+    """Serve the frontend without letting browsers keep a stale module graph.
+
+    CSS and ES modules are cached aggressively from Last-Modified/ETag alone.
+    After a JS change the rating page can keep rendering an older script, so
+    new markup (question descriptions, help) never appears until cache is
+    cleared. no-store makes a normal refresh pick up the files on disk.
+    """
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+
 def create_app() -> FastAPI:
     """Construct and return the FastAPI application.
 
@@ -92,6 +115,7 @@ def create_app() -> FastAPI:
     app.include_router(api.router, prefix="/api")
     app.include_router(audio_router.router)
     app.include_router(report_router.router)
+    app.include_router(progress_router.router)
 
     # PHP-compatible aliases at root level so the same frontend JS (which calls
     # "config.php" and "save.php" as relative URLs) works with both FastAPI and
@@ -143,7 +167,11 @@ def create_app() -> FastAPI:
     )
 
     frontend_dir = Path(__file__).parent.parent / "frontend"
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+    app.mount(
+        "/",
+        NoStoreStaticFiles(directory=str(frontend_dir), html=True),
+        name="frontend",
+    )
     return app
 
 

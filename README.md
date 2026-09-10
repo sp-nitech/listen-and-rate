@@ -16,9 +16,10 @@ Screenshots of the interface are shown below.
 ## Key Features
 
 - **Configuration-Driven**: Define experiments in a single YAML file.
+- **Per-rater assignments**: Optionally map each rater to a list of items via `assignments.path` (a JSON object). Raters open `?rater=<id>`.
 - **Dual Backend Support**: Choose the deployment option that fits your environment.
-  1. PHP: Drop a static bundle into your `public_html` or `www` directory.
-  1. FastAPI: Run it as a lightweight Python backend server.
+  1. PHP: Drop a static bundle into your `public_html` or `www` directory. Not available for `pair_survey` or configs that use `assignments`.
+  1. FastAPI: Run it as a lightweight Python backend server, or with Docker (see below).
 - **Built-in Analytics**: Analyze experimental results directly in your browser without external plotting or statistical analysis tools.
 
 ## Supported Tests
@@ -30,6 +31,7 @@ Screenshots of the interface are shown below.
 - **ABX**: Determine whether the third sample (X) matches sample A or B.
 - **XAB**: Determine whether the first sample (X) is closer to sample A or B.
 - **MUSHRA**: Compare multiple stimuli and rate each on a 0-100 scale.
+- **pair_survey**: Show a labeled source clip and generated clip, then rate the generated clip on any number of configured questions (e.g. naturalness, similarity). PHP export is not supported for this type.
 
 ## Supported Browsers
 
@@ -145,6 +147,36 @@ To use a different host or port, specify them as Make variables:
 make serve CONFIG=/path/to/your/config.yaml HOST=127.0.0.1 PORT=8080
 ```
 
+This fork's default experiment lives under `data/`:
+
+```text
+data/
+  json/
+    config.yaml          # pair_survey + assignments
+    assignments.json     # {"alice": ["utt_001", ...], "bob": [...]}
+  audio/
+    source/              # source-speaker reference
+    generated/           # generated output (matching filenames)
+  ratings/               # one JSON file per session
+```
+
+Generate placeholder clips, then serve:
+
+```sh
+uv run python scripts/make_sample_data.py
+make serve CONFIG=data/json/config.yaml
+```
+
+Open <http://localhost:8000/?rater=alice> (or `bob`, `carol`). JSON is the recommended `output.format` for `pair_survey`: each trial stores one row for the generated system (`system`, `item`, `reference`) plus a column per question.
+
+### 2.C. Docker deployment
+
+```sh
+docker compose up --build
+```
+
+This bind-mounts `./data` into the container, so ratings written to `data/ratings/` survive replacing the image. For production HTTPS on `rate.ramsalab.ae`, use the Caddy overlay and runbook in [deploy/README.md](deploy/README.md).
+
 ### 3. Analyzing results
 
 Results are stored in a subdirectory named after the configuration file, with one file per session:
@@ -203,3 +235,12 @@ The figure below is an example from a generated report.
 
 Released under the 3-Clause BSD License.
 See [LICENSE](LICENSE) for details.
+
+## Developing
+
+Upstream's `make test` / `make lint` also run PHP and Biome tooling that this
+fork does not require. The Python suite is:
+
+```sh
+uv run pytest
+```

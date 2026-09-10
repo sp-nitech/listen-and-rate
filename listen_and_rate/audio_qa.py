@@ -18,7 +18,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TypeVar
 
-from .config import Config, DMOSConfig, MUSHRAConfig, XABConfig
+from .config import Config, DMOSConfig, MUSHRAConfig, PairSurveyConfig, XABConfig
 from .config.base import StimulusConfig
 
 # What one measurement yields per clip: a float for loudness, a (leading,
@@ -88,7 +88,7 @@ def stimuli_under_check(
     # Only these test types have one, and only when a system is flagged.
     reference = (
         config.reference_system
-        if isinstance(config, (DMOSConfig, XABConfig, MUSHRAConfig))
+        if isinstance(config, (DMOSConfig, XABConfig, MUSHRAConfig, PairSurveyConfig))
         else None
     )
     if not reference:

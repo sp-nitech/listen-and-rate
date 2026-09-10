@@ -3,7 +3,7 @@
  * renders the test into #app. Shows an error screen on any failure.
  */
 
-import { fetchConfig, submitRatings } from './api.js';
+import { currentRater, fetchConfig, submitRatings } from './api.js';
 import { escapeHtml } from './dom.js';
 import { MetadataPage } from './metadata.js';
 import { runPracticeStage } from './practice.js';
@@ -16,6 +16,7 @@ import { CMOSTest } from './test-types/cmos.js';
 import { DMOSTest } from './test-types/dmos.js';
 import { MOSTest } from './test-types/mos.js';
 import { MUSHRATest } from './test-types/mushra.js';
+import { PairSurveyTest } from './test-types/pair-survey.js';
 import { XABTest } from './test-types/xab.js';
 
 /**
@@ -32,7 +33,14 @@ function flatStimuli(config) {
   if (config.test_type === 'dmos') {
     return config.trials.flatMap((trial) => [trial.reference, trial.test]);
   }
-  if (config.test_type === 'cmos' || config.test_type === 'ab' || config.test_type === 'abx') {
+  if (config.test_type === 'pair_survey') {
+    return config.trials.flatMap((trial) => [trial.source, trial.generated]);
+  }
+  if (
+    config.test_type === 'cmos' ||
+    config.test_type === 'ab' ||
+    config.test_type === 'abx'
+  ) {
     return config.trials.flatMap((trial) => trial.stimuli);
   }
   if (config.test_type === 'xab') {
@@ -94,6 +102,7 @@ const testTypeMap = {
   abx: ABXTest,
   xab: XABTest,
   mushra: MUSHRATest,
+  pair_survey: PairSurveyTest,
 };
 
 /**
@@ -156,8 +165,36 @@ function promptRetry(container, err) {
   });
 }
 
+/**
+ * Keep a resumed session's trial list, but take the latest question copy
+ * (titles, descriptions, scale help) from the live config. Rubric wording
+ * is display-only; freezing it made an in-progress session hide new help
+ * text after a config edit whose fingerprint still matched.
+ */
+function overlayQuestionCopy(frozen, fresh) {
+  if (!Array.isArray(frozen?.questions) || !Array.isArray(fresh?.questions)) {
+    return frozen;
+  }
+  const liveByKey = new Map(fresh.questions.map((q) => [q.key, q]));
+  return {
+    ...frozen,
+    questions: frozen.questions.map((q) => {
+      const live = liveByKey.get(q.key);
+      if (!live) return q;
+      return {
+        ...q,
+        label: live.label,
+        description: live.description,
+        help: live.help,
+        labels: live.labels,
+      };
+    }),
+  };
+}
+
 async function main() {
-  const freshConfig = await fetchConfig();
+  const rater = currentRater();
+  const freshConfig = await fetchConfig(rater);
   // Set before any DOM is touched - promptResume() below needs translated
   // strings too. Re-set once `config` is chosen (see below): a resumed
   // session's own frozen ui_language governs its own re-render, the same way
@@ -188,7 +225,8 @@ async function main() {
 
   // On resume, use the frozen config the session was started with - re-fetching
   // would re-sample and re-shuffle into a different test (and re-mint x tokens).
-  const config = resume ? saved.config : freshConfig;
+  // Question wording is overlaid from the live config so rubric edits show up.
+  const config = resume ? overlayQuestionCopy(saved.config, freshConfig) : freshConfig;
   setLanguage(config.ui_language);
   document.title = config.title;
   document.documentElement.lang = currentLanguage();
@@ -277,6 +315,18 @@ async function main() {
     });
   };
 
+  async function onProgress(sid, testType, payload) {
+    await submitRatings({
+      session_id: sid,
+      test_type: testType,
+      rater,
+      metadata: listenerMetadata,
+      survey: {},
+      complete: false,
+      ...payload,
+    });
+  }
+
   async function onSubmit(sid, testType, payload) {
     // Post-test survey: shown between the last trial ("Finish") and the
     // actual POST, so its answers ride along in the same submission.
@@ -298,8 +348,12 @@ async function main() {
     const request = {
       session_id: sid,
       test_type: testType,
+      // Echoed back so the saved results say whose task list this was. The
+      // server re-checks it against the assignments rather than trusting it.
+      rater,
       metadata: listenerMetadata,
       survey: surveyAnswers,
+      complete: true,
       ...payload,
     };
     let submitted = false;
@@ -331,6 +385,7 @@ async function main() {
 
   const test = new TestClass(config, sessionId, onSubmit);
   test._onChange = () => persist(test);
+  test.onProgress = onProgress;
   test.render(container);
   if (resume) test.restoreProgress(saved.progress);
 }

@@ -463,6 +463,159 @@ audio {
   grid-template-columns: repeat(7, 1fr);
 }
 
+/* -- pair_survey questions ---------------------------------------------- */
+/* Several questions share one page here, so each is a labelled block that
+   lays its own buttons out - unlike the fixed-width grid the single-question
+   types get from .rating-buttons. The blocks stack; the buttons inside one
+   wrap to as many rows as they need, which is what lets a question carry any
+   number of scale points or options without a per-type column count. */
+.rating-buttons.pair-survey-questions {
+  display: block;
+}
+
+.question-block + .question-block {
+  margin-top: 16px;
+}
+
+.question-block {
+  overflow: visible;
+}
+
+.question-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 6px;
+}
+
+.question-description {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1.45;
+  margin: 0 0 8px;
+}
+
+.question-optional {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.question-help {
+  margin: 0 0 10px;
+}
+
+.question-help-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  list-style: none;
+}
+
+.question-help-summary::-webkit-details-marker {
+  display: none;
+}
+
+.question-help-summary::before {
+  content: "?";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.question-help-summary:hover,
+.question-help-summary:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.question-help-list {
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.question-help-list li + li {
+  margin-top: 8px;
+}
+
+.question-help-score {
+  display: block;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.question-options .rating-btn {
+  flex: 1 1 140px;
+  justify-content: flex-start;
+}
+
+.question-options .rating-word {
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Per-clip questions sit inside the audio card, below the player, separated
+   from it so they read as being about that clip rather than as more player
+   chrome. Type is stepped down against the pair-level questions for the same
+   reason: within a card, the card already says which clip. */
+.stimulus-questions {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.stimulus-questions .question-label {
+  font-size: 0.78rem;
+}
+
+/* One row whatever the scale length, rather than the wrapping flex row the
+   pair-level questions use: a card is roughly half the page wide, so a 5-point
+   scale would wrap to 4+1 and stop reading as a scale. Columns share the width
+   equally and shrink instead. */
+.stimulus-questions .question-options {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.stimulus-questions .question-options .rating-btn {
+  padding: 10px 2px;
+}
+
+.stimulus-questions .rating-btn .rating-score {
+  font-size: 1.1rem;
+}
+
+/* Small enough that a one-word caption ("Excellent") still fits a column
+   whole; overflow-wrap is the fallback for a longer one, since a caption that
+   broke out of its button would overlap the next. */
+.stimulus-questions .rating-btn .rating-word {
+  font-size: 0.55rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
 /* -- Rating buttons ----------------------------------------------------- */
 .rating-section {
   margin-bottom: 36px;
@@ -1315,4 +1468,97 @@ audio {
        no need to recompute a pixel interval here. */
     height: 160px;
   }
+}
+
+/* -- Rater progress page ------------------------------------------------ */
+.progress-page {
+  padding: 48px 24px 80px;
+}
+
+.progress-main {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.progress-main h1 {
+  font-size: 1.75rem;
+  margin-bottom: 8px;
+}
+
+.progress-main h2 {
+  font-size: 1.15rem;
+  margin: 32px 0 12px;
+}
+
+.progress-meta {
+  color: var(--color-text-muted);
+  margin-bottom: 24px;
+}
+
+.progress-empty {
+  color: var(--color-text-muted);
+}
+
+.progress-table,
+.progress-items {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.progress-table th,
+.progress-table td,
+.progress-items th,
+.progress-items td {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.progress-table th,
+.progress-items th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.progress-table tr:last-child td,
+.progress-items tr:last-child td {
+  border-bottom: none;
+}
+
+.progress-table a {
+  color: var(--color-primary);
+}
+
+.progress-status-not_started {
+  color: var(--color-text-muted);
+}
+
+.progress-status-in_progress {
+  color: var(--color-practice);
+}
+
+.progress-status-complete {
+  color: var(--color-success);
+}
+
+.progress-rater {
+  margin: 8px 0 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+.progress-rater summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.progress-items {
+  margin-top: 12px;
 }

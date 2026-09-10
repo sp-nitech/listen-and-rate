@@ -273,6 +273,45 @@ def test_json_saver_refuses_to_overwrite_existing_session(tmp_path):
     ) == original
 
 
+def test_json_saver_overwrite_rewrites_the_same_session(tmp_path):
+    saver = JSONResultSaver(tmp_path, EXPERIMENT_ID)
+    saver.save(SESSION_ID, TEST_TYPE, RATINGS, complete=False)
+    saver.save(
+        SESSION_ID,
+        TEST_TYPE,
+        [{"system": "x", "item": "y", "rating": 1}],
+        overwrite=True,
+        complete=True,
+    )
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
+    assert data["complete"] is True
+    assert data["records"] == [{"system": "x", "item": "y", "rating": 1}]
+
+
+def test_json_saver_complete_defaults_to_true(tmp_path):
+    JSONResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
+    assert data["complete"] is True
+
+
+def test_csv_saver_overwrite_rewrites_the_same_session(tmp_path):
+    saver = CSVResultSaver(tmp_path, EXPERIMENT_ID)
+    saver.save(SESSION_ID, TEST_TYPE, RATINGS)
+    saver.save(
+        SESSION_ID,
+        TEST_TYPE,
+        [{"system": "x", "item": "y", "rating": 1}],
+        overwrite=True,
+    )
+    rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
+    assert len(rows) == 1
+    assert rows[0]["system"] == "x"
+
+
 # -- make_result_saver ------------------------------------------------------
 
 

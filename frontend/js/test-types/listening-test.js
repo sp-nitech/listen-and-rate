@@ -45,6 +45,8 @@ export class ListeningTest {
     this.config = config;
     this.sessionId = sessionId;
     this.onSubmit = onSubmit;
+    this.onProgress = null;
+    this._saving = false;
     this.currentIndex = 0;
     this._boundKeydown = this._handleKeydown.bind(this);
     // Dwell-time measurement (config.metrics.dwell_time); see _flushDwell for
@@ -190,6 +192,11 @@ export class ListeningTest {
     }
   }
 
+  /** ArrowRight (or the configured next key): advance, without submitting. */
+  _onNextShortcut() {
+    this._navigate(1);
+  }
+
   /** Serialize progress for resume: current page, answers, and what was heard. */
   getProgress() {
     // Bank the running clock first, so the record carries the time already
@@ -227,6 +234,10 @@ export class ListeningTest {
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     // Let buttons handle their own Enter activation; Space is reserved for audio below.
     if (tag === 'BUTTON' && e.key === 'Enter') return;
+    if (this._saving) {
+      e.preventDefault();
+      return;
+    }
 
     const { shortcuts } = this;
 
@@ -247,7 +258,7 @@ export class ListeningTest {
 
     if (e.key === shortcuts.next) {
       e.preventDefault();
-      this._navigate(1);
+      this._onNextShortcut();
       return;
     }
     if (e.key === shortcuts.prev) {

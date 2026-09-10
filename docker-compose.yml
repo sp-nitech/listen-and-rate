@@ -1,0 +1,21 @@
+services:
+  rate-app:
+    build: .
+    image: rate-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Everything the experiment needs - config, audio, assignments - lives
+      # under the mounted data/ directory, so changing the experiment means
+      # editing files on the host and restarting, never rebuilding the image.
+      # JS/CSS are also bind-mounted (see volumes). Python code still needs
+      # --build after a backend change.
+      LISTEN_AND_RATE_CONFIG: /app/data/json/config.yaml
+    volumes:
+      # Read-write: collected ratings are written back into data/ratings/, and
+      # keeping them on the host is what lets the container be replaced.
+      - ./data:/app/data
+      # JS/CSS are served from this tree. Mounting it means a browser refresh
+      # picks up UI edits without rebuilding the image.
+      - ./frontend:/app/frontend

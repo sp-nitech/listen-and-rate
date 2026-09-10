@@ -11,7 +11,9 @@ from ...storage import ResultSaver
 from ...x_token import commit, resolve
 from ._shared import (
     _all_stimuli,
+    _assigned_items,
     _build_response_trials,
+    _filter_assigned,
     _id_to_meta,
     _metrics_row,
     _pair_row,
@@ -44,16 +46,23 @@ def _abx_trials_to_response(
     return response_trials
 
 
-def _get_abx_test_config(config: ABXConfig, x_secret: bytes) -> dict:
+def _get_abx_test_config(
+    config: ABXConfig, x_secret: bytes, rater: str | None = None
+) -> dict:
     all_stimuli = _all_stimuli(config)
     id_to_label = {s.id: s.label for s in all_stimuli}
+    assigned = _assigned_items(config, rater)
     response_trials = _abx_trials_to_response(
-        _build_response_trials(config, all_stimuli), id_to_label, x_secret
+        _build_response_trials(config, all_stimuli, assigned), id_to_label, x_secret
     )
+    if not response_trials:
+        raise HTTPException(
+            status_code=400, detail=f"No trials are assigned to rater {rater!r}"
+        )
 
     extras = _practice_extras(
         config,
-        build_ab_trials(all_stimuli),
+        _filter_assigned(build_ab_trials(all_stimuli), assigned),
         lambda ts: _abx_trials_to_response(ts, id_to_label, x_secret),
     )
     return _test_config_response(config, trials=response_trials, **extras)

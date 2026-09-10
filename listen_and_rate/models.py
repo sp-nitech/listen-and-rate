@@ -26,7 +26,7 @@ class RatingEntry(BaseModel):
 
 
 class ChoiceEntry(BaseModel):
-    """A single AB/ABX/CMOS trial's outcome submitted by a listener.
+    """A single AB/ABX/CMOS/pair_survey trial's outcome submitted by a listener.
 
     stimulus_ids is the pair of stimuli shown for this trial.
     selected_stimulus_id is which one the listener chose - None for AB's
@@ -37,17 +37,26 @@ class ChoiceEntry(BaseModel):
     session storage.
     rating is only used for CMOS: the signed comparison rating (-3..3) of
     stimulus_ids[1] relative to stimulus_ids[0], as shown to the listener.
+    answers is pair_survey's: the configured questions' responses, keyed by
+    question key. stimulus_ids is [source, generated] in that order.
+    stimulus_answers is unused (kept so an older client payload still parses).
     """
 
     stimulus_ids: list[str]
     selected_stimulus_id: str | None = None
     x_token: str | None = None
     rating: int | None = None
+    answers: dict[str, str] = Field(default_factory=dict)
+    stimulus_answers: dict[str, dict[str, str]] = Field(default_factory=dict)
     dwell_time: float | None = _DWELL_TIME
 
 
 class SubmitRequest(BaseModel):
-    """Payload sent to POST /api/submit at the end of a test session."""
+    """Payload sent to POST /api/submit.
+
+    pair_survey posts on each Next (`complete=false`) as well as Finish.
+    Other test types post once at the end of a session.
+    """
 
     # Names the result file inside the experiment's directory, so it is held
     # to the same rule as experiment_id and rejected (422) rather than
@@ -59,6 +68,13 @@ class SubmitRequest(BaseModel):
     choices: list[ChoiceEntry] = Field(default_factory=list)  # CMOS, AB, ABX, XAB
     metadata: dict[str, str] = Field(default_factory=dict)  # pre-test form answers
     survey: dict[str, str] = Field(default_factory=dict)  # post-test form answers
+    # Echoed back from the ?rater= the browser loaded with, so the results say
+    # whose task list this session came from. Only meaningful when the config
+    # has an `assignments` section; ignored otherwise (see _save_and_ok).
+    rater: str | None = None
+    # False for pair_survey incremental saves (each Next). Defaults True so
+    # older clients that omit it still mark the session finished.
+    complete: bool = True
 
     @field_validator("session_id")
     @classmethod

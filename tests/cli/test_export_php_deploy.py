@@ -1028,3 +1028,67 @@ def test_export_php_deploy_config_data_includes_resume_window(
     _run_export(config_yaml, outdir, monkeypatch)
     text = (outdir / "config_data.php").read_text(encoding="utf-8")
     assert "'resume' => ['max_age_ms' => 1800000]" in text
+
+
+def test_export_rejects_pair_survey(tmp_path, test_audio_file, monkeypatch):
+    """pair_survey has no PHP save equivalent - refuse rather than a broken bundle."""
+    da = tmp_path / "sys_a"
+    db = tmp_path / "sys_b"
+    da.mkdir()
+    db.mkdir()
+    shutil.copy(test_audio_file, da / "utt1.wav")
+    shutil.copy(test_audio_file, db / "utt1.wav")
+    config_yaml = write_config(
+        tmp_path,
+        {
+            "test_type": "pair_survey",
+            "title": "T",
+            "instructions": "I",
+            "questions": [
+                {
+                    "key": "similarity",
+                    "label": "Same?",
+                    "type": "scale",
+                    "min": 1,
+                    "max": 5,
+                }
+            ],
+            "stimuli_dirs": {
+                "systems": [
+                    {"path": str(da), "system": "A", "reference": True},
+                    {"path": str(db), "system": "B"},
+                ]
+            },
+        },
+    )
+    with pytest.raises(SystemExit, match="pair_survey"):
+        _run_export(config_yaml, tmp_path / "deploy", monkeypatch)
+
+
+def test_export_rejects_assignments(tmp_path, test_audio_file, monkeypatch):
+    """PHP config.php has no rater query, so an assignment split would be undone."""
+    da = tmp_path / "sys_a"
+    db = tmp_path / "sys_b"
+    da.mkdir()
+    db.mkdir()
+    shutil.copy(test_audio_file, da / "utt1.wav")
+    shutil.copy(test_audio_file, db / "utt1.wav")
+    assignments = tmp_path / "assignments.json"
+    assignments.write_text('{"alice": ["utt1"]}', encoding="utf-8")
+    config_yaml = write_config(
+        tmp_path,
+        {
+            "test_type": "ab",
+            "title": "T",
+            "instructions": "I",
+            "assignments": {"path": str(assignments)},
+            "stimuli_dirs": {
+                "systems": [
+                    {"path": str(da), "system": "A"},
+                    {"path": str(db), "system": "B"},
+                ]
+            },
+        },
+    )
+    with pytest.raises(SystemExit, match="assignments"):
+        _run_export(config_yaml, tmp_path / "deploy", monkeypatch)

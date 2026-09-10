@@ -112,8 +112,17 @@ export class PairedTrialTest extends ListeningTest {
         <span class="audio-card-label">${label}</span>
         ${audioPlayerHtml(localIndex, preload)}
         <p class="audio-error" hidden>⚠ Audio file could not be loaded. Please contact the administrator.</p>
+        ${this._audioCardExtraHtml(localIndex)}
       </div>
     `;
+  }
+
+  /**
+   * Extra markup inside one audio card, below the player. Empty for the
+   * types that ask about the trial as a whole.
+   */
+  _audioCardExtraHtml() {
+    return '';
   }
 
   _bindAudioElement(audio) {

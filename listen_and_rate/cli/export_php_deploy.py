@@ -16,6 +16,7 @@ from listen_and_rate.config import (
     Config,
     DMOSConfig,
     MUSHRAConfig,
+    PairSurveyConfig,
     StimulusConfig,
     XABConfig,
     load_config_or_exit,
@@ -507,6 +508,18 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config_or_exit(args.config)
+    if isinstance(config, PairSurveyConfig):
+        raise SystemExit(
+            "pair_survey is not supported by the PHP exporter: the PHP save "
+            "handler has no equivalent of the configurable questions. Deploy "
+            "with FastAPI instead (`make serve` or `docker compose up`)."
+        )
+    if config.assignments is not None:
+        raise SystemExit(
+            "assignments is not supported by the PHP exporter: the PHP "
+            "config handler has no rater query and would serve every item. "
+            "Deploy with FastAPI instead (`make serve` or `docker compose up`)."
+        )
     run_configured_duration_check(config)
     run_configured_loudness_check(config)
     run_configured_silence_check(config)

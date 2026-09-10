@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 
 from fastapi.testclient import TestClient
@@ -38,15 +39,17 @@ def _two_system_client(
     n_items=2,
     items_per_session=None,
     presentation_order="random",
+    reference_first=False,
     **extra,
 ):
     da, db = _two_system_dirs(tmp_path, test_audio_file, n_items)
-    stimuli_dirs = {
-        "systems": [
-            {"path": str(da), "system": "A"},
-            {"path": str(db), "system": "B"},
-        ]
-    }
+    systems = [
+        {"path": str(da), "system": "A"},
+        {"path": str(db), "system": "B"},
+    ]
+    if reference_first:
+        systems[0]["reference"] = True
+    stimuli_dirs = {"systems": systems}
     if items_per_session is not None:
         stimuli_dirs["items_per_session"] = items_per_session
     config = {
@@ -171,6 +174,64 @@ def _ab_client(
         items_per_session,
         presentation_order,
         allow_tie=allow_tie,
+        **extra,
+    )
+
+
+def _pair_survey_questions():
+    """The two-question set the VC evaluation uses: naturalness + similarity."""
+    return [
+        {
+            "key": "naturalness",
+            "label": "How natural?",
+            "type": "scale",
+            "min": 1,
+            "max": 5,
+        },
+        {
+            "key": "similarity",
+            "label": "How similar?",
+            "type": "scale",
+            "min": 1,
+            "max": 5,
+        },
+    ]
+
+
+def _pair_survey_client(
+    tmp_path,
+    test_audio_file,
+    monkeypatch,
+    n_items=2,
+    items_per_session=None,
+    presentation_order="fixed",
+    questions=None,
+    assignments=None,
+    require_known_rater=True,
+    output_format="json",
+    **extra,
+):
+    extra = {
+        "questions": questions if questions is not None else _pair_survey_questions(),
+        **extra,
+    }
+    if assignments is not None:
+        path = tmp_path / "assignments.json"
+        path.write_text(json.dumps(assignments), encoding="utf-8")
+        extra["assignments"] = {
+            "path": str(path),
+            "require_known_rater": require_known_rater,
+        }
+    extra["output"] = {"format": output_format, "path": str(tmp_path / "results")}
+    return _two_system_client(
+        tmp_path,
+        test_audio_file,
+        monkeypatch,
+        "pair_survey",
+        n_items,
+        items_per_session,
+        presentation_order,
+        reference_first=True,
         **extra,
     )
 

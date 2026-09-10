@@ -45,6 +45,17 @@ test('fetchConfig names the status when the config cannot be loaded', async () =
   await assert.rejects(fetchConfig, /503/);
 });
 
+test('fetchConfig forwards the rater query', async () => {
+  const calls = stubFetch({ body: { test_type: 'pair_survey' } });
+  await fetchConfig('alice');
+  assert.equal(calls[0].url, 'config.php?rater=alice');
+});
+
+test('fetchConfig surfaces FastAPI detail on a rater rejection', async () => {
+  stubFetch({ status: 400, body: { detail: 'Unknown rater: "nobody"' } });
+  await assert.rejects(() => fetchConfig('nobody'), /Unknown rater/);
+});
+
 // -- submitRatings -----------------------------------------------------------
 
 test('submitRatings posts the payload as JSON', async () => {

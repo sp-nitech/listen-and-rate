@@ -1,0 +1,21 @@
+.git
+.github
+.venv
+__pycache__
+**/__pycache__
+
+# Mounted at runtime rather than baked in: the audio is large and the ratings
+# have to outlive the container.
+data
+
+# Upstream's example stimuli, screenshots, test suites, and dev tooling - none
+# of it is needed to serve an experiment.
+assets
+stimuli
+tests
+tools
+scripts
+docker-compose.yml
+Dockerfile
+Makefile
+*.md

@@ -1,0 +1,196 @@
+# Voice conversion evaluation: each trial shows a source clip next to the
+# generated clip for the same item, and asks the questions declared below
+# about the generated clip only.
+
+test_type: pair_survey
+
+title: "Voice Conversion Evaluation"
+
+instructions: |
+  You will hear a source clip and a generated clip.
+
+  Rate the generated clip on each scale below. You may replay each clip as
+  many times as you need.
+
+output:
+  format: json # one file per session, under output.path/<experiment_id>/
+  path: ./data/ratings/
+
+experiment_id: vc_eval
+
+source_label: Source
+generated_label: Generated
+
+# Filenames must match across the two directories: source/utt_001.wav is the
+# source clip for generated/utt_001.wav. The source need not be the same
+# sentence, only the same filename.
+stimuli_dirs:
+  systems:
+    - path: ./data/audio/source
+      system: source
+      reference: true
+    - path: ./data/audio/generated
+      system: generated
+
+# Each rater sees only the items listed for them in this file. Raters identify
+# themselves in the URL: http://localhost:8000/?rater=alice
+assignments:
+  path: ./data/json/assignments.json
+  require_known_rater: true
+
+questions:
+  - key: speaker_similarity
+    label: Speaker Similarity
+    description: How similar does the converted voice sound to the target speaker?
+    type: scale
+    min: 1
+    max: 5
+    labels:
+      1: Not similar
+      2: Slightly similar
+      3: Somewhat similar
+      4: Very similar
+      5: Identical
+    help:
+      1: Does not resemble the target speaker at all
+      2: A few traces of the target voice, mostly different
+      3: Resembles the target but noticeable differences remain
+      4: Clearly the target speaker with minor differences
+      5: Indistinguishable from the target speaker
+    required: true
+
+  - key: speaker_dissimilarity
+    label: Speaker Dissimilarity
+    description: >-
+      How different does the speaker's voice in the generated audio sound
+      from the original source audio, i.e., how well is the original
+      speaker's identity concealed?
+    type: scale
+    min: 1
+    max: 5
+    labels:
+      1: Not different
+      2: Slightly different
+      3: Somewhat different
+      4: Very different
+      5: Completely different
+    help:
+      1: Indistinguishable from the source speaker
+      2: Mostly resembles the source speaker, with only minor differences
+      3: Noticeably different, but some similarities to the source speaker remain
+      4: Mostly sounds different from the source speaker, with only minor similarities
+      5: Does not resemble the source speaker at all
+    required: true
+
+  - key: naturalness
+    label: Naturalness
+    description: How natural does the speech in the generated audio sound?
+    type: scale
+    min: 1
+    max: 5
+    labels:
+      1: Completely unnatural
+      2: Mostly unnatural
+      3: Somewhat natural
+      4: Mostly natural
+      5: Completely natural
+    help:
+      1: Sounds artificial or synthetic throughout
+      2: Synthetic quality is prominent throughout
+      3: Sounds human-like, but noticeably synthetic at times
+      4: Sounds human-like overall, with minor unnatural moments
+      5: Indistinguishable from genuine human speech
+    required: true
+
+  - key: intelligibility
+    label: Intelligibility
+    description: >-
+      How clearly are the words spoken in the original source audio
+      intelligible in the generated audio?
+    type: scale
+    min: 1
+    max: 5
+    labels:
+      1: Unintelligible
+      2: Barely intelligible
+      3: Somewhat intelligible
+      4: Mostly intelligible
+      5: Fully intelligible
+    help:
+      1: Content cannot be understood
+      2: Only isolated words or phrases understood
+      3: Most words understood, however some require guessing
+      4: Nearly all words clear, with 1-2 unclear moments
+      5: Every word understood without effort
+    required: true
+
+  - key: style_preservation
+    label: Style Preservation
+    description: >-
+      How well does the generated audio preserve the speaking style of the
+      original source audio, including rhythm, stress, intonation, emotion,
+      and speaking rate?
+    type: scale
+    min: 1
+    max: 5
+    labels:
+      1: Not preserved
+      2: Mostly lost
+      3: Somewhat preserved
+      4: Mostly preserved
+      5: Fully preserved
+    help:
+      1: Speaker style completely different from the source
+      2: Only a few aspects of the speaking style are preserved, and the overall style is noticeably different
+      3: Some aspects of the speaking style are preserved, while others are noticeably different
+      4: Speaking style closely matches the source, with only minor differences
+      5: Speaking style is identical to source
+    required: true
+
+  - key: accentedness
+    label: Accentedness
+    description: >-
+      How much does the pronunciation in the generated audio sound like that
+      of a native speaker?
+    type: scale
+    min: 1
+    max: 5
+    labels:
+      1: Not native
+      2: Slightly native
+      3: Somewhat native
+      4: Mostly native
+      5: Fully native
+    help:
+      1: Pronunciation has a strong and noticeable non-native accent throughout
+      2: A strong non-native accent is present throughout much of the utterance
+      3: A noticeable non-native accent is present on several sounds
+      4: Pronunciation sounds native overall, with only a slight, barely noticeable non-native accent on a few sounds
+      5: Pronunciation sounds fully native, with no noticeable non-native accent
+    required: true
+
+  - key: audio_quality
+    label: Audio Quality
+    description: >-
+      How good is the overall sound quality of the generated audio,
+      considering clarity and the absence of noise, distortion, or other
+      audio artifacts?
+    type: scale
+    min: 1
+    max: 5
+    labels:
+      1: Severely degraded
+      2: Heavy artifacts
+      3: Noticeable artifacts
+      4: Mostly clean
+      5: Excellent
+    help:
+      1: Severe noise, distortion, or artifacts are present, which make the audio difficult to listen to
+      2: Prominent noise, distortion, or artifacts are present, which frequently interfere with listening
+      3: Noticeable noise, distortion, or artifacts are present, but they do not strongly interfere with listening
+      4: Audio is mostly clean, with only minor imperfections that are not distracting
+      5: Audio is completely clean, with no noticeable noise, distortion, or artifacts
+    required: true
+
+metrics:
+  dwell_time: true

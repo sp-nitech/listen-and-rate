@@ -1,6 +1,6 @@
 PROJECT := listen_and_rate
 
-CONFIG        := examples/config.mos.yaml
+CONFIG        := data/json/config.yaml
 REPORT_CONFIG := examples/report-config.yaml
 
 DEPLOY  :=

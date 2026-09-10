@@ -91,3 +91,11 @@ def test_audio_returns_404_for_unknown_id(client):
 
 def test_audio_range_request_returns_206(client):
     assert client.get("/audio/s001", headers={"Range": "bytes=0-99"}).status_code == 206
+
+
+def test_frontend_assets_are_not_cached(client):
+    """Browsers otherwise keep an old ES module graph and omit new UI markup."""
+    for path in ("/js/app.js", "/css/style.css", "/"):
+        res = client.get(path)
+        assert res.status_code == 200, path
+        assert res.headers["cache-control"] == "no-store", path

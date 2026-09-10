@@ -31,8 +31,15 @@ export const en = {
   trial_hint_navigate: 'navigate',
   trial_hint_next: 'next',
 
+  pair_survey_step_listen: '① Listen to both',
+  pair_survey_step_answer: '② Answer every question',
+  pair_survey_hint_answer: 'click to answer',
+  pair_survey_optional: '(optional)',
+  pair_survey_help: 'Score details',
+
   submit_idle: 'Submit',
   submit_busy: 'Submitting…',
+  save_busy: 'Saving…',
 
   complete_title: 'Thank you!',
   complete_body: 'Your ratings have been saved successfully.',

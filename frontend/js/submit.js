@@ -1,6 +1,17 @@
 import { escapeHtml } from './dom.js';
 import { t } from './strings.js';
 
+/** Inline error under the trial page; replaces any previous one. */
+function showSubmitError(test, err) {
+  test._pageSlot.querySelectorAll('.submit-error').forEach((el) => el.remove());
+  test._pageSlot.insertAdjacentHTML(
+    'beforeend',
+    `<p class="submit-error" style="color:var(--color-error);margin-top:12px;text-align:center">
+        Error: ${escapeHtml(err.message)}
+      </p>`
+  );
+}
+
 /**
  * Shared submit flow for every test-type class: disable the Submit button,
  * detach the keyboard shortcuts, send the payload, and - if the server
@@ -34,11 +45,38 @@ export async function submitPayload(test, buildPayload) {
       btn.textContent = t('submit_idle');
     }
     document.addEventListener('keydown', test._boundKeydown);
-    test._pageSlot.insertAdjacentHTML(
-      'beforeend',
-      `<p style="color:var(--color-error);margin-top:12px;text-align:center">
-        Error: ${escapeHtml(err.message)}
-      </p>`
-    );
+    showSubmitError(test, err);
+  }
+}
+
+/**
+ * Incremental pair_survey save: POST answered trials without leaving the
+ * test UI. Practice and a missing onProgress callback are no-ops.
+ *
+ * @param {Object} test
+ * @param {Function} buildPayload
+ */
+export async function saveProgressPayload(test, buildPayload) {
+  if (test.config.isPractice || typeof test.onProgress !== 'function') return;
+
+  const btn = test._pageSlot.querySelector('#btn-next');
+  const prevBtn = test._pageSlot.querySelector('#btn-prev');
+  const previousLabel = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t('save_busy');
+  }
+  if (prevBtn) prevBtn.disabled = true;
+
+  try {
+    await test.onProgress(test.sessionId, test.config.test_type, buildPayload());
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = previousLabel ?? t('trial_next');
+    }
+    if (prevBtn) prevBtn.disabled = test.currentIndex === 0;
+    showSubmitError(test, err);
+    throw err;
   }
 }

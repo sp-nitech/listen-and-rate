@@ -1,0 +1,46 @@
+# Overlay for DigitalOcean. Start with:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requires a project-root .env (copy deploy/env.example). `!reset` / `!override`
+# need Docker Compose v2.24+; the official Docker packages on Ubuntu 24.04 qualify.
+
+services:
+  rate-app:
+    # Caddy is the only public listener. 8000 stays on the compose network.
+    ports: !reset []
+    # Bake JS/CSS into the image. Only experiment data is mounted.
+    volumes: !override
+      - ./data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/status')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      rate-app:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:

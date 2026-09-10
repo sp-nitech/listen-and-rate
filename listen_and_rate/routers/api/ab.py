@@ -21,8 +21,8 @@ from ._shared import (
 )
 
 
-def _get_ab_test_config(config: ABConfig) -> dict:
-    return _pair_config_response(config, allow_tie=config.allow_tie)
+def _get_ab_test_config(config: ABConfig, rater: str | None = None) -> dict:
+    return _pair_config_response(config, rater, allow_tie=config.allow_tie)
 
 
 def _submit_ab(body: SubmitRequest, config: ABConfig, saver: ResultSaver) -> dict:

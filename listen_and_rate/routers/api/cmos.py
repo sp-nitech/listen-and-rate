@@ -20,8 +20,8 @@ from ._shared import (
 )
 
 
-def _get_cmos_test_config(config: CMOSConfig) -> dict:
-    return _pair_config_response(config, rating_labels=config.rating_labels)
+def _get_cmos_test_config(config: CMOSConfig, rater: str | None = None) -> dict:
+    return _pair_config_response(config, rater, rating_labels=config.rating_labels)
 
 
 def _submit_cmos(body: SubmitRequest, config: CMOSConfig, saver: ResultSaver) -> dict:

@@ -21,8 +21,15 @@ export const ja = {
   trial_hint_navigate: '移動',
   trial_hint_next: '次へ',
 
+  pair_survey_step_listen: '① 両方を聴く',
+  pair_survey_step_answer: '② すべての設問に回答',
+  pair_survey_hint_answer: 'クリックで回答',
+  pair_survey_optional: '（任意）',
+  pair_survey_help: '評価の目安',
+
   submit_idle: '送信',
   submit_busy: '送信中…',
+  save_busy: '保存中…',
 
   complete_title: 'ありがとうございました！',
   complete_body: '評価が正常に保存されました。',

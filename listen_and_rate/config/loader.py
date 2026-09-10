@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import warnings
 from pathlib import Path
 from typing import Annotated
@@ -19,6 +20,7 @@ from .dmos import DMOSConfig, build_dmos_trials
 from .errors import format_config_error
 from .mos import MOSConfig
 from .mushra import MUSHRAConfig, build_mushra_trials
+from .pair_survey import PairSurveyConfig
 from .xab import XABConfig, build_xab_trials
 
 Config = Annotated[
@@ -28,7 +30,8 @@ Config = Annotated[
     | ABConfig
     | ABXConfig
     | XABConfig
-    | MUSHRAConfig,
+    | MUSHRAConfig
+    | PairSurveyConfig,
     Field(discriminator="test_type"),
 ]
 
@@ -112,6 +115,65 @@ def _expand_stimuli_dirs(dirs_config: StimuliDirsConfig) -> list[StimulusConfig]
                 )
             )
     return stimuli
+
+
+def _load_assignments(config: Config, trial_items: set[str]) -> dict[str, list[str]]:
+    """Read and validate the {rater: [item, ...]} file, if one is configured.
+
+    Everything is checked here rather than on first use so that a typo costs
+    a failed startup instead of a rater who quietly gets the wrong task list
+    (or an empty one) hours into data collection.
+    """
+    if config.assignments is None:
+        return {}
+
+    path = Path(config.assignments.path)
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"assignments file not found: {path}") from None
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"assignments file {path} is not valid JSON: {exc}") from None
+
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError(
+            f"assignments file {path} must be a non-empty JSON object mapping "
+            'each rater to their items, e.g. {"alice": ["utt_001"]}'
+        )
+
+    resolved: dict[str, list[str]] = {}
+    for rater, items in raw.items():
+        # The rater id travels in a URL and is stored as a form answer, so it
+        # is held to the same character rule as every other id here.
+        if not is_valid_id(rater):
+            raise ValueError(
+                f"assignments file {path}: rater {rater!r} must contain only "
+                "letters, digits, '.', '-', or '_' (and cannot be '.' or '..')"
+            )
+        if not isinstance(items, list) or not items:
+            raise ValueError(
+                f"assignments file {path}: rater {rater!r} must map to a "
+                "non-empty list of item names"
+            )
+        duplicated = _duplicates([str(i) for i in items])
+        if duplicated:
+            raise ValueError(
+                f"assignments file {path}: rater {rater!r} lists duplicate "
+                f"item(s): {duplicated}"
+            )
+        # An item that names no trial would shorten this rater's list without
+        # saying so - the usual cause is a name that exists in one system
+        # directory but not the other, which _expand_stimuli_dirs only warns
+        # about.
+        unknown = sorted({str(i) for i in items} - trial_items)
+        if unknown:
+            raise ValueError(
+                f"assignments file {path}: rater {rater!r} lists item(s) that "
+                f"are not paired across both systems: {unknown}"
+            )
+        resolved[rater] = [str(i) for i in items]
+    return resolved
 
 
 def _check_no_basename_conflicts(stimuli: list[StimulusConfig]) -> None:
@@ -217,6 +279,10 @@ def load_config(config_path: str | Path) -> Config:
         for entry in data["stimuli_dirs"].get("systems") or []:
             entry["path"] = str(_normalize(Path(entry["path"])))
 
+    # Normalize assignments.path
+    if isinstance(data.get("assignments"), dict) and "path" in data["assignments"]:
+        data["assignments"]["path"] = str(_normalize(Path(data["assignments"]["path"])))
+
     config = TypeAdapter(Config).validate_python(data)
 
     # The config file's name is only the DEFAULT experiment_id, and it is
@@ -317,6 +383,26 @@ def load_config(config_path: str | Path) -> Config:
             )
         _check_practice_count(len(dmos_trials), "trials")
 
+    if isinstance(config, PairSurveyConfig):
+        pair_survey_trials = build_dmos_trials(
+            config.stimuli_list.entries if config.stimuli_list else [],
+            config.reference_system,
+        )
+        if not pair_survey_trials:
+            raise ValueError(
+                "No item is present in both the source (reference) and the "
+                "generated system. This test type requires at least one paired item"
+            )
+        n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
+        unique_items = {t.item for t in pair_survey_trials}
+        if n is not None and n > len(unique_items):
+            raise ValueError(
+                f"items_per_session ({n}) exceeds the number of paired "
+                f"items ({len(unique_items)})"
+            )
+        _check_practice_count(len(pair_survey_trials), "trials")
+        config._rater_items = _load_assignments(config, unique_items)
+
     if isinstance(config, (CMOSConfig, ABConfig, ABXConfig)):
         trials = build_ab_trials(
             config.stimuli_list.entries if config.stimuli_list else []
@@ -333,6 +419,7 @@ def load_config(config_path: str | Path) -> Config:
                 f"trials ({len(trials)})"
             )
         _check_practice_count(len(trials), "trials")
+        config._rater_items = _load_assignments(config, {t.item for t in trials})
 
     if isinstance(config, XABConfig):
         xab_trials = build_xab_trials(

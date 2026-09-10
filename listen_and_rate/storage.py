@@ -93,8 +93,17 @@ class ResultSaver(ABC):
         records: list[dict],
         metadata: dict[str, str] | None = None,
         survey: dict[str, str] | None = None,
+        *,
+        overwrite: bool = False,
+        complete: bool = True,
     ) -> None:
-        """Persist one session's records; called once per POST /api/submit."""
+        """Persist one session's records.
+
+        `overwrite` rewrites an existing file for the same session_id
+        (pair_survey incremental saves). `complete` is stored on JSON
+        results so a progress page can tell a finished session from one
+        still in flight.
+        """
         ...
 
 
@@ -149,8 +158,12 @@ class CSVResultSaver(ResultSaver):
         records: list[dict],
         metadata: dict[str, str] | None = None,
         survey: dict[str, str] | None = None,
+        *,
+        overwrite: bool = False,
+        complete: bool = True,
     ) -> None:
         """Write one row per record to {experiment_id}/{session_id}.csv."""
+        del complete  # JSON-only; CSV rows have no session-level complete flag.
         path = self._dir / f"{session_id}.csv"
         ts = datetime.now().astimezone().isoformat(timespec="seconds")
         meta = metadata or {}
@@ -170,7 +183,12 @@ class CSVResultSaver(ResultSaver):
         )
         self._dir.mkdir(parents=True, exist_ok=True)
         try:
-            f = open(path, "x", newline="", encoding="utf-8")
+            f = open(
+                path,
+                "w" if overwrite else "x",
+                newline="",
+                encoding="utf-8",
+            )
         except FileExistsError:
             raise ResultExistsError(session_id) from None
         with f:
@@ -213,6 +231,9 @@ class JSONResultSaver(ResultSaver):
         records: list[dict],
         metadata: dict[str, str] | None = None,
         survey: dict[str, str] | None = None,
+        *,
+        overwrite: bool = False,
+        complete: bool = True,
     ) -> None:
         """Write this session's records to {experiment_id}/{session_id}.json."""
         self._dir.mkdir(parents=True, exist_ok=True)
@@ -221,12 +242,17 @@ class JSONResultSaver(ResultSaver):
             "session_id": session_id,
             "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
             "test_type": test_type,
+            "complete": complete,
             "metadata": metadata or {},
             "survey": survey or {},
             "records": records,
         }
         try:
-            f = open(self._dir / f"{session_id}.json", "x", encoding="utf-8")
+            f = open(
+                self._dir / f"{session_id}.json",
+                "w" if overwrite else "x",
+                encoding="utf-8",
+            )
         except FileExistsError:
             raise ResultExistsError(session_id) from None
         with f:

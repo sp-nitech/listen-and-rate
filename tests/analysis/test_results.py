@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import pandas as pd
 import pytest
 
 from listen_and_rate import __version__
@@ -103,6 +104,35 @@ def test_report_reads_a_php_written_file_whose_form_objects_are_empty(tmp_path):
         encoding="utf-8",
     )
     assert "<html" in generate_report_html([path]).lower()
+
+
+def test_json_metrics_read_as_the_prefixed_columns_csv_carries(tmp_path):
+    # Each JSON record keeps its metrics nested; the reader flattens them to
+    # the metrics_ columns the CSV saver writes, and drops the nested dict.
+    path = tmp_path / "s1.json"
+    path.write_text(
+        json.dumps(
+            {
+                "session_id": "s1",
+                "timestamp": "2026-01-01",
+                "test_type": "mos",
+                "records": [
+                    {
+                        "system": "A",
+                        "item": "i1",
+                        "rating": 4,
+                        "metrics": {"dwell_time": 8.25},
+                    },
+                    {"system": "B", "item": "i1", "rating": 2},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    df = _read_result_file(path)
+    assert "metrics" not in df.columns
+    assert df["metrics_dwell_time"].iloc[0] == 8.25
+    assert pd.isna(df["metrics_dwell_time"].iloc[1])
 
 
 def test_version_note_stays_quiet_when_a_file_cannot_be_read(tmp_path):

@@ -15,6 +15,7 @@ from pathlib import Path
 from .. import __version__
 from ..storage import (
     METADATA_COLUMN_PREFIX,
+    METRICS_COLUMN_PREFIX,
     SURVEY_COLUMN_PREFIX,
     TOOL_VERSION_COLUMN,
 )
@@ -54,21 +55,23 @@ def _read_result_file(path):
             "session_id": data.get("session_id", ""),
             "timestamp": data.get("timestamp", ""),
             "test_type": data.get("test_type", ""),
-            **r,
+            **{k: v for k, v in r.items() if k != "metrics"},
         }
-        # Flatten the nested form objects into the same prefixed columns CSV
-        # results carry, so filters and the Participants section behave
-        # identically for both formats.
-        for k, v in _form_object(data, "metadata").items():
+        # Flatten the nested form objects and each record's metrics into the
+        # same prefixed columns CSV results carry, so filters and the
+        # Participants section behave identically for both formats.
+        for k, v in _nested_object(data, "metadata").items():
             row[METADATA_COLUMN_PREFIX + k] = v
-        for k, v in _form_object(data, "survey").items():
+        for k, v in _nested_object(data, "survey").items():
             row[SURVEY_COLUMN_PREFIX + k] = v
+        for k, v in _nested_object(r, "metrics").items():
+            row[METRICS_COLUMN_PREFIX + k] = v
         rows.append(row)
     return pd.DataFrame(rows)
 
 
-def _form_object(data: dict, key: str) -> dict:
-    """Read a stored metadata/survey object, tolerating PHP's empty-list form.
+def _nested_object(data: dict, key: str) -> dict:
+    """Read a stored metadata/survey/metrics object, tolerating PHP's empty list.
 
     PHP cannot tell an empty list from an empty map, so json_encode writes
     "metadata": [] where the Python saver writes {}. save.php now writes an

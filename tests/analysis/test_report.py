@@ -17,6 +17,7 @@ from ._helpers import (
     RATINGS_A_B,
     THREE_SYSTEM_CSV_ROWS,
     XAB_CSV_ROWS,
+    _mos_rows,
     _plotly_call_args,
     _plotly_config,
     _with_session_meta,
@@ -706,6 +707,22 @@ def test_json_form_answers_flattened_with_prefixes(tmp_path):
     assert "HP" in html and "OK" in html
 
 
+def test_json_metrics_reach_the_filter_and_the_participants_section(tmp_path):
+    # Session total 843.2 s (14:03); only the 443.2 s page passes min 400.
+    dwell = {("A", "u1"): 100.0, ("A", "u2"): 443.2, ("B", "u1"): 200.0}
+    ratings = [
+        {**r, "metrics": {"dwell_time": dwell.get((r["system"], r["item"]), 100.0)}}
+        for r in RATINGS_A_B
+    ]
+    p = _write_json(tmp_path / "s1.json", "s1", "mos", ratings)
+    html = generate_report_html(
+        [p], groups=[{"label": "Slow", "metrics_filter": {"dwell_time": {"min": 400}}}]
+    )
+    assert "Slow" in html
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
+    assert cells == ["dwell_time", "14:03", "14:03", "14:03", "14:03"]
+
+
 # -- Participants section -----------------------------------------------------
 
 
@@ -764,6 +781,113 @@ def test_participants_section_appears_once_after_group_sections(tmp_path):
     )
     assert html.count("Participants") == 1
     assert html.rfind("Participants") > html.rfind("HeadphonesOnly")
+
+
+@pytest.mark.parametrize(
+    ("seconds", "expected"),
+    [
+        (0.0, "0:00"),
+        (843.2, "14:03"),
+        (59.6, "1:00"),
+        (4512.0, "75:12"),
+    ],
+)
+def test_format_duration_reads_as_minutes_and_seconds(seconds, expected):
+    from listen_and_rate.analysis.report import _format_duration
+
+    assert _format_duration(seconds) == expected
+
+
+def _timed_mos_rows(entries: list[tuple[str, str, float | str]]) -> list[dict]:
+    """Build MOS rows from (session_id, system, dwell_time); one row per page."""
+    return [
+        {**row, "metrics_dwell_time": dwell}
+        for row, (_, _, dwell) in zip(
+            _mos_rows([(sid, system, "u1", 3) for sid, system, _ in entries]),
+            entries,
+            strict=True,
+        )
+    ]
+
+
+# Session totals: s1 843.2 s (14:03), s2 581.4 s (9:41), s3 1512.0 s (25:12).
+_SESSION_TIMED_ROWS = _timed_mos_rows(
+    [
+        ("s1", "A", 400.0),
+        ("s1", "B", 443.2),
+        ("s2", "A", 300.0),
+        ("s2", "B", 281.4),
+        ("s3", "A", 1000.0),
+        ("s3", "B", 512.0),
+    ]
+)
+
+
+def _metrics_table(html: str) -> str:
+    """Return the HTML of the table under the Participants "Metrics" heading."""
+    start = html.index(">Metrics</h3>")
+    return html[start : html.index("</table>", start)]
+
+
+def test_participants_section_shows_recorded_metrics(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", _SESSION_TIMED_ROWS)])
+    assert ">dwell_time</td>" in _metrics_table(html)
+
+
+def test_metrics_summarize_each_session_total(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", _SESSION_TIMED_ROWS)])
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
+    # Mean 978.87 s, median 843.2 s, min 581.4 s, max 1512.0 s.
+    assert cells == ["dwell_time", "16:19", "14:03", "9:41", "25:12"]
+
+
+def test_metrics_count_a_mushra_page_once(tmp_path):
+    # Every system row of a MUSHRA page carries that page's one reading, so
+    # adding up the rows would double this two-system session's 843.2 s.
+    page_dwell = {"u1": 300.0, "u2": 543.2}
+    rows = [
+        {**row, "metrics_dwell_time": page_dwell[row["item"]]}
+        for row in MUSHRA_CSV_ROWS
+    ]
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
+    assert cells == ["dwell_time", "14:03", "14:03", "14:03", "14:03"]
+
+
+def test_metrics_leave_out_sessions_without_readings(tmp_path):
+    # A file from before dwell_time was turned on has no metrics column at
+    # all; its session must not count as a zero-length test.
+    untimed = _mos_rows([("s4", "A", "u1", 3), ("s4", "B", "u1", 3)])
+    html = generate_report_html(
+        [
+            _write_csv(tmp_path / "timed.csv", _SESSION_TIMED_ROWS),
+            _write_csv(tmp_path / "untimed.csv", untimed),
+        ]
+    )
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
+    assert cells == ["dwell_time", "16:19", "14:03", "9:41", "25:12"]
+
+
+def test_metrics_skip_a_metric_with_no_readings(tmp_path):
+    rows = _timed_mos_rows([("s1", "A", ""), ("s1", "B", "")])
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
+    assert ">Metrics</h3>" not in html
+
+
+def test_metrics_absent_without_metrics_columns(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)])
+    assert "Participants" in html
+    assert ">Metrics</h3>" not in html
+
+
+def test_metrics_cover_the_full_data_once_under_groups(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _SESSION_TIMED_ROWS)],
+        groups=[{"label": "OnlyS1", "stimuli_filter": {"session_id": "s1"}}],
+    )
+    assert html.count(">Metrics</h3>") == 1
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
+    assert cells == ["dwell_time", "16:19", "14:03", "9:41", "25:12"]
 
 
 def test_plotlyjs_embedded_once_across_sections(tmp_path):

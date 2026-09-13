@@ -84,20 +84,28 @@ def _section_heading_html(label: str) -> str:
     )
 
 
-def _participants_section_html(df, form_labels: dict[str, str] | None = None) -> str:
-    """Build the trailing "Participants" section: form-answer distributions.
+def _participants_section_html(
+    df,
+    form_labels: dict[str, str] | None = None,
+    page_columns: list[str] | None = None,
+) -> str:
+    """Build the trailing "Participants" section: what the listeners gave.
 
     One table per form (Metadata / Survey) listing, for every prefixed
     column present in the results, how many SESSIONS gave each response -
     rows are deduplicated by session_id first, since form answers repeat on
-    every rating row of a session. Returns '' when the results carry no form
-    columns at all, so reports without metadata/survey stay unchanged.
+    every rating row of a session. A third table (Metrics) follows when the
+    results carry recorded metrics; see _metrics_subsection_html. Returns ''
+    when the results carry none of these, so reports without them stay
+    unchanged.
 
     form_labels maps a prefixed column name (e.g. 'survey_trial_count') to
     the field's human label from the config; when present it is shown in the
     Field column instead of the bare key. Columns without a label (or when
     no config was given) fall back to the key, so config-less reports are
     unchanged.
+
+    page_columns is passed through to _metrics_subsection_html.
     """
     labels = form_labels or {}
     per_session = df.drop_duplicates("session_id") if "session_id" in df.columns else df
@@ -119,9 +127,59 @@ def _participants_section_html(df, form_labels: dict[str, str] | None = None) ->
             _table_heading_html(form_label)
             + _render_table_html(["Field", "Response", "Sessions"], rows)
         )
-    if not subsections:
+    subsections.append(_metrics_subsection_html(df, page_columns))
+    body = "".join(subsections)
+    if not body:
         return ""
-    return _section_heading_html("Participants") + "".join(subsections)
+    return _section_heading_html("Participants") + body
+
+
+def _metrics_subsection_html(df, page_columns: list[str] | None = None) -> str:
+    """Build the Participants "Metrics" table: each metric's session totals.
+
+    For every metrics_ column, each session's readings are added up and the
+    table shows the mean, median, min and max of those totals - for
+    dwell_time, how long the test took. The median sits beside the mean
+    because one listener who left the tab open moves the mean and the max a
+    long way. The only metric today is dwell_time, so every value is read
+    as seconds and shown as m:ss.
+
+    The readings are added up per page, not per row. page_columns names the
+    columns that identify one page when a page writes several rows each
+    carrying its one reading (MUSHRA); None means every row is its own page.
+
+    Blank readings are dropped before adding up. A metric is recorded on
+    every answered page or on none of a session's pages, so what this leaves
+    out is a whole session from a file written before the metric was turned
+    on - not part of a session, which would understate its total. Returns ''
+    when no metric has a reading at all.
+    """
+    per_page = df.drop_duplicates(page_columns) if page_columns else df
+    rows = []
+    for column in [c for c in df.columns if c.startswith(METRICS_COLUMN_PREFIX)]:
+        values = per_page[column].apply(_metric_value)
+        totals = values[values.notna()].groupby(per_page["session_id"]).sum()
+        if totals.empty:
+            continue
+        metric = column[len(METRICS_COLUMN_PREFIX) :]
+        stats = (totals.mean(), totals.median(), totals.min(), totals.max())
+        rows.append([metric] + [_format_duration(s) for s in stats])
+    if not rows:
+        return ""
+    return _table_heading_html("Metrics") + _render_table_html(
+        ["Metric", "Mean", "Median", "Min", "Max"], rows
+    )
+
+
+def _format_duration(seconds: float) -> str:
+    """Render seconds as m:ss, rounded to the whole second.
+
+    Minutes keep counting past the hour ("75:12") rather than rolling into an
+    h:mm:ss form: a listening session that long is rare, and one format for
+    every row keeps the column comparable at a glance.
+    """
+    minutes, secs = divmod(round(seconds), 60)
+    return f"{minutes}:{secs:02d}"
 
 
 def _apply_metrics_filter(sub, group: dict, label: str):
@@ -222,9 +280,10 @@ def generate_report_html(
     Requires optional 'analyze' dependencies (plotly, scipy, pandas).
     Install with:  uv sync --extra analyze   (or:  make setup-analyze)
 
-    When the results carry metadata/survey form answers, a trailing
-    "Participants" section shows their per-session response distributions
-    (always over the full data, regardless of groups).
+    When the results carry metadata/survey form answers or recorded metrics,
+    a trailing "Participants" section shows the per-session response
+    distributions and each metric's session totals (always over the full
+    data, regardless of groups).
 
     Args:
         paths: Result CSV/JSON file(s); all rows are combined into one report.
@@ -315,7 +374,9 @@ def generate_report_html(
             )
 
     # Resolve the test type to a body renderer once; groups then reuse the
-    # same renderer per filtered subset.
+    # same renderer per filtered subset. page_columns identify one trial page
+    # when a page writes more than one row (see _participants_section_html).
+    page_columns = None
     common = dict(
         confidence=confidence,
         font_family=font_family,
@@ -370,6 +431,8 @@ def generate_report_html(
         )
     else:  # "mushra"
         typed_df = df[df["test_type"] == "mushra"]
+        # One page rates every system of an item at once.
+        page_columns = ["session_id", "item"]
         render = partial(
             _generate_mos_report,
             **common,
@@ -395,8 +458,9 @@ def generate_report_html(
             + render(_filter_group_rows(typed_df, group))
             for group in groups
         )
-    # Trailing form-answer distributions, always computed on the FULL data
-    # (never per group) and rendered at most once; '' without form columns.
-    body += _participants_section_html(typed_df, form_labels)
+    # Trailing form-answer distributions and metric totals, always computed on
+    # the FULL data (never per group) and rendered at most once; '' without
+    # form or metrics columns.
+    body += _participants_section_html(typed_df, form_labels, page_columns)
     html = _wrap_report_html(title, body, width)
     return _set_html_title(html, title)

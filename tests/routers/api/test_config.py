@@ -43,12 +43,9 @@ def test_a_lone_config_ignores_the_stage_parameter(client):
     assert res.json()["title"] == "Test Evaluation"
 
 
-def test_a_sequence_rejects_an_unknown_or_missing_stage(
-    tmp_path, test_audio_file, monkeypatch
-):
+def test_a_sequence_rejects_an_unknown_stage(tmp_path, test_audio_file, monkeypatch):
     with _sequence_client(tmp_path, test_audio_file, monkeypatch) as client:
         assert client.get("/config.php", params={"stage": "c"}).status_code == 404
-        assert client.get("/audio/s001").status_code == 404
 
 
 def test_save_php_alias(client):

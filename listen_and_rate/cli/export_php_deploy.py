@@ -33,10 +33,11 @@ logger = logging.getLogger(__name__)
 # frontend/ lives at the repo root; this file is
 # listen_and_rate/cli/export_php_deploy.py.
 _FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
-# Written by every export and by nothing else - the first by a lone config's,
-# the second by a sequence's - so either marks a directory as one this tool
-# produced. See _clear_outdir_except_results.
-_BUNDLE_MARKERS = ("config_data.php", "sequence.php")
+# Files only this tool writes at a bundle's root, so either marks a directory
+# as one it produced (see _clear_outdir_except_results): sequence.php in every
+# bundle, config_data.php in one exported before each config got its own
+# stages/<id>/ directory - still recognized, so re-exporting upgrades it.
+_BUNDLE_MARKERS = ("sequence.php", "config_data.php")
 
 _STATIC_ASSETS = [
     "index.html",
@@ -533,25 +534,22 @@ def _write_stage(
 
 
 def main() -> None:
-    """Load YAML config, resolve stimuli, and write a full PHP deployment bundle.
+    """Load YAML config(s), resolve stimuli, and write a full PHP deployment bundle.
 
-    Copies the static frontend assets (index.html, css/, js/, save.php,
-    config.php) into --outdir, then writes config_data.php and
-    stimulus_map.php there too, so --outdir ends up as a self-contained bundle
+    The configs run back to back as a sequence, one config being a sequence
+    of one. Copies the static frontend assets (index.html, css/, js/, the PHP
+    scripts) into --outdir once, writes sequence.php listing the stages (the
+    configs' experiment_ids, in the order given), and writes each stage's
+    config_data.php, stimulus_map.php, and audio under stages/<experiment_id>/
+    (see frontend/stage.php), so --outdir ends up as a self-contained bundle
     ready to upload as-is. config_data.php holds the raw experiment
-    definition (including stimuli_per_session/items_per_session); it is
-    read by config.php, which re-applies per-session sampling and
+    definition (including stimuli_per_session/items_per_session); it is read
+    by config.php, which re-applies per-session sampling and
     presentation_order on every request rather than baking in one fixed
-    subset, and withholds
-    'system' from its response to keep listeners blind to the underlying
-    system under test. stimulus_map.php carries that mapping for save.php.
-
-    Given several configs, writes a sequence instead: one copy of the page
-    and scripts, sequence.php listing the stages (the configs' experiment_ids,
-    in the order given), and each stage's config_data.php, stimulus_map.php,
-    and audio under stages/<experiment_id>/ (see frontend/stage.php). Results
-    stay under the bundle root either way, so re-exporting one shape as the
-    other keeps what was collected.
+    subset, and withholds 'system' from its response to keep listeners blind
+    to the underlying system under test. stimulus_map.php carries that
+    mapping for save.php. Results stay under the bundle root, whatever the
+    stages, so re-exporting keeps what was collected.
     """
     # Emit INFO-level progress to stderr when run as a real CLI. Under pytest
     # the root logger already has a handler, so this no-ops and the messages
@@ -605,12 +603,7 @@ def main() -> None:
         run_configured_duration_check(config)
         run_configured_loudness_check(config)
         run_configured_silence_check(config)
-    # A lone config's files sit at the bundle root, as they always have; each
-    # stage of a sequence gets its own directory (see frontend/stage.php).
-    is_sequence = len(configs) > 1
-    stage_subdirs = [
-        Path("stages", c.experiment_id) if is_sequence else Path() for c in configs
-    ]
+    stage_subdirs = [Path("stages", c.experiment_id) for c in configs]
     # Resolved before outdir is touched: an audio file outside the working
     # directory fails here, leaving an existing bundle as it was.
     audio_urls = [
@@ -632,11 +625,10 @@ def main() -> None:
     # Before any stage: sequence.php is also what marks the directory as a
     # bundle (_BUNDLE_MARKERS), so a stage that fails to write - a broken
     # file, Ctrl-C - leaves a bundle a rerun with --overwrite can still clear.
-    if is_sequence:
-        (outdir / "sequence.php").write_text(
-            _render_sequence_php([c.experiment_id for c in configs]),
-            encoding="utf-8",
-        )
+    (outdir / "sequence.php").write_text(
+        _render_sequence_php([c.experiment_id for c in configs]),
+        encoding="utf-8",
+    )
     for results_subpath in results_subpaths:
         _seed_results_dir(outdir, results_subpath)
     for config, sub, urls in zip(configs, stage_subdirs, audio_urls, strict=True):

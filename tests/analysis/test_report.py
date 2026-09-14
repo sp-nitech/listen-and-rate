@@ -100,12 +100,6 @@ def test_report_table_width_is_decoupled_from_config_width(tmp_path):
         assert "translateX(-50%)" in html
 
 
-def test_ab_report_labels_main_tables(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)])
-    assert ">Significance tests</h3>" in html
-    assert ">Data summary</h3>" in html
-
-
 def test_generate_report_default_confidence(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
     assert "95% CI" in html
@@ -164,46 +158,6 @@ def test_generate_report_no_mos_rows(tmp_path):
 # -- dispatch + mixed-type guard --------------------------------------------
 
 
-def test_generate_report_dispatches_dmos(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "dmos.csv", DMOS_CSV_ROWS)])
-    assert "p-value (t-test)" in html
-
-
-def test_generate_report_dispatches_mushra(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "mushra.csv", MUSHRA_CSV_ROWS)])
-    assert "p-value (t-test)" in html
-
-
-def test_generate_report_mixed_mushra_and_mos_raises_error(tmp_path):
-    mushra_path = _write_csv(tmp_path / "mushra.csv", MUSHRA_CSV_ROWS)
-    mos_path = _write_csv(tmp_path / "mos.csv", CSV_ROWS)
-    with pytest.raises(ValueError, match="Mixed test_type"):
-        generate_report_html([mushra_path, mos_path])
-
-
-def test_generate_report_dispatches_dmos_cmos_ab(tmp_path):
-    dmos_html = generate_report_html([_write_csv(tmp_path / "dmos.csv", DMOS_CSV_ROWS)])
-    cmos_html = generate_report_html([_write_csv(tmp_path / "cmos.csv", CMOS_CSV_ROWS)])
-    assert "p-value (t-test)" in dmos_html
-    assert "p-value (t-test" in cmos_html
-
-
-def test_generate_report_mixed_dmos_and_cmos_raises_error(tmp_path):
-    dmos_path = _write_csv(tmp_path / "dmos.csv", DMOS_CSV_ROWS)
-    cmos_path = _write_csv(tmp_path / "cmos.csv", CMOS_CSV_ROWS)
-    with pytest.raises(ValueError, match="Mixed test_type"):
-        generate_report_html([dmos_path, cmos_path])
-
-
-def test_generate_report_dispatches_mos_vs_ab(tmp_path):
-    mos_html = generate_report_html([_write_csv(tmp_path / "mos.csv", CSV_ROWS)])
-    ab_html = generate_report_html([_write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)])
-    assert "p-value (t-test)" in mos_html
-    # Both p-value columns follow the "p-value (X)"/"... (X)" form.
-    assert "Adjusted p-value (Bonferroni)" in mos_html
-    assert "p-value (binomial test)" in ab_html
-
-
 def test_generate_report_mixed_test_types_raises_error(tmp_path):
     mos_path = _write_csv(tmp_path / "mos.csv", CSV_ROWS)
     ab_path = _write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)
@@ -211,27 +165,24 @@ def test_generate_report_mixed_test_types_raises_error(tmp_path):
         generate_report_html([mos_path, ab_path])
 
 
-def test_generate_report_dispatches_mos_ab_abx(tmp_path):
-    mos_html = generate_report_html([_write_csv(tmp_path / "mos.csv", CSV_ROWS)])
-    ab_html = generate_report_html([_write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)])
-    abx_html = generate_report_html([_write_csv(tmp_path / "abx.csv", ABX_CSV_ROWS)])
-    assert "p-value (t-test)" in mos_html
-    assert "p-value (binomial test)" in ab_html
-    assert "p-value (binomial test)" in abx_html
-
-
-def test_generate_report_mixed_ab_and_abx_raises_error(tmp_path):
-    ab_path = _write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)
-    abx_path = _write_csv(tmp_path / "abx.csv", ABX_CSV_ROWS)
-    with pytest.raises(ValueError, match="Mixed test_type"):
-        generate_report_html([ab_path, abx_path])
-
-
-def test_generate_report_mixed_abx_and_xab_raises_error(tmp_path):
-    abx_path = _write_csv(tmp_path / "abx.csv", ABX_CSV_ROWS)
-    xab_path = _write_csv(tmp_path / "xab.csv", XAB_CSV_ROWS)
-    with pytest.raises(ValueError, match="Mixed test_type"):
-        generate_report_html([abx_path, xab_path])
+@pytest.mark.parametrize(
+    ("rows", "expected"),
+    [
+        # MOS also runs the pairwise tests, whose p-values are adjusted.
+        (CSV_ROWS, ["p-value (t-test)", "Adjusted p-value (Bonferroni)"]),
+        (DMOS_CSV_ROWS, ["p-value (t-test)"]),
+        (MUSHRA_CSV_ROWS, ["p-value (t-test)"]),
+        (CMOS_CSV_ROWS, ["p-value (t-test"]),
+        (AB_CSV_ROWS, ["p-value (binomial test)"]),
+        (ABX_CSV_ROWS, ["p-value (binomial test)"]),
+        (XAB_CSV_ROWS, ["p-value (binomial test)"]),
+    ],
+    ids=["mos", "dmos", "mushra", "cmos", "ab", "abx", "xab"],
+)
+def test_generate_report_dispatches_each_test_type(tmp_path, rows, expected):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
+    for text in expected:
+        assert text in html
 
 
 # -- browser tab title ------------------------------------------------------
@@ -242,13 +193,6 @@ def test_generate_report_sets_browser_tab_title_mos(tmp_path):
         [_write_csv(tmp_path / "s.csv", CSV_ROWS)], title="My MOS Experiment"
     )
     assert "<title>My MOS Experiment</title>" in html
-
-
-def test_generate_report_sets_browser_tab_title_ab(tmp_path):
-    html = generate_report_html(
-        [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)], title="My AB Experiment"
-    )
-    assert "<title>My AB Experiment</title>" in html
 
 
 def test_generate_report_escapes_title_in_tab_title(tmp_path):

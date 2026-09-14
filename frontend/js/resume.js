@@ -195,7 +195,7 @@ export function findResumableStage(configs, records, now) {
     const record = records.get(recordKey(config.experiment_id)) ?? null;
     if (
       isResumable(record, config.config_version, now, config.resume.max_age_ms) &&
-      sameSequence(savedSequence(record), sequence)
+      isSavedUnder(record, sequence)
     ) {
       return { index, record };
     }
@@ -203,16 +203,14 @@ export function findResumableStage(configs, records, now) {
   return null;
 }
 
-/**
- * The stages a record was saved under. One saved before sequences existed
- * carries none, and stands for the lone config it froze.
- */
-function savedSequence(record) {
-  return record.sequence ?? [record.config?.experiment_id];
-}
-
-function sameSequence(a, b) {
-  return a.length === b.length && a.every((id, i) => id === b[i]);
+/** Whether `record` was saved under exactly these stages, in this order. */
+function isSavedUnder(record, sequence) {
+  const saved = record.sequence;
+  return (
+    Array.isArray(saved) &&
+    saved.length === sequence.length &&
+    saved.every((id, i) => id === sequence[i])
+  );
 }
 
 /**

@@ -4,15 +4,9 @@
  * Each stage counts its own pages in its trial counter ("Trial 1 / 4"),
  * while the bar at the top of the page shows how far the whole session has
  * come: every stage takes a share of the bar in proportion to its pages, and
- * a stage's progress is placed within its share. A lone config is a
- * sequence of one, so its share is the whole bar.
- *
- * The current stage's share is module-level state, set by app.js as each
- * stage starts - like stage.js's stage, and for the same reason: exactly one
- * stage runs at a time.
+ * a stage places its progress within its share (see stage.js's Stage). A
+ * lone config is a sequence of one, so its share is the whole bar.
  */
-
-let _span = { start: 0, width: 1 };
 
 /**
  * Return how many pages a delivered config presents: one per stimulus for
@@ -41,24 +35,8 @@ export function stageSpans(pageCounts) {
   });
 }
 
-/** Set the share of the bar that the stage now running takes. */
-export function setStageSpan(span) {
-  _span = span;
-}
-
-/**
- * Return the fraction of the whole bar reached by `fraction` of the current
- * stage.
- *
- * @param {number} fraction - How much of the current stage is done, 0 to 1.
- * @returns {number}
- */
-export function overallFraction(fraction) {
-  return _span.start + _span.width * fraction;
-}
-
-/** Show `fraction` (0 to 1) of the current stage done on the shared bar. */
-export function showStageProgress(fraction) {
+/** Fill the shared bar (if the page has one) to `fraction` (0 to 1) of its width. */
+export function paintProgressBar(fraction) {
   const bar = document.getElementById('progress-bar');
-  if (bar) bar.style.width = `${overallFraction(fraction) * 100}%`;
+  if (bar) bar.style.width = `${fraction * 100}%`;
 }

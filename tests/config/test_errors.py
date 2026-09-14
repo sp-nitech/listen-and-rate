@@ -65,17 +65,6 @@ def test_load_config_still_raises_validation_error(tmp_path):
         load_config(write_config(tmp_path, data))
 
 
-def test_load_sequence_or_exit_formats_a_stage_config_error(tmp_path):
-    """A typo in any config of a sequence exits as cleanly as a lone config."""
-    data = minimal_config("/tmp/nonexistent.wav")
-    data["test_type"] = "mos2"
-    with pytest.raises(SystemExit) as excinfo:
-        load_sequence_or_exit([write_config(tmp_path, data)])
-    message = str(excinfo.value)
-    assert "test_type" in message
-    assert _PYDANTIC_URL not in message
-
-
 def test_load_sequence_or_exit_names_the_config_that_is_wrong(
     tmp_path, test_audio_file
 ):
@@ -89,5 +78,6 @@ def test_load_sequence_or_exit_names_the_config_that_is_wrong(
         load_sequence_or_exit([good, bad])
     message = str(excinfo.value)
     assert "bogus_key" in message
+    assert _PYDANTIC_URL not in message
     assert f"In {bad}" in message
     assert str(good) not in message

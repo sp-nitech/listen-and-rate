@@ -130,11 +130,14 @@ test('a record saved under a different sequence does not decide where a page loa
   }
 });
 
-test('a record saved before sequences existed still resumes its lone config', () => {
-  // It carries no sequence, so it stands for the one config it froze.
+test('a record naming no sequence is passed over', () => {
+  // Only a record saved under the sequence served now is resumed, and one
+  // naming none - saved before records carried it - is not one.
   const record = { fingerprint: 'v1', savedAt: 900, config: stageConfig('a') };
-  const found = findResumableStage([stageConfig('a')], new Map([[recordKey('a'), record]]), 1000);
-  assert.deepEqual(found, { index: 0, record });
+  assert.equal(
+    findResumableStage([stageConfig('a')], new Map([[recordKey('a'), record]]), 1000),
+    null
+  );
 });
 
 // -- clearStageRecords -------------------------------------------------------

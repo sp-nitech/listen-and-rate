@@ -15,7 +15,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 
-import { setStageSpan } from '../../../js/progress.js';
+import { Stage } from '../../../js/stage.js';
 import { ListeningTest } from '../../../js/test-types/listening-test.js';
 
 let now = 0;
@@ -37,8 +37,8 @@ function tick(seconds) {
 
 /** A ListeningTest with every DOM and answer hook stubbed out. */
 class StubTest extends ListeningTest {
-  constructor({ dwellTime = true, trials = 3, isPractice = false } = {}) {
-    super({ metrics: { dwell_time: dwellTime }, isPractice }, 'session', () => {});
+  constructor({ dwellTime = true, trials = 3, isPractice = false, stage } = {}) {
+    super({ metrics: { dwell_time: dwellTime }, isPractice }, 'session', () => {}, stage);
     this.trials = trials;
     this.submitted = false;
   }
@@ -199,13 +199,14 @@ function stubProgressBar(width) {
 
 afterEach(() => {
   delete globalThis.document;
-  setStageSpan({ start: 0, width: 1 });
 });
 
 test("answering moves the bar within the stage's share of the whole session", () => {
   const bar = stubProgressBar('0%');
-  setStageSpan({ start: 0.25, width: 0.5 });
-  new StubTest({ trials: 2 })._updateProgressBar();
+  new StubTest({
+    trials: 2,
+    stage: new Stage('b', { start: 0.25, width: 0.5 }),
+  })._updateProgressBar();
   assert.equal(bar.style.width, '75%');
 });
 

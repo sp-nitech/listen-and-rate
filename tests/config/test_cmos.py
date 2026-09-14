@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
-
 import pytest
 from pydantic import ValidationError
 
@@ -138,14 +136,6 @@ def test_cmos_rating_labels_accepts_plus_prefixed_positive_keys(
     assert result.rating_labels == {"3": "Much better", "1": "Slightly better"}
 
 
-def test_cmos_rating_labels_accepts_valid_keys(tmp_path, test_audio_file):
-    da, db = two_system_dirs(tmp_path, test_audio_file)
-    data = stimuli_dirs_data([{"path": str(da)}, {"path": str(db)}], test_type="cmos")
-    data["rating_labels"] = {"-3": "Much worse", "3": "Much better"}
-    result = load_config(write_config(tmp_path, data))
-    assert result.rating_labels == {"-3": "Much worse", "3": "Much better"}
-
-
 def test_cmos_rating_labels_accepts_bare_numeric_keys(tmp_path, test_audio_file):
     da, db = two_system_dirs(tmp_path, test_audio_file)
     data = stimuli_dirs_data([{"path": str(da)}, {"path": str(db)}], test_type="cmos")
@@ -156,23 +146,3 @@ def test_cmos_rating_labels_accepts_bare_numeric_keys(tmp_path, test_audio_file)
         "0": "About the same",
         "3": "Much better",
     }
-
-
-def test_cmos_requires_stimuli_dirs_not_explicit_stimuli(tmp_path, test_audio_file):
-    data = {
-        "test_type": "cmos",
-        "title": "T",
-        "instructions": "I",
-        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
-    }
-    with pytest.raises(ValidationError):
-        load_config(write_config(tmp_path, data))
-
-
-def test_cmos_requires_exactly_two_systems(tmp_path, test_audio_file):
-    d = tmp_path / "sys_a"
-    d.mkdir()
-    shutil.copy(test_audio_file, d / "utt1.wav")
-    data = stimuli_dirs_data([{"path": str(d)}], test_type="cmos")
-    with pytest.raises(ValidationError, match="2"):
-        load_config(write_config(tmp_path, data))

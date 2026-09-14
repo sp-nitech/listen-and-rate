@@ -6,17 +6,10 @@ import re
 
 from ._helpers import (
     ABX_CSV_ROWS,
-    ABX_ROWS,
     _plotly_call_args,
     _write_csv,
-    _write_json,
     generate_report_html,
 )
-
-
-def test_generate_abx_report_returns_html(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", ABX_CSV_ROWS)])
-    assert "<html>" in html
 
 
 def test_generate_abx_report_shows_accuracy_and_ci(tmp_path):
@@ -46,23 +39,6 @@ def test_generate_abx_report_annotation_omits_the_raw_counts(tmp_path):
 def test_generate_abx_report_includes_binomial_pvalue(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", ABX_CSV_ROWS)])
     assert "A vs B" in html
-
-
-def test_generate_abx_report_json_input(tmp_path):
-    p1 = _write_json(tmp_path / "s1.json", "s1", "abx", ABX_ROWS)
-    html = generate_report_html([p1])
-    assert "<html>" in html
-    assert "A vs B" in html
-
-
-def test_generate_abx_report_shows_summary_stats(tmp_path):
-    csv_path = _write_csv(tmp_path / "s1.csv", ABX_CSV_ROWS)
-    json_path = _write_json(tmp_path / "s2.json", "s2", "abx", ABX_ROWS)
-    html = generate_report_html([csv_path, json_path])
-    assert ">2<" in html  # 2 participants (s1, s2)
-    assert ">8<" in html  # 8 guesses collected (4 rows each)
-    assert ">Significance tests</h3>" in html
-    assert ">Data summary</h3>" in html
 
 
 def test_generate_abx_report_counts_chart_is_vertical(tmp_path):

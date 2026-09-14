@@ -54,18 +54,25 @@ export function finalConfirmHint(config) {
   return finalButtonLabel(config).toLowerCase();
 }
 
+/** The config's practice stimuli/trials, or [] when it has no practice stage. */
+export function practiceItems(config) {
+  return config.practice_stimuli ?? config.practice_trials ?? [];
+}
+
 /**
  * Run the practice stage: render the real TestClass on a config copy whose
  * stimuli/trials are the server's independently-sampled practice_stimuli/
  * practice_trials, with an onSubmit that never hits the network.
  *
  * @param {Object} config - Server config from /api/config.
+ * @param {import('./stage.js').Stage} stage - The stage the practice precedes;
+ *   its audio is that stage's.
  * @param {string} sessionId
  * @param {Function} TestClass - The same test-type class used for the real test.
  * @param {HTMLElement} container
  * @returns {Promise<void>} Resolves once the practice round is completed.
  */
-export function runPracticeStage(config, sessionId, TestClass, container) {
+export function runPracticeStage(config, stage, sessionId, TestClass, container) {
   const practiceConfig = { ...config, isPractice: true };
   if (config.stimuli) {
     practiceConfig.stimuli = config.practice_stimuli;
@@ -74,9 +81,14 @@ export function runPracticeStage(config, sessionId, TestClass, container) {
   }
 
   return new Promise((resolve) => {
-    const test = new TestClass(practiceConfig, sessionId, async () => {
-      resolve();
-    });
+    const test = new TestClass(
+      practiceConfig,
+      sessionId,
+      async () => {
+        resolve();
+      },
+      stage
+    );
     test.render(container);
   });
 }

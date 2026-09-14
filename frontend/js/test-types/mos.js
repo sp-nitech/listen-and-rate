@@ -17,7 +17,6 @@ import {
 } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
 import { ratingKeysHint } from '../hints.js';
-import { audioUrl } from '../stage.js';
 import { t } from '../strings.js';
 import { submitPayload } from '../submit.js';
 import { ListeningTest } from './listening-test.js';
@@ -25,8 +24,8 @@ import { ListeningTest } from './listening-test.js';
 const MOS_LABELS_DEFAULT = { 1: 'Bad', 2: 'Poor', 3: 'Fair', 4: 'Good', 5: 'Excellent' };
 
 export class MOSTest extends ListeningTest {
-  constructor(config, sessionId, onSubmit) {
-    super(config, sessionId, onSubmit);
+  constructor(config, sessionId, onSubmit, stage) {
+    super(config, sessionId, onSubmit, stage);
     this.stimuli = config.stimuli;
     this.ratings = new Map(); // stimulus id → rating value
     this.played = new Set(); // stimulus ids played to completion (enables rating)
@@ -155,7 +154,7 @@ export class MOSTest extends ListeningTest {
 
     // Swap only the src on the persistent <audio>, rewound to the start, and
     // reset the custom player's icon/progress.
-    const url = audioUrl(s);
+    const url = this.stage.audioUrl(s);
     if (this._el.audio.getAttribute('src') !== url) {
       this._el.audio.src = url;
     } else {

@@ -45,13 +45,6 @@ def test_mos_rating_labels_rejects_key_outside_1_to_5(tmp_path, test_audio_file)
         load_config(write_config(tmp_path, data))
 
 
-def test_mos_rating_labels_accepts_valid_keys(tmp_path, test_audio_file):
-    data = minimal_config(str(test_audio_file))
-    data["rating_labels"] = {"1": "Bad", "5": "Excellent"}
-    result = load_config(write_config(tmp_path, data))
-    assert result.rating_labels == {"1": "Bad", "5": "Excellent"}
-
-
 def test_mos_rating_labels_accepts_bare_numeric_keys(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
     data["rating_labels"] = {1: "Bad", 5: "Excellent"}

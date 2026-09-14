@@ -29,8 +29,8 @@ export class DMOSTest extends PairedTrialTest {
    * @param {string} sessionId - UUID identifying this listener's session.
    * @param {Function} onSubmit - Async callback invoked with (sessionId, testType, {ratings}).
    */
-  constructor(config, sessionId, onSubmit) {
-    super(config, sessionId, onSubmit);
+  constructor(config, sessionId, onSubmit, stage) {
+    super(config, sessionId, onSubmit, stage);
     // choices: trial index → rating value (1-5)
     // played: trial index → Set of local indices (0 = reference, 1 = test)
     this.shortcuts = config.shortcuts ?? {

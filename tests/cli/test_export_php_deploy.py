@@ -43,6 +43,12 @@ def _run_export(
     main()
 
 
+def _stage_dir(outdir: Path) -> Path:
+    """Return the directory of a bundle's only stage - a lone config's."""
+    (stage,) = (outdir / "stages").iterdir()
+    return stage
+
+
 def _config_with_systems(tmp_path, test_audio_file) -> Path:
     return write_config(
         tmp_path,
@@ -141,7 +147,7 @@ def test_export_php_deploy_bakes_in_the_version_that_exported_the_bundle(
     # result file it writes.
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert f"'tool_version' => '{__version__}'" in text
 
 
@@ -150,7 +156,7 @@ def test_export_php_deploy_writes_valid_config_data_php(
 ):
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert text.startswith("<?php")
     assert "'test_type' => 'mos'" in text
     assert "'stimuli' => [" in text
@@ -175,12 +181,14 @@ def test_export_php_deploy_audio_url_is_cwd_relative(
 ):
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     urls = re.findall(r"'audio_url' => '([^']*)'", text)
     assert urls
     cwd = Path.cwd()
     for u in urls:
-        assert (cwd / u).exists()
+        # Under the stage's directory, the file's path from the working one.
+        assert u.startswith("stages/config/")
+        assert (cwd / u.removeprefix("stages/config/")).exists()
         # A URL whichever OS exported it: audio_x.php also joins it onto the
         # server's own path, where a Windows separator names no file.
         assert "\\" not in u
@@ -192,7 +200,7 @@ def test_export_php_deploy_config_data_excludes_system(
     config_yaml = _config_with_systems(tmp_path, test_audio_file)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     # Per-stimulus system identity must not leak (reference_system, a
     # separate top-level field with a non-sensitive system name, is fine).
     assert "System A" not in text
@@ -219,7 +227,7 @@ def test_export_php_deploy_config_data_includes_session_sampling_params(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'items_per_session' => 1" in text
     assert "'stimuli_per_session' => null" in text
     # config.php re-applies presentation_order per request, so the bundle must
@@ -250,7 +258,7 @@ def test_export_php_deploy_config_data_includes_survey_fields(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'survey' => [" in text
     assert "'key' => 'trial_count'" in text
     assert "'Appropriate'" in text
@@ -277,7 +285,7 @@ def test_export_php_deploy_config_data_includes_practice_params(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'practice_count' => 2" in text
     assert "'practice_instructions' => 'Warm-up.'" in text
 
@@ -296,7 +304,7 @@ def test_export_php_deploy_config_data_practice_instructions_null_when_unset(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'practice_count' => 1" in text
     assert "'practice_instructions' => null" in text
 
@@ -306,7 +314,7 @@ def test_export_php_deploy_config_data_practice_defaults_when_unset(
 ):
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'practice_count' => 0" in text
     assert "'practice_instructions' => null" in text
 
@@ -329,7 +337,7 @@ def test_export_php_deploy_config_data_includes_practice_for_trial_types(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'practice_count' => 1" in text
     assert "'practice_instructions' => 'Warm-up.'" in text
 
@@ -357,7 +365,7 @@ def test_export_php_deploy_config_data_includes_reference_system_for_dmos(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'reference_system' => 'Reference'" in text
     # Not leaked into the per-stimulus response-facing entries
     assert "'system'" not in text
@@ -372,7 +380,7 @@ def test_export_php_deploy_config_data_omits_reference_system_for_mos(
 ):
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'reference_system' => null" in text
 
 
@@ -403,7 +411,7 @@ def test_export_php_deploy_config_data_for_mushra_with_reference_and_anchor(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'reference_system' => 'Reference'" in text
     # 2 rateable systems: Test and Anchor (Reference excluded).
     assert "'mushra_rateable_system_count' => 2" in text
@@ -433,7 +441,7 @@ def test_export_php_deploy_config_data_for_mushra_without_reference_or_anchor(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'reference_system' => null" in text
     assert "'mushra_rateable_system_count' => 2" in text
     assert "'reference' => true" not in text
@@ -458,7 +466,7 @@ def test_export_php_deploy_config_data_for_cmos(tmp_path, test_audio_file, monke
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'test_type' => 'cmos'" in text
     # CMOS has no reference system and no allow_tie concept, like AB/ABX.
     assert "'reference_system' => null" in text
@@ -488,7 +496,7 @@ def test_export_php_deploy_config_data_includes_allow_tie_for_ab(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'test_type' => 'ab'" in text
     assert "'allow_tie' => false" in text
 
@@ -513,7 +521,7 @@ def test_export_php_deploy_config_data_includes_x_secret_for_abx(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'test_type' => 'abx'" in text
     match = re.search(r"'x_secret' => '([0-9a-f]+)'", text)
     assert match, f"x_secret not found in {text!r}"
@@ -544,7 +552,7 @@ def test_export_php_deploy_config_data_includes_reference_system_for_xab(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'test_type' => 'xab'" in text
     assert "'reference_system' => 'Reference'" in text
     # XAB's X is a disclosed reference, not a hidden duplicate - no secret.
@@ -558,7 +566,7 @@ def test_export_php_deploy_config_data_omits_x_secret_for_mos(
 ):
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'x_secret' => null" in text
 
 
@@ -567,7 +575,7 @@ def test_export_php_deploy_config_data_includes_audio_preload(
 ):
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'audio_preload' => 'auto'" in text
     # Clip durations are baked in so config.php can serve them without
     # soundfile.
@@ -595,7 +603,7 @@ def test_export_php_deploy_config_data_includes_default_output_path(
     config_yaml = _config_with_output_path(tmp_path, test_audio_file)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'output_path' => './results/'" in text
     # Default layout unchanged: results/ seeded with .htaccess as before.
     assert (outdir / "results" / ".htaccess").exists()
@@ -611,7 +619,7 @@ def test_export_php_deploy_seeds_custom_relative_results_dir(
     )
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'output_path' => './collected/'" in text
     assert (outdir / "collected" / ".htaccess").exists()
     assert not (outdir / "results").exists()
@@ -640,7 +648,7 @@ def test_export_php_deploy_writes_stimulus_map_php(
     config_yaml = _config_with_systems(tmp_path, test_audio_file)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "stimulus_map.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "stimulus_map.php").read_text(encoding="utf-8")
     assert text.startswith("<?php")
     assert "'s001' => ['system' => 'System A', 'item' => 'utt1']" in text
     assert "'s002' => ['system' => 'System B', 'item' => 'utt1']" in text
@@ -673,6 +681,10 @@ def test_export_php_deploy_produces_expected_bundle_layout(
     assert (outdir / "x_token.php").is_file()
     assert (outdir / "stage.php").is_file()
     assert (outdir / "audio_x.php").is_file()
+    # One layout for any number of configs: a lone config is a sequence of one.
+    assert "return ['config'];" in (outdir / "sequence.php").read_text(encoding="utf-8")
+    assert (outdir / "stages" / "config" / "config_data.php").is_file()
+    assert not (outdir / "config_data.php").exists()
 
 
 def _sequence_configs(tmp_path, test_audio_file) -> list[Path]:
@@ -730,24 +742,20 @@ def test_export_puts_each_stage_audio_under_its_own_directory(
         assert (outdir / "stages" / stage / "clip.wav").exists()
 
 
-def test_export_keeps_results_when_switching_between_one_config_and_a_sequence(
+def test_export_keeps_results_when_the_stages_change(
     tmp_path, test_audio_file, monkeypatch
 ):
-    # Both shapes keep results at the bundle root, so re-exporting one as the
-    # other must not lose what was collected under either.
+    # Results sit at the bundle root whatever the stages are, so re-exporting
+    # with one dropped keeps what was collected - and drops its stage alone.
     first, second = _sequence_configs(tmp_path, test_audio_file)
     outdir = tmp_path / "deploy"
-    collected = outdir / "results" / "a" / "real-listener-session.csv"
-    _run_export(first, outdir, monkeypatch)
+    collected = outdir / "results" / "b" / "real-listener-session.csv"
+    _run_export([first, second], outdir, monkeypatch)
     collected.parent.mkdir(parents=True)
     collected.write_text("session_id\n", encoding="utf-8")
-    _run_export([first, second], outdir, monkeypatch, overwrite=True)
-    assert collected.is_file()
-    assert not (outdir / "config_data.php").exists()
     _run_export(first, outdir, monkeypatch, overwrite=True)
     assert collected.is_file()
-    assert not (outdir / "sequence.php").exists()
-    assert not (outdir / "stages").exists()
+    assert [d.name for d in (outdir / "stages").iterdir()] == ["a"]
 
 
 def test_export_of_a_sequence_that_fails_part_way_can_be_rerun(
@@ -794,7 +802,7 @@ def test_export_php_deploy_creates_audio_symlinks(
 ):
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     urls = re.findall(r"'audio_url' => '([^']*)'", text)
     assert urls
     for u in urls:
@@ -813,7 +821,7 @@ def test_export_php_deploy_copies_audio_files_when_copy_audio(
     and unzipped elsewhere - unlike the default absolute symlinks."""
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch, copy_audio=True)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     urls = re.findall(r"'audio_url' => '([^']*)'", text)
     assert urls
     for u in urls:
@@ -836,7 +844,7 @@ def test_export_php_deploy_falls_back_to_copy_when_symlinks_unsupported(
     outdir = tmp_path / "deploy"
     with caplog.at_level(logging.WARNING):
         _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     urls = re.findall(r"'audio_url' => '([^']*)'", text)
     assert urls
     for u in urls:
@@ -855,7 +863,7 @@ def test_export_php_deploy_overwrite_regenerates_copied_audio(
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch, copy_audio=True)
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True, copy_audio=True)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     urls = re.findall(r"'audio_url' => '([^']*)'", text)
     assert urls
     for u in urls:
@@ -878,7 +886,7 @@ def test_export_normalizes_audio_into_bundle_as_real_wav(tmp_path, monkeypatch):
     outdir = tmp_path / "deploy"
     _run_export(write_config(tmp_path, config), outdir, monkeypatch)
 
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     urls = re.findall(r"'audio_url' => '([^']*)'", text)
     assert urls and all(u.endswith(".wav") for u in urls)
     for u in urls:
@@ -908,7 +916,7 @@ def test_export_normalize_converts_non_wav_input_to_wav(tmp_path, monkeypatch):
     outdir = tmp_path / "deploy"
     _run_export(write_config(tmp_path, config), outdir, monkeypatch)
 
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     (url,) = re.findall(r"'audio_url' => '([^']*)'", text)
     assert url.endswith(".wav")  # mp3 input normalized out as wav
     assert (outdir / url).is_file()
@@ -921,7 +929,7 @@ def test_export_php_deploy_can_run_twice_with_overwrite(
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
-    assert (outdir / "config_data.php").is_file()
+    assert (_stage_dir(outdir) / "config_data.php").is_file()
 
 
 def test_export_php_deploy_does_not_overwrite_existing_outdir_by_default(
@@ -945,7 +953,7 @@ def test_export_php_deploy_overwrite_flag_regenerates_existing_outdir(
     (outdir / "stale.txt").write_text("leftover from a previous run", encoding="utf-8")
     _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
     assert not (outdir / "stale.txt").exists()
-    assert (outdir / "config_data.php").is_file()
+    assert (_stage_dir(outdir) / "config_data.php").is_file()
 
 
 def test_export_php_deploy_overwrite_preserves_existing_results_directory(
@@ -968,7 +976,7 @@ def test_export_php_deploy_overwrite_preserves_existing_results_directory(
         collected.read_text(encoding="utf-8")
         == "session_id,timestamp,test_type,system,item,rating\n"
     )
-    assert (outdir / "config_data.php").is_file()
+    assert (_stage_dir(outdir) / "config_data.php").is_file()
 
 
 def test_export_php_deploy_overwrite_clears_results_dir_when_output_path_absolute(
@@ -991,8 +999,8 @@ def test_export_php_deploy_creates_outdir_if_missing(
 ):
     outdir = tmp_path / "nested" / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    assert (outdir / "config_data.php").is_file()
-    assert (outdir / "stimulus_map.php").is_file()
+    assert (_stage_dir(outdir) / "config_data.php").is_file()
+    assert (_stage_dir(outdir) / "stimulus_map.php").is_file()
 
 
 def test_export_php_deploy_config_data_uses_the_configs_experiment_id(
@@ -1015,7 +1023,7 @@ def test_export_php_deploy_config_data_uses_the_configs_experiment_id(
     config_yaml = write_config(tmp_path, config, name="some-filename.yaml")
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'experiment_id' => 'chosen-name'" in text
     assert "some-filename" not in text
 
@@ -1039,6 +1047,20 @@ def test_export_refuses_to_overwrite_a_directory_that_is_not_a_bundle(
     assert (outdir / "important" / "data.txt").read_text(encoding="utf-8") == (
         "irreplaceable"
     )
+
+
+def test_export_overwrites_a_bundle_from_before_stages(
+    config_yaml, tmp_path, monkeypatch
+):
+    # Bundles exported before every config got its stages/<id>/ directory
+    # kept config_data.php at their root; re-exporting is how they move on.
+    outdir = tmp_path / "deploy"
+    outdir.mkdir()
+    (outdir / "config_data.php").write_text("<?php return [];", encoding="utf-8")
+    (outdir / "index.html").write_text("old page", encoding="utf-8")
+    _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
+    assert not (outdir / "config_data.php").exists()
+    assert (outdir / "sequence.php").is_file()
 
 
 def test_export_refuses_to_write_into_the_frontend_source(
@@ -1089,7 +1111,7 @@ def test_export_php_deploy_config_data_includes_metrics(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'metrics' => ['dwell_time' => true]" in text
 
 
@@ -1107,7 +1129,7 @@ def test_export_php_deploy_config_data_includes_ui_language(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'ui_language' => 'ja'" in text
 
 
@@ -1130,5 +1152,5 @@ def test_export_php_deploy_config_data_includes_resume_window(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    text = (outdir / "config_data.php").read_text(encoding="utf-8")
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
     assert "'resume' => ['max_age_ms' => 1800000]" in text

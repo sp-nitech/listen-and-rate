@@ -6,7 +6,7 @@ canonical order: MOS, DMOS, CMOS, AB, ABX, XAB, MUSHRA.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
 from ...config import (
     ABConfig,
@@ -18,9 +18,11 @@ from ...config import (
     XABConfig,
 )
 from ...dependencies import (
+    SequenceManifest,
+    Stage,
     get_config,
     get_result_saver,
-    get_sequence,
+    get_stage_or_manifest,
     get_x_secret,
 )
 from ...models import SubmitRequest
@@ -37,21 +39,20 @@ router = APIRouter()
 
 
 @router.get("/status")
-def status(request: Request, sequence: list[str] | None = Depends(get_sequence)):
+def status(target: Stage | SequenceManifest = Depends(get_stage_or_manifest)):
     """Health-check endpoint; also confirms the loaded test type.
 
     A sequence asked about as a whole - no stage named - lists its stages
     instead, as /api/config does.
     """
-    if sequence is not None:
-        return {"status": "ok", "sequence": sequence}
-    return {"status": "ok", "test_type": get_config(request).test_type}
+    if isinstance(target, SequenceManifest):
+        return {"status": "ok", "sequence": target.stage_ids}
+    return {"status": "ok", "test_type": target.config.test_type}
 
 
 @router.get("/config")
 def get_test_config(
-    request: Request,
-    sequence: list[str] | None = Depends(get_sequence),
+    target: Stage | SequenceManifest = Depends(get_stage_or_manifest),
     x_secret: bytes = Depends(get_x_secret),
 ):
     """Return test parameters for the frontend.
@@ -61,11 +62,9 @@ def get_test_config(
     When several configs are served and no stage is named, returns the
     sequence manifest instead: the stage ids, in the order to run them.
     """
-    if sequence is not None:
-        return {"sequence": sequence}
-    # Resolved here rather than through Depends: a manifest request names no
-    # stage, so get_config would have rejected it before the check above.
-    config = get_config(request)
+    if isinstance(target, SequenceManifest):
+        return {"sequence": target.stage_ids}
+    config = target.config
     if isinstance(config, MOSConfig):
         return _get_mos_test_config(config)
     if isinstance(config, DMOSConfig):

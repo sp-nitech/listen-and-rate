@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import shutil
 import sys
+import warnings
 from pathlib import Path
 
 import pytest
@@ -138,15 +139,35 @@ _DEVICE_FORM = {
 }
 
 
-def test_sequence_asks_for_metadata_only_in_the_first_config(tmp_path, test_audio_file):
-    # The form is shown once, before the first test, so a form written in a
-    # later config would never be shown - reject it rather than ignore it.
+def test_sequence_warns_that_a_later_config_metadata_is_ignored(
+    tmp_path, test_audio_file
+):
+    # The form is shown once, before the first test, so a different form in a
+    # later config would never be shown. It is ignored rather than rejected:
+    # a config written to run on its own may well carry a form of its own.
     data = minimal_config(str(test_audio_file))
-    with pytest.raises(ValueError, match="'b'.*first config"):
-        load_sequence(
+    with pytest.warns(UserWarning, match="Config 'b': metadata is ignored"):
+        _, second = load_sequence(
             [
                 write_config(tmp_path, data, name="a.yaml"),
                 write_config(tmp_path, {**data, "metadata": _DEVICE_FORM}, "b.yaml"),
+            ]
+        )
+    assert second.metadata.fields == []
+
+
+def test_sequence_says_nothing_of_a_later_config_repeating_the_metadata(
+    tmp_path, test_audio_file
+):
+    # Nothing is lost when the form is the first one's, so there is nothing
+    # to warn about.
+    data = {**minimal_config(str(test_audio_file)), "metadata": _DEVICE_FORM}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        load_sequence(
+            [
+                write_config(tmp_path, data, name="a.yaml"),
+                write_config(tmp_path, data, name="b.yaml"),
             ]
         )
 

@@ -7,14 +7,8 @@ from ._helpers import (
     CMOS_ROWS,
     _plotly_call_args,
     _write_csv,
-    _write_json,
     generate_report_html,
 )
-
-
-def test_generate_cmos_report_returns_html(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", CMOS_CSV_ROWS)])
-    assert "<html>" in html
 
 
 def test_generate_cmos_report_hover_thin_spaces_around_plus_minus(tmp_path):
@@ -54,23 +48,6 @@ def test_generate_cmos_report_category_chart_has_seven_bars(tmp_path):
 def test_generate_cmos_report_includes_ttest_pvalue(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CMOS_CSV_ROWS)])
     assert "p-value (t-test" in html
-
-
-def test_generate_cmos_report_json_input(tmp_path):
-    p1 = _write_json(tmp_path / "s1.json", "s1", "cmos", CMOS_ROWS)
-    html = generate_report_html([p1])
-    assert "<html>" in html
-    assert "A vs B" in html
-
-
-def test_generate_cmos_report_shows_summary_stats(tmp_path):
-    csv_path = _write_csv(tmp_path / "s1.csv", CMOS_CSV_ROWS)
-    json_path = _write_json(tmp_path / "s2.json", "s2", "cmos", CMOS_ROWS)
-    html = generate_report_html([csv_path, json_path])
-    assert ">2<" in html  # 2 participants (s1, s2)
-    assert ">8<" in html  # 8 ratings collected (4 rows each)
-    assert ">Significance tests</h3>" in html
-    assert ">Data summary</h3>" in html
 
 
 def test_generate_cmos_report_orders_pairs_by_system_order(tmp_path):

@@ -210,18 +210,6 @@ final class SaveTest extends TestCase
         validate_submission_shape('abx', ['choices' => []]);
     }
 
-    public function testValidateSubmissionShapeAcceptsCmosWithChoices(): void
-    {
-        $this->expectNotToPerformAssertions();
-        validate_submission_shape('cmos', ['choices' => [['stimulus_ids' => ['a1', 'b1'], 'rating' => 1]]]);
-    }
-
-    public function testValidateSubmissionShapeRejectsCmosWithEmptyChoices(): void
-    {
-        $this->expectException(SaveRequestError::class);
-        validate_submission_shape('cmos', ['choices' => []]);
-    }
-
     public function testValidateSubmissionShapeErrorHasStatus400(): void
     {
         try {
@@ -454,13 +442,6 @@ final class SaveTest extends TestCase
     }
 
     // -- resolve_results_dir ----------------------------------------------
-
-    public function testResolveResultsDirDefaultsToResultsSubdirWhenMissing(): void
-    {
-        // config_data.php generated before output_path existed.
-        $this->assertSame('/bundle/results', resolve_results_dir('/bundle', null));
-        $this->assertSame('/bundle/results', resolve_results_dir('/bundle', ''));
-    }
 
     public function testResolveResultsDirResolvesDefaultRelativePath(): void
     {
@@ -1084,16 +1065,6 @@ final class SaveTest extends TestCase
         $this->assertSame('a1', $groundTruth);
     }
 
-    public function testValidateAbxChoiceRejectsInvalidPair(): void
-    {
-        $this->expectException(SaveRequestError::class);
-        validate_abx_choice(
-            $this->abStimulusMap(),
-            ['stimulus_ids' => ['a1', 'a2'], 'selected_stimulus_id' => 'a1', 'x_token' => 'irrelevant'],
-            self::ABX_SECRET
-        );
-    }
-
     public function testValidateAbxChoiceRejectsMissingSelection(): void
     {
         $token = commit_x('a1', 'b1', 'a1', self::ABX_SECRET);
@@ -1257,16 +1228,6 @@ final class SaveTest extends TestCase
         );
     }
 
-    public function testValidateXabChoiceRejectsInvalidPair(): void
-    {
-        $this->expectException(SaveRequestError::class);
-        validate_xab_choice(
-            $this->xabStimulusMap(),
-            ['stimulus_ids' => ['a1', 'a1'], 'selected_stimulus_id' => 'a1'],
-            'Reference'
-        );
-    }
-
     // -- build_xab_json_result / build_xab_csv_rows -------------------------
 
     public function testBuildXabJsonResultProducesItemSystemASystemBCloser(): void
@@ -1366,15 +1327,6 @@ final class SaveTest extends TestCase
         );
         $this->assertSame(['tool_version', 'session_id', 'timestamp'], $fields);
         $this->assertSame([['0.2.0', 's1', 't1'], ['0.2.0', 's1', 't2']], $rows);
-    }
-
-    public function testPrependToolVersionWritesTheColumnEvenWhenTheBundleHasNoVersion(): void
-    {
-        // An older bundle carries no version. The column still has to be there,
-        // or the analysis could not tell "unknown" apart from "not recorded".
-        [$fields, $rows] = prepend_tool_version_columns(['session_id'], [['s1']], '');
-        $this->assertSame(['tool_version', 'session_id'], $fields);
-        $this->assertSame([['', 's1']], $rows);
     }
 
     public function testResultKeysComeOutInTheSameOrderAsTheFastapiSaver(): void

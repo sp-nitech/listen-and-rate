@@ -12,13 +12,15 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
 import { fetchConfig, submitRatings } from '../../js/api.js';
-import { setStage } from '../../js/stage.js';
+import { Stage } from '../../js/stage.js';
 
 const real = globalThis.fetch;
 
+/** A lone config's page, whose requests name no stage. */
+const LONE = new Stage(null);
+
 afterEach(() => {
   globalThis.fetch = real;
-  setStage(null);
 });
 
 /** Reply with `body` and `status`, recording what was requested. */
@@ -39,18 +41,17 @@ function stubFetch({ status = 200, body = {}, json = true } = {}) {
 
 test('fetchConfig returns the parsed config', async () => {
   stubFetch({ body: { test_type: 'mos' } });
-  assert.deepEqual(await fetchConfig(), { test_type: 'mos' });
+  assert.deepEqual(await fetchConfig(LONE), { test_type: 'mos' });
 });
 
 test('fetchConfig names the status when the config cannot be loaded', async () => {
   stubFetch({ status: 503 });
-  await assert.rejects(fetchConfig, /503/);
+  await assert.rejects(() => fetchConfig(LONE), /503/);
 });
 
 test('fetchConfig asks for the stage the page is running', async () => {
   const calls = stubFetch({ body: { test_type: 'mos' } });
-  setStage('b');
-  await fetchConfig();
+  await fetchConfig(new Stage('b'));
   assert.equal(calls[0].url, 'config.php?stage=b');
 });
 
@@ -58,7 +59,7 @@ test('fetchConfig asks for the stage the page is running', async () => {
 
 test('submitRatings posts the payload as JSON', async () => {
   const calls = stubFetch({ body: { status: 'ok' } });
-  await submitRatings({ session_id: 's1', test_type: 'mos' });
+  await submitRatings(LONE, { session_id: 's1', test_type: 'mos' });
   assert.equal(calls[0].url, 'save.php');
   assert.equal(calls[0].init.method, 'POST');
   assert.deepEqual(JSON.parse(calls[0].init.body), { session_id: 's1', test_type: 'mos' });
@@ -66,25 +67,24 @@ test('submitRatings posts the payload as JSON', async () => {
 
 test('submitRatings posts to the stage the page is running', async () => {
   const calls = stubFetch({ body: { status: 'ok' } });
-  setStage('b');
-  await submitRatings({ session_id: 's1', test_type: 'mos' });
+  await submitRatings(new Stage('b'), { session_id: 's1', test_type: 'mos' });
   assert.equal(calls[0].url, 'save.php?stage=b');
 });
 
 test("submitRatings surfaces FastAPI's detail", async () => {
   stubFetch({ status: 400, body: { detail: 'ratings must be a non-empty array' } });
-  await assert.rejects(() => submitRatings({}), /non-empty array/);
+  await assert.rejects(() => submitRatings(LONE, {}), /non-empty array/);
 });
 
 test("submitRatings surfaces save.php's error", async () => {
   // Same rejection, different key - the PHP bundle answers with `error`.
   stubFetch({ status: 400, body: { error: 'Unknown stimulus IDs' } });
-  await assert.rejects(() => submitRatings({}), /Unknown stimulus IDs/);
+  await assert.rejects(() => submitRatings(LONE, {}), /Unknown stimulus IDs/);
 });
 
 test('submitRatings falls back to the status when the body explains nothing', async () => {
   // A proxy or a fatal error can answer with something that is not JSON at
   // all, which must not turn into an unhandled parse failure.
   stubFetch({ status: 500, json: false });
-  await assert.rejects(() => submitRatings({}), /500/);
+  await assert.rejects(() => submitRatings(LONE, {}), /500/);
 });

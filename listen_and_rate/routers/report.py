@@ -6,17 +6,17 @@ import html as _html
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 
-from ..dependencies import STAGE_PARAM, get_config, get_sequence
+from ..dependencies import STAGE_PARAM, SequenceManifest, Stage, get_stage_or_manifest
 
 router = APIRouter()
 
 
 @router.get("/report", response_class=HTMLResponse, include_in_schema=False)
 def get_report(
-    request: Request, sequence: list[str] | None = Depends(get_sequence)
+    target: Stage | SequenceManifest = Depends(get_stage_or_manifest),
 ) -> HTMLResponse:
     """Return a standalone Plotly HTML report for the current experiment's results.
 
@@ -25,11 +25,9 @@ def get_report(
     """
     from ..analysis import generate_report_html
 
-    if sequence is not None:
-        return HTMLResponse(content=_stage_index_html(sequence))
-    # Resolved here rather than through Depends: a sequence asked for no stage
-    # is answered above, and get_config would have rejected it first.
-    config = get_config(request)
+    if isinstance(target, SequenceManifest):
+        return HTMLResponse(content=_stage_index_html(target.stage_ids))
+    config = target.config
     results_dir = Path(config.output.path) / config.experiment_id
     paths = (
         sorted([*results_dir.glob("*.csv"), *results_dir.glob("*.json")])

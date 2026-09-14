@@ -405,11 +405,12 @@ def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
     Each stage keeps its own results directory, named by its experiment_id,
     so two stages sharing an id would pool two tests' results into one.
 
-    The metadata form is asked once, before the first test, so only the first
-    config may define it; one in a later config would never be shown. Its
-    answers are stored with every stage's results, so each later config gets
-    a copy of the form: every stage then validates and writes them exactly as
-    a lone config does.
+    The metadata form is asked once, before the first test, so a later
+    config's own form would never be shown. It is ignored - with a warning
+    when it differs from the first config's, as a config written to run on
+    its own may well carry one. The answers are stored with every stage's
+    results, so each later config gets a copy of the first config's form:
+    every stage then validates and writes them exactly as a lone config does.
     """
     configs = [_load_named(p) for p in config_paths]
     # Compared ignoring case: on a case-insensitive filesystem (macOS,
@@ -427,11 +428,12 @@ def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
         seen.add(key)
     first, *later = configs
     for config in later:
-        if config.metadata != MetadataFormConfig():
-            raise ValueError(
-                f"Config {config.experiment_id!r} defines `metadata`, but in a "
-                "sequence the form is asked once, before the first test. Move "
-                "it to the first config."
+        if config.metadata not in (MetadataFormConfig(), first.metadata):
+            warnings.warn(
+                f"Config {config.experiment_id!r}: metadata is ignored. A "
+                "sequence uses the metadata of the first config.",
+                UserWarning,
+                stacklevel=2,
             )
     return [first] + [c.model_copy(update={"metadata": first.metadata}) for c in later]
 

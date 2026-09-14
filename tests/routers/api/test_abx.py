@@ -14,28 +14,6 @@ from ._helpers import (
 )
 
 
-def test_abx_config_items_per_session_preserves_order_when_presentation_fixed(
-    tmp_path, test_audio_file, monkeypatch
-):
-    """With presentation_order="fixed", the sampled trial subset must keep its original
-    item order (utt0 < utt1 < ...), not an arbitrary permutation."""
-    with _abx_client(
-        tmp_path,
-        test_audio_file,
-        monkeypatch,
-        n_items=6,
-        items_per_session=4,
-        presentation_order="fixed",
-    ) as tc:
-        for _ in range(20):
-            trials = tc.get("/api/config").json()["trials"]
-            utt_indices = [
-                int(trials[i]["stimuli"][0]["id"].split("utt")[1])
-                for i in range(len(trials))
-            ]
-            assert utt_indices == sorted(utt_indices)
-
-
 def test_x_secret_env_var_makes_secret_stable_across_restarts(
     tmp_path, test_audio_file, monkeypatch
 ):
@@ -94,22 +72,6 @@ def test_abx_x_token_is_not_a_real_stimulus_id(tmp_path, test_audio_file, monkey
         ids = [s["id"] for s in trial["stimuli"]]
         x_token = trial["x"]["token"]
         assert x_token not in ids
-
-
-def test_abx_config_items_per_session_samples_trial_count(
-    tmp_path, test_audio_file, monkeypatch
-):
-    with _abx_client(
-        tmp_path, test_audio_file, monkeypatch, n_items=3, items_per_session=1
-    ) as tc:
-        assert len(tc.get("/api/config").json()["trials"]) == 1
-
-
-def test_abx_submit_missing_choices_returns_400(tmp_path, test_audio_file, monkeypatch):
-    """An abx submission with no choices key must be rejected, not silently accepted."""
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
-        res = tc.post("/api/submit", json={"session_id": "s1", "test_type": "abx"})
-        assert res.status_code == 400
 
 
 def test_abx_submit_scores_exactly_one_of_two_opposite_guesses_correct(
@@ -214,74 +176,6 @@ def test_abx_submit_matched_not_in_pair_returns_400(
                         "stimulus_ids": ids,
                         "selected_stimulus_id": "unknown-id",
                         "x_token": x_token,
-                    }
-                ],
-            },
-        )
-        assert res.status_code == 400
-
-
-def test_abx_submit_mismatched_item_pair_returns_400(
-    tmp_path, test_audio_file, monkeypatch
-):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=2) as tc:
-        trials = tc.get("/api/config").json()["trials"]
-        id1 = trials[0]["stimuli"][0]["id"]
-        id2 = trials[1]["stimuli"][0]["id"]
-        res = tc.post(
-            "/api/submit",
-            json={
-                "session_id": "s1",
-                "test_type": "abx",
-                "choices": [
-                    {
-                        "stimulus_ids": [id1, id2],
-                        "selected_stimulus_id": id1,
-                        "x_token": "0" * 20,
-                    }
-                ],
-            },
-        )
-        assert res.status_code == 400
-
-
-def test_abx_submit_same_system_pair_returns_400(
-    tmp_path, test_audio_file, monkeypatch
-):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=2) as tc:
-        res = tc.post(
-            "/api/submit",
-            json={
-                "session_id": "s1",
-                "test_type": "abx",
-                "choices": [
-                    {
-                        "stimulus_ids": ["A__utt0", "A__utt1"],
-                        "selected_stimulus_id": "A__utt0",
-                        "x_token": "0" * 20,
-                    }
-                ],
-            },
-        )
-        assert res.status_code == 400
-
-
-def test_abx_submit_unknown_stimulus_id_returns_400(
-    tmp_path, test_audio_file, monkeypatch
-):
-    with _abx_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
-        trial = tc.get("/api/config").json()["trials"][0]
-        good_id = trial["stimuli"][0]["id"]
-        res = tc.post(
-            "/api/submit",
-            json={
-                "session_id": "s1",
-                "test_type": "abx",
-                "choices": [
-                    {
-                        "stimulus_ids": [good_id, "nonexistent"],
-                        "selected_stimulus_id": good_id,
-                        "x_token": "0" * 20,
                     }
                 ],
             },

@@ -14,7 +14,6 @@
  * server-side YAML config.
  */
 
-import { stageUrl } from '../stage.js';
 import { submitPayload } from '../submit.js';
 import { PairedTrialTest } from './paired-trial-test.js';
 
@@ -26,8 +25,8 @@ export class ABXTest extends PairedTrialTest {
    * @param {string} sessionId - UUID identifying this listener's session.
    * @param {Function} onSubmit - Async callback invoked with (sessionId, testType, {choices}).
    */
-  constructor(config, sessionId, onSubmit) {
-    super(config, sessionId, onSubmit);
+  constructor(config, sessionId, onSubmit, stage) {
+    super(config, sessionId, onSubmit, stage);
     // choices: trial index → matched local index (0/1)
     // played: trial index → Set of local indices (0/1/'x') played to completion
     this.shortcuts = config.shortcuts ?? {
@@ -44,7 +43,7 @@ export class ABXTest extends PairedTrialTest {
   _xAudioUrl(trial) {
     const [idA, idB] = trial.stimuli.map((s) => s.id);
     const params = new URLSearchParams({ token: trial.x.token, a: idA, b: idB });
-    return stageUrl(`audio_x.php?${params.toString()}`);
+    return this.stage.url(`audio_x.php?${params.toString()}`);
   }
 
   // -- build-once structure -------------------------------------------------

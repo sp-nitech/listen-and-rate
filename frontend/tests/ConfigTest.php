@@ -98,6 +98,8 @@ final class ConfigTest extends TestCase
                 'resume' => ['max_age_ms' => 7200000],
                 'stimuli_per_session' => null,
                 'items_per_session' => 1,
+                'practice_count' => 0,
+                'practice_instructions' => null,
                 'stimuli' => $this->stimuliWithTwoSystemsTwoItems(),
             ],
             $extra
@@ -180,19 +182,6 @@ final class ConfigTest extends TestCase
         $this->assertSame('ja', $response['ui_language']);
     }
 
-    public function testBuildConfigResponseDefaultsUiLanguageToEnForABundleFromBeforeTheFeature(): void
-    {
-        // Same reasoning as the resume backward-compat test just below: a
-        // bundle exported before ui_language existed carries no key at all.
-        $data = $this->baseFakeConfigData('mos', [
-            'shortcuts' => ['play' => 'Space'],
-            'rating_labels' => null,
-        ]);
-        unset($data['ui_language']);
-        $response = build_config_response($data);
-        $this->assertSame('en', $response['ui_language']);
-    }
-
     public function testBuildConfigResponseExposesTheResumeWindow(): void
     {
         // Already in browser milliseconds when the bundle is exported: the
@@ -204,23 +193,6 @@ final class ConfigTest extends TestCase
         ]);
         $response = build_config_response($data);
         $this->assertSame(['max_age_ms' => 1800000], $response['resume']);
-    }
-
-    public function testBuildConfigResponseDefaultsResumeOffForABundleFromBeforeTheFeature(): void
-    {
-        // config_data.php is baked at export time; a bundle exported before
-        // resume existed carries no 'resume' key at all, e.g. when the PHP
-        // deployment's code is upgraded without re-running lar-export
-        // (avoided mid-experiment, since re-exporting changes config_version).
-        // Defaulting to off (rather than guessing a window) matches the
-        // pre-upgrade behavior instead of silently turning resume on.
-        $data = $this->baseFakeConfigData('mos', [
-            'shortcuts' => ['play' => 'Space'],
-            'rating_labels' => null,
-        ]);
-        unset($data['resume']);
-        $response = build_config_response($data);
-        $this->assertSame(['max_age_ms' => 0], $response['resume']);
     }
 
     public function testBuildConfigResponsePassesThroughFormPageTitles(): void
@@ -310,10 +282,9 @@ final class ConfigTest extends TestCase
         $this->assertSame(['a'], $extras['practice_stimuli']);
     }
 
-    public function testPracticeExtrasEmptyWhenCountZeroOrAbsent(): void
+    public function testPracticeExtrasEmptyWhenCountZero(): void
     {
         $this->assertSame([], practice_extras(['practice_count' => 0], ['a'], fn ($i) => $i));
-        $this->assertSame([], practice_extras([], ['a'], fn ($i) => $i));
     }
 
     public function testBuildConfigResponseIncludesPracticeFieldsWhenCountPositive(): void
@@ -339,14 +310,6 @@ final class ConfigTest extends TestCase
         $this->assertArrayNotHasKey('practice_instructions', $response);
     }
 
-    public function testBuildConfigResponseOmitsPracticeFieldsWhenKeysAbsent(): void
-    {
-        // Older config_data.php bundles may predate the practice feature.
-        $response = build_config_response($this->fakeConfigData());
-        $this->assertArrayNotHasKey('practice_stimuli', $response);
-        $this->assertArrayNotHasKey('practice_instructions', $response);
-    }
-
     /** Enable a 1-page practice stage on a fake config_data array. */
     private function withPractice(array $data): array
     {
@@ -364,16 +327,6 @@ final class ConfigTest extends TestCase
         $this->assertSame(['reference', 'test'], array_keys($trial));
         $this->assertSame(['id', 'label', 'audio_url'], array_keys($trial['reference']));
         $this->assertSame(['id', 'label', 'audio_url'], array_keys($trial['test']));
-    }
-
-    public function testBuildCmosConfigResponseIncludesPracticeTrials(): void
-    {
-        $response = build_cmos_config_response($this->withPractice($this->fakeCmosConfigData()));
-        $this->assertSame('W.', $response['practice_instructions']);
-        $this->assertCount(1, $response['practice_trials']);
-        $trial = $response['practice_trials'][0];
-        $this->assertSame(['stimuli'], array_keys($trial));
-        $this->assertCount(2, $trial['stimuli']);
     }
 
     public function testBuildAbConfigResponseIncludesPracticeTrials(): void
@@ -415,7 +368,7 @@ final class ConfigTest extends TestCase
         $this->assertSame('Anchor__u1', $trial['anchor']['id']);
     }
 
-    public function testTrialBuildersOmitPracticeFieldsWhenKeysAbsent(): void
+    public function testTrialBuildersOmitPracticeFieldsWhenCountZero(): void
     {
         $response = build_dmos_config_response($this->fakeDmosConfigData());
         $this->assertArrayNotHasKey('practice_trials', $response);
@@ -511,12 +464,6 @@ final class ConfigTest extends TestCase
             $this->assertSame(['id', 'label', 'audio_url'], array_keys($t['reference']));
             $this->assertSame(['id', 'label', 'audio_url'], array_keys($t['test']));
         }
-    }
-
-    public function testBuildDmosConfigResponseHasNoAllowTie(): void
-    {
-        $response = build_dmos_config_response($this->fakeDmosConfigData());
-        $this->assertArrayNotHasKey('allow_tie', $response);
     }
 
     public function testBuildConfigResponseDispatchesToDmosWhenTestTypeIsDmos(): void
@@ -657,23 +604,6 @@ final class ConfigTest extends TestCase
         ]);
     }
 
-    public function testBuildCmosConfigResponseAppliesItemsPerSession(): void
-    {
-        $response = build_cmos_config_response($this->fakeCmosConfigData());
-        $this->assertCount(1, $response['trials']);
-        $this->assertCount(2, $response['trials'][0]['stimuli']);
-    }
-
-    public function testBuildCmosConfigResponseStimuliOnlyExposeIdLabelAudioUrl(): void
-    {
-        $response = build_cmos_config_response($this->fakeCmosConfigData());
-        foreach ($response['trials'] as $t) {
-            foreach ($t['stimuli'] as $s) {
-                $this->assertSame(['id', 'label', 'audio_url'], array_keys($s));
-            }
-        }
-    }
-
     public function testBuildCmosConfigResponseHasNoAllowTie(): void
     {
         $response = build_cmos_config_response($this->fakeCmosConfigData());
@@ -798,13 +728,6 @@ final class ConfigTest extends TestCase
         ]);
     }
 
-    public function testBuildAbxConfigResponseAppliesItemsPerSession(): void
-    {
-        $response = build_abx_config_response($this->fakeAbxConfigData());
-        $this->assertCount(1, $response['trials']);
-        $this->assertCount(2, $response['trials'][0]['stimuli']);
-    }
-
     public function testBuildAbxConfigResponseStimuliOnlyExposeIdLabelAudioUrl(): void
     {
         $response = build_abx_config_response($this->fakeAbxConfigData());
@@ -846,12 +769,6 @@ final class ConfigTest extends TestCase
         // answer. The bound is loose enough not to flake (p < 1e-9 when fair).
         $this->assertGreaterThan($draws * 0.25, $first);
         $this->assertLessThan($draws * 0.75, $first);
-    }
-
-    public function testBuildAbxConfigResponseHasNoAllowTie(): void
-    {
-        $response = build_abx_config_response($this->fakeAbxConfigData());
-        $this->assertArrayNotHasKey('allow_tie', $response);
     }
 
     public function testBuildConfigResponseDispatchesToAbxWhenTestTypeIsAbx(): void

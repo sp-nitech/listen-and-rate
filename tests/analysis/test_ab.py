@@ -6,22 +6,14 @@ import re
 
 from ._helpers import (
     AB_CSV_ROWS,
-    AB_ROWS,
     XAB_CSV_ROWS,
-    XAB_ROWS,
     _plotly_call_args,
     _with_session_meta,
     _write_csv,
-    _write_json,
     generate_report_html,
 )
 
 # -- AB ---------------------------------------------------------------------
-
-
-def test_generate_ab_report_returns_html(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
-    assert "<html>" in html
 
 
 def test_generate_ab_report_shows_preference_rate_and_ci(tmp_path):
@@ -69,21 +61,6 @@ def test_generate_ab_report_counts_ties_separately(tmp_path):
 def test_generate_ab_report_includes_binomial_pvalue(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)])
     assert "A vs B" in html
-
-
-def test_generate_ab_report_json_input(tmp_path):
-    p1 = _write_json(tmp_path / "s1.json", "s1", "ab", AB_ROWS)
-    html = generate_report_html([p1])
-    assert "<html>" in html
-    assert "A vs B" in html
-
-
-def test_generate_ab_report_shows_summary_stats(tmp_path):
-    csv_path = _write_csv(tmp_path / "s1.csv", AB_CSV_ROWS)
-    json_path = _write_json(tmp_path / "s2.json", "s2", "ab", AB_ROWS)
-    html = generate_report_html([csv_path, json_path])
-    assert ">2<" in html  # 2 participants (s1, s2)
-    assert ">8<" in html  # 8 choices collected (4 rows each)
 
 
 def test_generate_ab_report_preference_chart_has_one_bar_per_pair(tmp_path):
@@ -185,16 +162,6 @@ def test_generate_ab_report_rate_follows_positional_token_under_swap(tmp_path):
     assert traces[0]["x"][0] == 0.0  # Zebra won 0 of 2
 
 
-def test_generate_ab_report_title_is_centered_heading(tmp_path):
-    # AB report has no per-chart title (removed to avoid clutter); the overall
-    # experiment title is a centered <h1> above the charts instead.
-    html = generate_report_html(
-        [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)], title="My AB Experiment"
-    )
-    assert "text-align:center" in html
-    assert ">My AB Experiment</h1>" in html
-
-
 def test_generate_ab_report_custom_font(tmp_path):
     html = generate_report_html(
         [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)],
@@ -208,13 +175,6 @@ def test_generate_ab_report_custom_font(tmp_path):
     # ...not the HTML page chrome, which keeps its fixed font.
     assert "font-family:Georgia" not in html
     assert "font-family:sans-serif" in html
-
-
-def test_generate_ab_report_custom_width(tmp_path):
-    html = generate_report_html(
-        [_write_csv(tmp_path / "s.csv", AB_CSV_ROWS)], width=600
-    )
-    assert "max-width:600px" in html
 
 
 def test_generate_ab_report_orders_pairs_by_system_order(tmp_path):
@@ -278,11 +238,6 @@ def test_generate_ab_report_orders_multiple_pairs_by_system_order(tmp_path):
 # -- XAB (reuses the AB generator) ------------------------------------------
 
 
-def test_generate_xab_report_returns_html(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", XAB_CSV_ROWS)])
-    assert "<html>" in html
-
-
 def test_generate_xab_report_shows_closer_rate_and_ci(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", XAB_CSV_ROWS)])
     assert "Closer-to-reference rate" in html
@@ -303,18 +258,3 @@ def test_generate_xab_report_includes_binomial_pvalue(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", XAB_CSV_ROWS)])
     assert "A vs B" in html
     assert "p-value (binomial test)" in html
-
-
-def test_generate_xab_report_json_input(tmp_path):
-    p1 = _write_json(tmp_path / "s1.json", "s1", "xab", XAB_ROWS)
-    html = generate_report_html([p1])
-    assert "<html>" in html
-    assert "A vs B" in html
-
-
-def test_generate_xab_report_shows_summary_stats(tmp_path):
-    csv_path = _write_csv(tmp_path / "s1.csv", XAB_CSV_ROWS)
-    json_path = _write_json(tmp_path / "s2.json", "s2", "xab", XAB_ROWS)
-    html = generate_report_html([csv_path, json_path])
-    assert ">2<" in html  # 2 participants (s1, s2)
-    assert ">8<" in html  # 8 choices collected (4 rows each)

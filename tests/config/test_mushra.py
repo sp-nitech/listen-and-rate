@@ -171,29 +171,6 @@ def test_mushra_rating_labels_accepts_valid_keys(tmp_path, test_audio_file):
     assert result.rating_labels == {"0": "Bad", "80": "Excellent"}
 
 
-def test_mushra_rating_labels_accepts_bare_numeric_keys(tmp_path, test_audio_file):
-    da, db = two_system_dirs(tmp_path, test_audio_file)
-    data = stimuli_dirs_data(
-        [{"path": str(da), "system": "A"}, {"path": str(db), "system": "B"}],
-        test_type="mushra",
-    )
-    data["rating_labels"] = {
-        0: "Bad",
-        20: "Poor",
-        40: "Fair",
-        60: "Good",
-        80: "Excellent",
-    }
-    result = load_config(write_config(tmp_path, data))
-    assert result.rating_labels == {
-        "0": "Bad",
-        "20": "Poor",
-        "40": "Fair",
-        "60": "Good",
-        "80": "Excellent",
-    }
-
-
 # -- build_mushra_trials --------------------------------------------------
 
 

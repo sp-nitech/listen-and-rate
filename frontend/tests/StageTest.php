@@ -31,10 +31,12 @@ final class StageTest extends TestCase
 
     public function testALoneConfigIgnoresTheStageParameter(): void
     {
-        $this->assertNull(sequence_stages($this->bundleDir));
-        $this->assertSame($this->bundleDir, stage_data_dir($this->bundleDir, []));
+        // A lone config is a sequence of one: nothing to choose between.
+        $this->writeSequence(['a']);
+        $this->assertSame(['a'], sequence_stages($this->bundleDir));
+        $this->assertSame($this->bundleDir . '/stages/a', stage_data_dir($this->bundleDir, []));
         $this->assertSame(
-            $this->bundleDir,
+            $this->bundleDir . '/stages/a',
             stage_data_dir($this->bundleDir, [STAGE_PARAM => 'anything'])
         );
     }

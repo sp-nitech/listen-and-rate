@@ -25,17 +25,25 @@ class Stage:
     audio_map: dict[str, str]
 
 
-def get_sequence(request: Request) -> list[str] | None:
-    """Return the stage ids when the request asks for a sequence's manifest.
+@dataclass(frozen=True)
+class SequenceManifest:
+    """The stages of a sequence, by experiment_id, in the order they run."""
 
-    That is a request naming no stage while several configs are served; the
-    browser fetches it first to learn which stages to run, in order. None
-    for every other request, which is for one stage (see get_stage).
+    stage_ids: list[str]
+
+
+def get_stage_or_manifest(request: Request) -> Stage | SequenceManifest:
+    """Return the Stage a request is for, or the sequence's manifest.
+
+    The manifest answers a request naming no stage while several configs are
+    served: the browser fetches it first to learn which stages to run, and a
+    health check or the report page asks about the server as a whole. Every
+    other request is for one stage (see get_stage).
     """
     stages = request.app.state.stages
     if len(stages) > 1 and STAGE_PARAM not in request.query_params:
-        return list(stages)
-    return None
+        return SequenceManifest(list(stages))
+    return get_stage(request)
 
 
 def get_stage(request: Request) -> Stage:

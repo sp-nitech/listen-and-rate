@@ -30,6 +30,7 @@
 
 import { PAUSE_SVG, PLAY_SVG, pauseOtherAudio } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
+import { audioUrl } from '../stage.js';
 import { t } from '../strings.js';
 import { submitPayload } from '../submit.js';
 import { PairedTrialTest } from './paired-trial-test.js';
@@ -378,7 +379,7 @@ export class MUSHRATest extends PairedTrialTest {
     const rated = this.choices.get(this.currentIndex);
 
     if (this._el.referenceAudio) {
-      const url = this._audioUrl(trial.reference);
+      const url = audioUrl(trial.reference);
       if (this._el.referenceAudio.getAttribute('src') !== url) this._el.referenceAudio.src = url;
       const refCol = this._el.referenceAudio.closest('.mushra-col');
       refCol?.classList.remove('audio-error-state');
@@ -403,7 +404,7 @@ export class MUSHRATest extends PairedTrialTest {
       range.tabIndex = enabled ? 0 : -1;
 
       const audio = col.querySelector('audio');
-      const url = this._audioUrl(s);
+      const url = audioUrl(s);
       if (audio.getAttribute('src') !== url) audio.src = url;
       col.classList.remove('audio-error-state');
       const playBtn = col.querySelector('.mushra-play-btn');

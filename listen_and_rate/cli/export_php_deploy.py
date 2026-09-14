@@ -8,6 +8,7 @@ import os
 import secrets
 import shutil
 import textwrap
+from collections.abc import Collection
 from pathlib import Path
 
 from listen_and_rate import __version__
@@ -18,7 +19,7 @@ from listen_and_rate.config import (
     MUSHRAConfig,
     StimulusConfig,
     XABConfig,
-    load_config_or_exit,
+    load_sequence_or_exit,
 )
 from listen_and_rate.duration import run_configured_duration_check
 from listen_and_rate.loudness import (
@@ -32,9 +33,10 @@ logger = logging.getLogger(__name__)
 # frontend/ lives at the repo root; this file is
 # listen_and_rate/cli/export_php_deploy.py.
 _FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
-# Written by every export and by nothing else, so its presence marks a
-# directory as one this tool produced - see _clear_outdir_except_results.
-_BUNDLE_MARKER = "config_data.php"
+# Written by every export and by nothing else - the first by a lone config's,
+# the second by a sequence's - so either marks a directory as one this tool
+# produced. See _clear_outdir_except_results.
+_BUNDLE_MARKERS = ("config_data.php", "sequence.php")
 
 _STATIC_ASSETS = [
     "index.html",
@@ -43,6 +45,7 @@ _STATIC_ASSETS = [
     "save.php",
     "config.php",
     "x_token.php",
+    "stage.php",
     "audio_x.php",
 ]
 
@@ -134,46 +137,50 @@ def _assert_not_the_frontend_source(outdir: Path) -> None:
         )
 
 
-def _clear_outdir_except_results(outdir: Path, results_subpath: Path | None) -> None:
-    """Remove everything in outdir except the results directory.
+def _clear_outdir_except_results(
+    outdir: Path, results_subpaths: Collection[Path | None]
+) -> None:
+    """Remove everything in outdir except the results directories.
 
     Everything else (index.html, css/, js/, save.php, config.php,
     config_data.php, stimulus_map.php, symlinked audio) is fully reproducible
     from the YAML config and frontend source, so it's always safe to
-    regenerate. The results directory (output.path resolved inside the
-    bundle) holds collected listener data, which is not reproducible, so it
-    is preserved unconditionally regardless of --overwrite. With an
-    output.path outside the bundle (results_subpath None) nothing inside
-    the bundle holds data, so everything is cleared.
+    regenerate. A results directory (an output.path resolved inside the
+    bundle - one per config, see _bundle_results_subpath) holds collected
+    listener data, which is not reproducible, so it is preserved
+    unconditionally regardless of --overwrite. An output.path outside the
+    bundle (a None subpath) holds no data inside it, so preserves nothing.
 
     Two shapes are refused rather than cleared, because in both this function
     cannot tell reproducible files from collected data:
 
-    - a non-empty directory with no _BUNDLE_MARKER in it was not written by
-      this tool, so a mistyped --outdir (a public_html serving other things,
-      say) would have everything but results/ deleted out of it;
+    - a non-empty directory with none of _BUNDLE_MARKERS in it was not
+      written by this tool, so a mistyped --outdir (a public_html serving
+      other things, say) would have everything but results/ deleted out of it;
     - results at the bundle root (output.path resolving to '.') puts the
       collected data in the same directory as everything regenerated, so
       "clear all but the results" has no meaning.
     """
-    if results_subpath is not None and not results_subpath.parts:
-        raise ValueError(
-            f"output.path ({results_subpath}) puts the results at the bundle "
-            "root, so regenerating the bundle cannot preserve them. Use a "
-            "subdirectory (the default is './results/'), or an absolute path "
-            "outside the bundle."
-        )
+    inside = [p for p in results_subpaths if p is not None]
+    for results_subpath in inside:
+        if not results_subpath.parts:
+            raise ValueError(
+                f"output.path ({results_subpath}) puts the results at the bundle "
+                "root, so regenerating the bundle cannot preserve them. Use a "
+                "subdirectory (the default is './results/'), or an absolute "
+                "path outside the bundle."
+            )
     entries = list(outdir.iterdir())
-    if entries and not (outdir / _BUNDLE_MARKER).exists():
+    if entries and not any((outdir / m).exists() for m in _BUNDLE_MARKERS):
         raise FileExistsError(
             f"{outdir} is not empty and does not look like a bundle this tool "
-            f"wrote ({_BUNDLE_MARKER} is missing), so --overwrite will not "
-            "clear it. Point --outdir at a new or previously exported "
-            "directory, or empty this one yourself."
+            f"wrote (none of {', '.join(_BUNDLE_MARKERS)} is in it), so "
+            "--overwrite will not clear it. Point --outdir at a new or "
+            "previously exported directory, or empty this one yourself."
         )
-    preserve = results_subpath.parts[0] if results_subpath is not None else None
+    preserve = {p.parts[0] for p in inside}
     for entry in entries:
-        if preserve is not None and entry.name == preserve:
+        if entry.name in preserve:
             continue
         if entry.is_dir() and not entry.is_symlink():
             shutil.rmtree(entry)
@@ -327,6 +334,15 @@ def _render_config_data_php(data: dict) -> str:
     return f"<?php\n\nreturn {_php_value(data)};\n"
 
 
+def _render_sequence_php(stage_ids: list[str]) -> str:
+    """Render a sequence bundle's stage ids, in order, for stage.php.
+
+    Its presence is what makes a bundle a sequence: stage.php then serves
+    each request from stages/<id>/ of the stage it names.
+    """
+    return f"<?php\n\nreturn {_php_value(stage_ids)};\n"
+
+
 def _build_config_data(
     config: Config,
     all_stimuli: list[StimulusConfig],
@@ -452,6 +468,65 @@ def _build_config_data(
     }
 
 
+def _stage_audio_urls(config: Config, stage_subdir: Path) -> dict[str, str]:
+    """Return each stimulus's bundle-relative audio URL, under stage_subdir.
+
+    The URL mirrors the file's path relative to the working directory, so
+    distinct files never share one. Normalized audio is always written out as
+    WAV (see apply_gain_and_write), so its URL carries a .wav suffix even when
+    the source was e.g. .mp3. The rewrite cannot collide two stimuli onto one
+    output path: load_config already rejects stimuli whose paths differ only
+    in extension.
+    """
+    if config.stimuli_list is None:
+        raise RuntimeError("config.stimuli_list is None after loading")
+    normalize = config.loudness_normalization is not None
+    urls = {}
+    for s in config.stimuli_list.entries:
+        url = Path(_audio_url(Path(s.path)))
+        urls[s.id] = str(stage_subdir / (url.with_suffix(".wav") if normalize else url))
+    return urls
+
+
+def _write_stage(
+    outdir: Path,
+    stage_subdir: Path,
+    config: Config,
+    audio_urls: dict[str, str],
+    copy_audio: bool,
+) -> None:
+    """Write one config's audio, config_data.php, and stimulus_map.php.
+
+    The two PHP files go in outdir/stage_subdir, where stage.php looks for
+    them; the audio goes at its bundle-relative audio_url.
+    """
+    all_stimuli = config.stimuli_list.entries if config.stimuli_list else []
+    if config.loudness_normalization is not None:
+        # Normalization always writes real (loudness-adjusted) audio into the
+        # bundle, so it supersedes the symlink/--copy-audio choice.
+        run_configured_loudness_normalization(
+            config, lambda s: outdir / audio_urls[s.id]
+        )
+    elif copy_audio:
+        _copy_audio_files(outdir, all_stimuli, audio_urls)
+    else:
+        _symlink_audio_files(outdir, all_stimuli, audio_urls)
+
+    stage_dir = outdir / stage_subdir
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    # config.experiment_id, not the filename: load_config already resolved
+    # one from the other, and recomputing it here would ignore an explicit
+    # `experiment_id:` and send the bundle to a different results directory
+    # than the FastAPI server uses.
+    config_data = _build_config_data(config, all_stimuli, audio_urls)
+    (stage_dir / "config_data.php").write_text(
+        _render_config_data_php(config_data), encoding="utf-8"
+    )
+    (stage_dir / "stimulus_map.php").write_text(
+        _render_stimulus_map_php(all_stimuli), encoding="utf-8"
+    )
+
+
 def main() -> None:
     """Load YAML config, resolve stimuli, and write a full PHP deployment bundle.
 
@@ -465,6 +540,13 @@ def main() -> None:
     subset, and withholds
     'system' from its response to keep listeners blind to the underlying
     system under test. stimulus_map.php carries that mapping for save.php.
+
+    Given several configs, writes a sequence instead: one copy of the page
+    and scripts, sequence.php listing the stages (the configs' experiment_ids,
+    in the order given), and each stage's config_data.php, stimulus_map.php,
+    and audio under stages/<experiment_id>/ (see frontend/stage.php). Results
+    stay under the bundle root either way, so re-exporting one shape as the
+    other keeps what was collected.
     """
     # Emit INFO-level progress to stderr when run as a real CLI. Under pytest
     # the root logger already has a handler, so this no-ops and the messages
@@ -475,7 +557,14 @@ def main() -> None:
         description="Generate a PHP static-deployment bundle from a YAML config file.",
     )
     parser.add_argument(
-        "--config", required=True, metavar="PATH", help="Path to the YAML config file"
+        "--config",
+        required=True,
+        nargs="+",
+        metavar="PATH",
+        help=(
+            "Path to the YAML config file. Give several to export a sequence: "
+            "the tests run back to back from one link, in the order given."
+        ),
     )
     parser.add_argument(
         "--outdir",
@@ -506,64 +595,47 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    config = load_config_or_exit(args.config)
-    run_configured_duration_check(config)
-    run_configured_loudness_check(config)
-    run_configured_silence_check(config)
-    if config.stimuli_list is None:
-        raise RuntimeError("config.stimuli_list is None after loading")
-
-    all_stimuli = config.stimuli_list.entries
-    # Normalized audio is always written out as WAV (see apply_gain_and_write),
-    # so its URL carries a .wav suffix even when the source was e.g. .mp3.
-    # The rewrite cannot collide two stimuli onto one output path: load_config
-    # already rejects stimuli whose paths differ only in extension.
-    normalize = config.loudness_normalization is not None
-    audio_urls = {
-        s.id: (
-            str(Path(_audio_url(Path(s.path))).with_suffix(".wav"))
-            if normalize
-            else _audio_url(Path(s.path))
-        )
-        for s in all_stimuli
-    }
-    # config.experiment_id, not the filename: load_config already resolved
-    # one from the other, and recomputing it here would ignore an explicit
-    # `experiment_id:` and send the bundle to a different results directory
-    # than the FastAPI server uses.
-    config_data = _build_config_data(config, all_stimuli, audio_urls)
+    configs = load_sequence_or_exit(args.config)
+    for config in configs:
+        run_configured_duration_check(config)
+        run_configured_loudness_check(config)
+        run_configured_silence_check(config)
+    # A lone config's files sit at the bundle root, as they always have; each
+    # stage of a sequence gets its own directory (see frontend/stage.php).
+    is_sequence = len(configs) > 1
+    stage_subdirs = [
+        Path("stages", c.experiment_id) if is_sequence else Path() for c in configs
+    ]
+    # Resolved before outdir is touched: an audio file outside the working
+    # directory fails here, leaving an existing bundle as it was.
+    audio_urls = [
+        _stage_audio_urls(c, sub) for c, sub in zip(configs, stage_subdirs, strict=True)
+    ]
 
     outdir = Path(args.outdir)
     _assert_not_the_frontend_source(outdir)
-    results_subpath = _bundle_results_subpath(config.output.path)
+    results_subpaths = {_bundle_results_subpath(c.output.path) for c in configs}
     if outdir.exists():
         if not args.overwrite:
             raise FileExistsError(
                 f"{outdir} already exists. "
                 f"Pass --overwrite to regenerate it, or remove it manually."
             )
-        _clear_outdir_except_results(outdir, results_subpath)
+        _clear_outdir_except_results(outdir, results_subpaths)
     outdir.mkdir(parents=True, exist_ok=True)
     _copy_static_assets(outdir)
-    _seed_results_dir(outdir, results_subpath)
-    if normalize:
-        # Normalization always writes real (loudness-adjusted) audio into the
-        # bundle, so it supersedes the symlink/--copy-audio choice.
-        run_configured_loudness_normalization(
-            config, lambda s: outdir / audio_urls[s.id]
+    # Before any stage: sequence.php is also what marks the directory as a
+    # bundle (_BUNDLE_MARKERS), so a stage that fails to write - a broken
+    # file, Ctrl-C - leaves a bundle a rerun with --overwrite can still clear.
+    if is_sequence:
+        (outdir / "sequence.php").write_text(
+            _render_sequence_php([c.experiment_id for c in configs]),
+            encoding="utf-8",
         )
-    elif args.copy_audio:
-        _copy_audio_files(outdir, all_stimuli, audio_urls)
-    else:
-        _symlink_audio_files(outdir, all_stimuli, audio_urls)
-
-    config_data_path = outdir / "config_data.php"
-    config_data_path.write_text(_render_config_data_php(config_data), encoding="utf-8")
-
-    stimulus_map_path = outdir / "stimulus_map.php"
-    stimulus_map_path.write_text(
-        _render_stimulus_map_php(all_stimuli), encoding="utf-8"
-    )
+    for results_subpath in results_subpaths:
+        _seed_results_dir(outdir, results_subpath)
+    for config, sub, urls in zip(configs, stage_subdirs, audio_urls, strict=True):
+        _write_stage(outdir, sub, config, urls, args.copy_audio)
 
     logger.info(
         "Copy `%s` to your public_html or www directory to deploy the experiment",

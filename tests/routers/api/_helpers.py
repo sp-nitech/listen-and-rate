@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 
 from fastapi.testclient import TestClient
@@ -16,6 +17,40 @@ def _create_app_client(tmp_path, config: dict, monkeypatch) -> TestClient:
     from listen_and_rate.main import create_app
 
     return TestClient(create_app())
+
+
+def _create_sequence_client(tmp_path, configs: dict[str, dict], monkeypatch):
+    """Serve `configs` ({experiment_id: config}) as one sequence, in that order.
+
+    Each config is written to <experiment_id>.yaml, so its file name gives it
+    that experiment_id.
+    """
+    paths = [write_config(tmp_path, c, f"{eid}.yaml") for eid, c in configs.items()]
+    monkeypatch.setenv("LISTEN_AND_RATE_CONFIG", os.pathsep.join(map(str, paths)))
+    from listen_and_rate.main import create_app
+
+    return TestClient(create_app())
+
+
+def _stage_config(tmp_path, test_audio_file, title: str, **extra) -> dict:
+    return {
+        "test_type": "mos",
+        "title": title,
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+        **extra,
+    }
+
+
+def _sequence_client(tmp_path, test_audio_file, monkeypatch):
+    """Serve MOS stages a ("First", with the metadata form) then b ("Second")."""
+    device = {"fields": [{"key": "device", "label": "Device"}]}
+    configs = {
+        "a": _stage_config(tmp_path, test_audio_file, "First", metadata=device),
+        "b": _stage_config(tmp_path, test_audio_file, "Second"),
+    }
+    return _create_sequence_client(tmp_path, configs, monkeypatch)
 
 
 def _two_system_dirs(tmp_path, test_audio_file, n_items):

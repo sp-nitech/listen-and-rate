@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated
 
@@ -13,7 +14,12 @@ from ..ids import is_valid_id
 from ._utils import _AUDIO_EXTENSIONS, _duplicates, _normalize, _safe_id
 from .ab import ABConfig, build_ab_trials
 from .abx import ABXConfig
-from .base import StimuliDirsConfig, StimuliListConfig, StimulusConfig
+from .base import (
+    MetadataFormConfig,
+    StimuliDirsConfig,
+    StimuliListConfig,
+    StimulusConfig,
+)
 from .cmos import CMOSConfig
 from .dmos import DMOSConfig, build_dmos_trials
 from .errors import format_config_error
@@ -390,5 +396,53 @@ def load_config_or_exit(config_path: str | Path) -> Config:
     """
     try:
         return load_config(config_path)
+    except ValidationError as exc:
+        raise SystemExit(format_config_error(exc)) from None
+
+
+def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
+    """Load the configs of tests run back to back, one stage per config.
+
+    Each stage keeps its own results directory, named by its experiment_id,
+    so two stages sharing an id would pool two tests' results into one.
+
+    The metadata form is asked once, before the first test, so only the first
+    config may define it; one in a later config would never be shown. Its
+    answers are stored with every stage's results, so each later config gets
+    a copy of the form: every stage then validates and writes them exactly as
+    a lone config does.
+    """
+    configs = [load_config(p) for p in config_paths]
+    # Compared ignoring case: on a case-insensitive filesystem (macOS,
+    # Windows, and the hosts using them) results/Study and results/study are
+    # one directory, as are the bundle's stages/Study and stages/study.
+    seen: set[str] = set()
+    for config in configs:
+        key = config.experiment_id.casefold()
+        if key in seen:
+            raise ValueError(
+                f"Two configs share the experiment_id {config.experiment_id!r}. "
+                "Each test in a sequence needs its own results directory, so "
+                "rename one file or set `experiment_id:` in it."
+            )
+        seen.add(key)
+    first, *later = configs
+    for config in later:
+        if config.metadata != MetadataFormConfig():
+            raise ValueError(
+                f"Config {config.experiment_id!r} defines `metadata`, but in a "
+                "sequence the form is asked once, before the first test. Move "
+                "it to the first config."
+            )
+    return [first] + [c.model_copy(update={"metadata": first.metadata}) for c in later]
+
+
+def load_sequence_or_exit(config_paths: Sequence[str | Path]) -> list[Config]:
+    """load_sequence, but turn a config-file ValidationError into a clean exit.
+
+    The sequence counterpart of load_config_or_exit, for the same boundaries.
+    """
+    try:
+        return load_sequence(config_paths)
     except ValidationError as exc:
         raise SystemExit(format_config_error(exc)) from None

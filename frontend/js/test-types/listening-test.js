@@ -33,6 +33,7 @@ import {
   practiceBadgeHtml,
   practiceBannerHtml,
 } from '../practice.js';
+import { showStageProgress } from '../progress.js';
 import { t } from '../strings.js';
 
 export class ListeningTest {
@@ -159,9 +160,10 @@ export class ListeningTest {
   }
 
   _updateProgressBar() {
-    const pct = (this._answeredCount() / this._trialCount()) * 100;
-    const bar = document.getElementById('progress-bar');
-    if (bar) bar.style.width = `${pct}%`;
+    // Practice pages are no part of the test, so they leave the bar showing
+    // the real progress.
+    if (this.config.isPractice) return;
+    showStageProgress(this._answeredCount() / this._trialCount());
   }
 
   /** Move to an adjacent page; forward navigation is blocked while unanswered. */

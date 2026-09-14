@@ -89,5 +89,17 @@ def test_audio_returns_404_for_unknown_id(client):
     assert client.get("/audio/nonexistent").status_code == 404
 
 
+def test_audio_of_a_sequence_is_looked_up_in_the_named_stage(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # Stimulus ids are only unique within one config, so the stage decides
+    # which audio_map an id is resolved in.
+    from .api._helpers import _sequence_client
+
+    with _sequence_client(tmp_path, test_audio_file, monkeypatch) as client:
+        assert client.get("/audio/s001", params={"stage": "b"}).status_code == 200
+        assert client.get("/audio/s001").status_code == 404
+
+
 def test_audio_range_request_returns_206(client):
     assert client.get("/audio/s001", headers={"Range": "bytes=0-99"}).status_code == 206

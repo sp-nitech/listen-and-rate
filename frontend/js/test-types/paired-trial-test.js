@@ -22,6 +22,7 @@ import {
   rewindAudio,
 } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
+import { audioUrl } from '../stage.js';
 import { t } from '../strings.js';
 import { ListeningTest } from './listening-test.js';
 
@@ -94,14 +95,9 @@ export class PairedTrialTest extends ListeningTest {
     this._el.next.addEventListener('click', () => this._nextOrSubmit());
   }
 
-  /** Resolve a stimulus's audio URL (server audio_url, else the FastAPI /audio route). */
-  _audioUrl(s) {
-    return s.audio_url ?? `/audio/${encodeURIComponent(s.id)}`;
-  }
-
   /** A clip descriptor {url, id} for _trialAudioClips; id resolves the served duration. */
   _clip(s) {
-    return { url: this._audioUrl(s), id: s.id };
+    return { url: audioUrl(s), id: s.id };
   }
 
   /** One blinded audio card (persistent custom player; only its src changes per trial). */

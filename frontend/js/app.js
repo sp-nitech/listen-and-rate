@@ -1,14 +1,30 @@
 /**
  * Entry point: fetches config, selects the appropriate test class, and
  * renders the test into #app. Shows an error screen on any failure.
+ *
+ * The page runs one config, or several back to back as a sequence: config.php
+ * then answers with a manifest naming the stages, and each stage runs as a
+ * lone config would - its own practice, test, and survey, submitted to its
+ * own results - under one session id and one set of metadata answers, asked
+ * before the first. A lone config is a sequence of one (see stage.js).
  */
 
 import { fetchConfig, submitRatings } from './api.js';
 import { escapeHtml } from './dom.js';
 import { MetadataPage } from './metadata.js';
 import { runPracticeStage } from './practice.js';
-import { clearRecord, isResumable, pruneExpiredRecords, recordKey, saveRecord } from './resume.js';
+import { pageCount, setStageSpan, showStageProgress, stageSpans } from './progress.js';
+import {
+  buildRecord,
+  clearRecord,
+  clearStageRecords,
+  findResumableStage,
+  pruneExpiredRecords,
+  recordKey,
+  saveRecord,
+} from './resume.js';
 import { generateSessionId } from './session.js';
+import { audioUrl, setStage, stageUrl } from './stage.js';
 import { currentLanguage, setLanguage, t } from './strings.js';
 import { ABTest } from './test-types/ab.js';
 import { ABXTest } from './test-types/abx.js';
@@ -46,16 +62,20 @@ function flatStimuli(config) {
   return config.stimuli;
 }
 
+/** The config's practice stimuli/trials, or [] when it has no practice stage. */
+function practiceItems(config) {
+  return config.practice_stimuli ?? config.practice_trials ?? [];
+}
+
 /**
- * HEAD-request each stimulus audio URL in parallel.
+ * HEAD-request each audio URL in parallel.
  *
- * @param {Array<{id: string, audio_url?: string}>} stimuli
+ * @param {string[]} urls
  * @returns {Promise<string[]>} URLs that returned a non-OK response or threw.
  */
-async function checkAudioFiles(stimuli) {
+async function checkAudioFiles(urls) {
   const results = await Promise.all(
-    stimuli.map(async (s) => {
-      const url = s.audio_url ?? `/audio/${encodeURIComponent(s.id)}`;
+    urls.map(async (url) => {
       try {
         const res = await fetch(url, { method: 'HEAD' });
         return res.ok ? null : url;
@@ -70,11 +90,12 @@ async function checkAudioFiles(stimuli) {
 /**
  * GET save.php to verify the results directory is writable before the test starts.
  *
+ * @param {string} url - save.php, naming the stage in a sequence.
  * @returns {Promise<string|null>} Error message, or null if writable.
  */
-async function checkSaveEndpoint() {
+async function checkSaveEndpoint(url) {
   try {
-    const res = await fetch('save.php');
+    const res = await fetch(url);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return err.error || `save.php returned ${res.status}`;
@@ -96,6 +117,13 @@ const testTypeMap = {
   mushra: MUSHRATest,
 };
 
+/** Return the test class for the config's test_type; throws on an unknown one. */
+function testClassFor(config) {
+  const TestClass = testTypeMap[config.test_type];
+  if (!TestClass) throw new Error(`Unknown test type: "${config.test_type}"`);
+  return TestClass;
+}
+
 /**
  * Ask the listener whether to resume a saved in-progress session or start
  * over. Renders a two-button screen into `container` and resolves true
@@ -106,17 +134,20 @@ const testTypeMap = {
  * @returns {Promise<boolean>}
  */
 function promptResume(container, record) {
-  const total = (record.config?.stimuli ?? record.config?.trials ?? []).length;
+  const total = pageCount(record.config ?? {});
   const page = (record.progress?.currentIndex ?? 0) + 1;
+  // A stage handed its session but not started has no position to report.
   const progressHint =
-    total > 0 ? `<p>${t('resume_progress', { page: Math.min(page, total), total })}</p>` : '';
+    total > 0 && record.progress
+      ? `<p>${t('resume_progress', { page: Math.min(page, total), total })}</p>`
+      : '';
 
   container.innerHTML = `
     <div class="resume-screen">
       <h2>${t('resume_title')}</h2>
       <p>${t('resume_body')}</p>
       ${progressHint}
-      <div class="resume-actions">
+      <div class="screen-actions">
         <button class="btn btn-primary" id="btn-resume" type="button">${t('resume_resume')}</button>
         <button class="btn btn-secondary" id="btn-restart" type="button">${t('resume_startOver')}</button>
       </div>
@@ -129,6 +160,11 @@ function promptResume(container, record) {
   });
 }
 
+/** Whether a {title, description, fields} block has anything to display. */
+function hasFormPage(form) {
+  return !!form?.description || form?.fields?.length > 0;
+}
+
 /**
  * Show a submission-failure screen with a Retry button; resolves when the
  * listener clicks it. Used on the survey path, where the test UI (and its
@@ -138,11 +174,6 @@ function promptResume(container, record) {
  * @param {Error} err
  * @returns {Promise<void>}
  */
-/** Whether a {title, description, fields} block has anything to display. */
-function hasFormPage(form) {
-  return !!form?.description || form?.fields?.length > 0;
-}
-
 function promptRetry(container, err) {
   container.innerHTML = `
     <div class="error-screen">
@@ -156,62 +187,138 @@ function promptRetry(container, err) {
   });
 }
 
-async function main() {
-  const freshConfig = await fetchConfig();
-  // Set before any DOM is touched - promptResume() below needs translated
-  // strings too. Re-set once `config` is chosen (see below): a resumed
-  // session's own frozen ui_language governs its own re-render, the same way
-  // the rest of its config is treated as frozen.
-  setLanguage(freshConfig.ui_language);
-  const container = document.getElementById('app');
-  // How long an interrupted session stays resumable (resume.max_age_hours,
-  // converted by the backend); 0 turns resume off entirely.
-  const resumeMaxAgeMs = freshConfig.resume.max_age_ms;
-  // Records from experiments this browser saw earlier are dropped once they
-  // are too old to be offered, so they cannot fill the quota this session
-  // needs. Each is judged by its own saved window, never by this
-  // experiment's - a record belonging to a different experiment must not be
-  // pruned by this one's window. The scan already parses every surviving
-  // record, so this experiment's own (if any) is read back from there rather
-  // than re-parsed via loadRecord().
-  const survivors = pruneExpiredRecords(Date.now());
-  const key = recordKey(freshConfig.experiment_id);
+/**
+ * Show the screen between two stages of a sequence; resolves when the
+ * listener starts the next one. A button rather than an automatic move on:
+ * the next test opens with its own instructions, and the listener may want
+ * a break first.
+ *
+ * @param {HTMLElement} container
+ * @param {number} done - How many stages are submitted.
+ * @param {number} total - How many stages the sequence has.
+ * @returns {Promise<void>}
+ */
+function promptNextStage(container, done, total) {
+  container.innerHTML = `
+    <div class="complete-screen">
+      <div class="complete-icon">✓</div>
+      <h2>${t('complete_stage', { done, total })}</h2>
+      <p>${t('complete_body')}</p>
+      <div class="screen-actions">
+        <button class="btn btn-primary" id="btn-next-stage" type="button">${t('complete_next')}</button>
+      </div>
+    </div>
+  `;
+  return new Promise((resolve) => {
+    container.querySelector('#btn-next-stage').addEventListener('click', () => resolve());
+  });
+}
 
-  // Offer resume only when a saved session still matches the current config
-  // (fingerprint) and hasn't gone stale (no activity for max_age_ms).
-  const saved = survivors.get(key) ?? null;
-  let resume = false;
-  if (isResumable(saved, freshConfig.config_version, Date.now(), resumeMaxAgeMs)) {
-    resume = await promptResume(container, saved);
-    if (!resume) clearRecord(key);
-  }
+/** Show the screen that ends the whole session. */
+function showComplete(container) {
+  showStageProgress(1);
+  container.innerHTML = `
+    <div class="complete-screen">
+      <div class="complete-icon">✓</div>
+      <h2>${t('complete_title')}</h2>
+      <p>${t('complete_body')}</p>
+    </div>
+  `;
+}
 
-  // On resume, use the frozen config the session was started with - re-fetching
-  // would re-sample and re-shuffle into a different test (and re-mint x tokens).
-  const config = resume ? saved.config : freshConfig;
+/** Render the page chrome (language, tab title) for the config about to run. */
+function applyConfigChrome(config) {
   setLanguage(config.ui_language);
   document.title = config.title;
   document.documentElement.lang = currentLanguage();
+}
 
-  // Practice stimuli/trials are sampled independently of the session's, so
-  // they may reference audio files the session list doesn't - preflight them
-  // too, reusing flatStimuli on a config-shaped view of the practice subset.
-  // (Practice is skipped on resume, so only preflight it on a fresh start.)
-  const hasPractice = !resume && (config.practice_stimuli ?? config.practice_trials)?.length > 0;
-  const practiceStimuli = hasPractice
-    ? flatStimuli({
-        ...config,
-        stimuli: config.practice_stimuli,
-        trials: config.practice_trials,
-      })
-    : [];
-  const [missing, saveError] = await Promise.all([
-    checkAudioFiles([...practiceStimuli, ...flatStimuli(config)]),
-    checkSaveEndpoint(),
-  ]);
+/**
+ * Fetch every stage's config, in order. Sequential rather than in parallel:
+ * each request names its stage through stage.js's current stage.
+ *
+ * @param {string[]} stageIds
+ * @returns {Promise<Object[]>}
+ */
+async function fetchStageConfigs(stageIds) {
+  const configs = [];
+  for (const stageId of stageIds) {
+    setStage(stageId);
+    configs.push(await fetchConfig());
+  }
+  return configs;
+}
 
-  const errors = [];
-  if (saveError) errors.push(`<p><strong>Result saving:</strong> ${escapeHtml(saveError)}</p>`);
+/**
+ * Decide where this page load starts, from the saved records.
+ *
+ * With nothing to resume, the first stage starts with a new session.
+ * Otherwise the saved session is offered back - a stage in progress, or one
+ * handed its session but not started yet (see main). Resuming continues at
+ * that stage with the session id and metadata answers, restoring its frozen
+ * config and answers when it was in progress. Starting over clears every
+ * stage's record and begins the whole sequence again with a new session, as
+ * a lone config does: keeping the old session instead would, on a shared
+ * device, pass one listener's id and answers on to the next.
+ *
+ * @param {HTMLElement} container
+ * @param {Object[]} configs - Each stage's freshly fetched config, in order.
+ * @returns {Promise<{index: number, carried: Object|null, resumed: Object|null}>}
+ *   carried: {sessionId, metadata} to continue with, or null for a new
+ *   session. resumed: the saved record to restore, or null to start afresh.
+ */
+async function chooseStart(container, configs) {
+  const now = Date.now();
+  const found = findResumableStage(configs, pruneExpiredRecords(now), now);
+  if (!found) return { index: 0, carried: null, resumed: null };
+  const { index, record } = found;
+  setLanguage(configs[index].ui_language);
+  if (await promptResume(container, record)) {
+    return {
+      index,
+      carried: { sessionId: record.sessionId, metadata: record.metadata ?? {} },
+      resumed: record.progress ? record : null,
+    };
+  }
+  clearStageRecords(configs);
+  return { index: 0, carried: null, resumed: null };
+}
+
+/**
+ * Check, before anything is asked of the listener, that every stage about
+ * to run can: its audio (practice included) is reachable and its results can
+ * be saved. Returns the error screen's paragraphs, [] when all is well.
+ *
+ * @param {Array<{stageId: string|null, config: Object, withPractice: boolean}>} stages
+ * @returns {Promise<string[]>}
+ */
+async function preflight(stages) {
+  const missing = [];
+  const saveErrors = new Set();
+  for (const { stageId, config, withPractice } of stages) {
+    setStage(stageId);
+    // Practice stimuli/trials are sampled independently of the session's, so
+    // they may reference audio files the session list doesn't - preflight
+    // them too, reusing flatStimuli on a config-shaped view of the subset.
+    const practice = withPractice
+      ? flatStimuli({
+          ...config,
+          stimuli: config.practice_stimuli,
+          trials: config.practice_trials,
+        })
+      : [];
+    const urls = [...practice, ...flatStimuli(config)].map(audioUrl);
+    const [stageMissing, saveError] = await Promise.all([
+      checkAudioFiles(urls),
+      checkSaveEndpoint(stageUrl('save.php')),
+    ]);
+    missing.push(...stageMissing);
+    if (saveError) saveErrors.add(saveError);
+  }
+
+  const errors = [...saveErrors].map(
+    (e) => `<p><strong>Result saving:</strong> ${escapeHtml(e)}</p>`
+  );
   if (missing.length > 0)
     errors.push(`
     <p><strong>${missing.length} audio file(s) not accessible:</strong></p>
@@ -219,7 +326,125 @@ async function main() {
       ${missing.map((u) => `<li><code>${escapeHtml(u)}</code></li>`).join('')}
     </ul>
   `);
+  return errors;
+}
 
+/**
+ * Run one stage - practice (unless resumed), the test, then the survey -
+ * and resolve once its answers are submitted.
+ *
+ * @param {HTMLElement} container
+ * @param {Object} config - The stage's delivered config.
+ * @param {{sessionId: string, metadata: Object}} session
+ * @param {Object|null} progress - Saved progress to restore, or null.
+ * @returns {Promise<void>}
+ */
+async function runStage(container, config, session, progress) {
+  applyConfigChrome(config);
+  const TestClass = testClassFor(config);
+  container.innerHTML = '';
+  showStageProgress(0);
+
+  // Practice is skipped on resume: the listener has already been through it.
+  // It leaves the progress bar alone (see ListeningTest._updateProgressBar).
+  if (!progress && practiceItems(config).length > 0) {
+    await runPracticeStage(config, session.sessionId, TestClass, container);
+    container.innerHTML = '';
+  }
+
+  // Persist the whole delivered config plus current answers/position after
+  // every state change, so the session can be resumed if the tab is closed.
+  // With the window set to 0 nothing is written at all: a record that will
+  // never be offered would only take up the listener's storage quota.
+  const key = recordKey(config.experiment_id);
+  const persist = (test) => {
+    if (config.resume.max_age_ms <= 0) return;
+    saveRecord(
+      key,
+      buildRecord(config, session.sessionId, session.metadata, test.getProgress(), Date.now())
+    );
+  };
+
+  await new Promise((resolve) => {
+    async function onSubmit(sid, testType, payload) {
+      // Post-test survey: shown between the last trial ("Finish") and the
+      // actual POST, so its answers ride along in the same submission.
+      const hasSurvey = hasFormPage(config.survey);
+      let surveyAnswers = {};
+      if (hasSurvey) {
+        const surveyPage = new MetadataPage(config.survey.fields, {
+          title: config.survey.title,
+          description: config.survey.description,
+          submitLabel: t('submit_idle'),
+          // Same wording as the test page's own button (see submit.js): from
+          // here the submission is what is in flight.
+          busyLabel: t('submit_busy'),
+        });
+        container.innerHTML = '';
+        surveyAnswers = await surveyPage.collect(container);
+      }
+
+      const request = {
+        session_id: sid,
+        test_type: testType,
+        metadata: session.metadata,
+        survey: surveyAnswers,
+        ...payload,
+      };
+      let submitted = false;
+      while (!submitted) {
+        try {
+          await submitRatings(request);
+          submitted = true;
+        } catch (err) {
+          // Without a survey the test UI still exists: rethrow so submit.js
+          // restores its button/shortcuts and shows the error inline there.
+          // With one, that UI is gone - retry from a dedicated screen instead
+          // (the answers are kept in `request`, nothing is re-entered).
+          if (!hasSurvey) throw err;
+          await promptRetry(container, err);
+        }
+      }
+      // The stage is complete - it must never be offered for resume again.
+      clearRecord(key);
+      resolve();
+    }
+
+    const test = new TestClass(config, session.sessionId, onSubmit);
+    test._onChange = () => persist(test);
+    test.render(container);
+    if (progress) test.restoreProgress(progress);
+  });
+}
+
+async function main() {
+  const container = document.getElementById('app');
+  // Before any stage is named, config.php answers with what the page is: a
+  // lone config, or a sequence's manifest listing its stages in order.
+  const first = await fetchConfig();
+  const stageIds = first.sequence ?? [null];
+  const freshConfigs = first.sequence ? await fetchStageConfigs(stageIds) : [first];
+  // Set before any DOM is touched - promptResume() needs translated strings
+  // too. Re-set as each stage runs (see applyConfigChrome).
+  setLanguage(freshConfigs[0].ui_language);
+
+  const start = await chooseStart(container, freshConfigs);
+  // A resumed stage runs the frozen config it was started with - re-fetching
+  // would re-sample and re-shuffle into a different test (and re-mint x
+  // tokens). Every other stage runs the config just fetched.
+  const configs = freshConfigs.map((config, i) =>
+    i === start.index && start.resumed ? start.resumed.config : config
+  );
+  applyConfigChrome(configs[start.index]);
+  const stages = stageIds.map((stageId, i) => ({ stageId, config: configs[i] })).slice(start.index);
+
+  for (const { config } of stages) testClassFor(config);
+  const errors = await preflight(
+    stages.map((stage, i) => ({
+      ...stage,
+      withPractice: !(i === 0 && start.resumed) && practiceItems(stage.config).length > 0,
+    }))
+  );
   if (errors.length > 0) {
     container.innerHTML = `
       <div class="error-screen">
@@ -230,109 +455,44 @@ async function main() {
     return;
   }
 
-  const TestClass = testTypeMap[config.test_type];
-  if (!TestClass) throw new Error(`Unknown test type: "${config.test_type}"`);
-
-  const sessionId = resume ? saved.sessionId : generateSessionId();
   container.innerHTML = '';
-
-  let listenerMetadata = resume ? (saved.metadata ?? {}) : {};
-  // Prose alone is reason enough to show the page: a study may need to state
-  // what it collects without collecting anything on that page itself.
-  if (!resume && hasFormPage(config.metadata)) {
-    const metaPage = new MetadataPage(config.metadata.fields, {
-      title: config.metadata.title,
-      description: config.metadata.description,
-    });
-    listenerMetadata = await metaPage.collect(container);
-    container.innerHTML = '';
-  }
-
-  if (hasPractice) {
-    await runPracticeStage(config, sessionId, TestClass, container);
-    container.innerHTML = '';
-    // The practice round fills the shared progress bar; the real test must
-    // start back at zero.
-    const bar = document.getElementById('progress-bar');
-    if (bar) bar.style.width = '0%';
-  }
-
-  // Persist the whole delivered config plus current answers/position after
-  // every state change, so the session can be resumed if the tab is closed.
-  // With the window set to 0 nothing is written at all: a record that will
-  // never be offered would only take up the listener's storage quota.
-  const persist = (test) => {
-    if (resumeMaxAgeMs <= 0) return;
-    saveRecord(key, {
-      v: 1,
-      fingerprint: config.config_version,
-      savedAt: Date.now(),
-      // No separate window field: pruning reads it back off config.resume
-      // (already carried below), the window of the experiment that saved
-      // this record - not by whichever experiment prunes next (see resume.js).
-      sessionId,
-      config,
-      metadata: listenerMetadata,
-      progress: test.getProgress(),
-    });
-  };
-
-  async function onSubmit(sid, testType, payload) {
-    // Post-test survey: shown between the last trial ("Finish") and the
-    // actual POST, so its answers ride along in the same submission.
-    const hasSurvey = hasFormPage(config.survey);
-    let surveyAnswers = {};
-    if (hasSurvey) {
-      const surveyPage = new MetadataPage(config.survey.fields, {
-        title: config.survey.title,
-        description: config.survey.description,
-        submitLabel: t('submit_idle'),
-        // Same wording as the test page's own button (see submit.js): from
-        // here the submission is what is in flight.
-        busyLabel: t('submit_busy'),
+  let session = start.carried;
+  if (!session) {
+    session = { sessionId: generateSessionId(), metadata: {} };
+    // Prose alone is reason enough to show the page: a study may need to
+    // state what it collects without collecting anything on that page itself.
+    if (hasFormPage(configs[0].metadata)) {
+      const metaPage = new MetadataPage(configs[0].metadata.fields, {
+        title: configs[0].metadata.title,
+        description: configs[0].metadata.description,
       });
+      session.metadata = await metaPage.collect(container);
       container.innerHTML = '';
-      surveyAnswers = await surveyPage.collect(container);
     }
-
-    const request = {
-      session_id: sid,
-      test_type: testType,
-      metadata: listenerMetadata,
-      survey: surveyAnswers,
-      ...payload,
-    };
-    let submitted = false;
-    while (!submitted) {
-      try {
-        await submitRatings(request);
-        submitted = true;
-      } catch (err) {
-        // Without a survey the test UI still exists: rethrow so submit.js
-        // restores its button/shortcuts and shows the error inline there.
-        // With one, that UI is gone - retry from a dedicated screen instead
-        // (the answers are kept in `request`, nothing is re-entered).
-        if (!hasSurvey) throw err;
-        await promptRetry(container, err);
-      }
-    }
-    // The session is complete - it must never be offered for resume again.
-    clearRecord(key);
-    const bar = document.getElementById('progress-bar');
-    if (bar) bar.style.width = '100%';
-    document.getElementById('app').innerHTML = `
-      <div class="complete-screen">
-        <div class="complete-icon">✓</div>
-        <h2>${t('complete_title')}</h2>
-        <p>${t('complete_body')}</p>
-      </div>
-    `;
   }
 
-  const test = new TestClass(config, sessionId, onSubmit);
-  test._onChange = () => persist(test);
-  test.render(container);
-  if (resume) test.restoreProgress(saved.progress);
+  // The progress bar spans the whole session, each stage its share of it -
+  // the stages already submitted included, so a resumed session's bar
+  // starts where they left it.
+  const spans = stageSpans(configs.map(pageCount));
+  for (const [i, { stageId, config }] of stages.entries()) {
+    setStage(stageId);
+    setStageSpan(spans[start.index + i]);
+    await runStage(container, config, session, i === 0 ? (start.resumed?.progress ?? null) : null);
+    const next = stages[i + 1];
+    if (!next) break;
+    // Hand the session on before asking for the click: a tab closed on the
+    // screen below then offers to continue at the next stage.
+    if (next.config.resume.max_age_ms > 0) {
+      saveRecord(
+        recordKey(next.config.experiment_id),
+        buildRecord(next.config, session.sessionId, session.metadata, null, Date.now())
+      );
+    }
+    showStageProgress(1);
+    await promptNextStage(container, start.index + i + 1, stageIds.length);
+  }
+  showComplete(container);
 }
 
 main().catch((err) => {

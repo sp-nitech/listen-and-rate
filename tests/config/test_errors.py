@@ -7,7 +7,11 @@ from __future__ import annotations
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from listen_and_rate.config import format_config_error, load_config
+from listen_and_rate.config import (
+    format_config_error,
+    load_config,
+    load_sequence_or_exit,
+)
 from listen_and_rate.config.loader import Config
 
 from ._helpers import minimal_config, write_config
@@ -59,3 +63,14 @@ def test_load_config_still_raises_validation_error(tmp_path):
     data["test_type"] = "mos2"
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
+
+
+def test_load_sequence_or_exit_formats_a_stage_config_error(tmp_path):
+    """A typo in any config of a sequence exits as cleanly as a lone config."""
+    data = minimal_config("/tmp/nonexistent.wav")
+    data["test_type"] = "mos2"
+    with pytest.raises(SystemExit) as excinfo:
+        load_sequence_or_exit([write_config(tmp_path, data)])
+    message = str(excinfo.value)
+    assert "test_type" in message
+    assert _PYDANTIC_URL not in message

@@ -24,7 +24,13 @@ from .base import (
 from .cmos import CMOSConfig
 from .dmos import DMOSConfig, DMOSTrial, build_dmos_trials
 from .errors import format_config_error
-from .loader import Config, load_config, load_config_or_exit
+from .loader import (
+    Config,
+    load_config,
+    load_config_or_exit,
+    load_sequence,
+    load_sequence_or_exit,
+)
 from .mos import MOSConfig
 from .mushra import MUSHRAConfig, MUSHRATrial, build_mushra_trials
 from .report import FontConfig, ReportConfig, ScaleConfig, load_report_config_or_exit
@@ -64,4 +70,6 @@ __all__ = [
     "load_config",
     "load_config_or_exit",
     "load_report_config_or_exit",
+    "load_sequence",
+    "load_sequence_or_exit",
 ]

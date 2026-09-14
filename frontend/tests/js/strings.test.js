@@ -111,11 +111,20 @@ test('the survey submit button and completion screen are translated', () => {
   assert.equal(t('complete_title'), 'Thank you!');
 });
 
+test('the screen between two tests of a sequence is translated', () => {
+  setLanguage('ja');
+  assert.equal(t('complete_stage', { done: 1, total: 2 }), '2 件中 1 件目の試験が終わりました');
+  assert.equal(t('complete_next'), '次の試験を始める');
+  setLanguage('en');
+  assert.equal(t('complete_stage', { done: 1, total: 2 }), 'Test 1 of 2 complete');
+  assert.equal(t('complete_next'), 'Continue');
+});
+
 // -- metadata.js's default submit button and text-field placeholder ---------
 
 test('the metadata form submit button and placeholder are translated', () => {
   setLanguage('ja');
-  assert.equal(t('metadata_startTest'), 'テストを開始');
+  assert.equal(t('metadata_startTest'), '試験を開始');
   assert.equal(t('metadata_textPlaceholder'), '半角英数字・ハイフン・ピリオドのみ使用可');
   setLanguage('en');
   assert.equal(t('metadata_startTest'), 'Start Test');

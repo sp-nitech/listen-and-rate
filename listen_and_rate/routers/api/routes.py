@@ -6,7 +6,7 @@ canonical order: MOS, DMOS, CMOS, AB, ABX, XAB, MUSHRA.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ...config import (
     ABConfig,
@@ -17,7 +17,12 @@ from ...config import (
     MOSConfig,
     XABConfig,
 )
-from ...dependencies import get_config, get_result_saver, get_x_secret
+from ...dependencies import (
+    get_config,
+    get_result_saver,
+    get_sequence,
+    get_x_secret,
+)
 from ...models import SubmitRequest
 from ...storage import ResultExistsError, ResultSaver
 from .ab import _get_ab_test_config, _submit_ab
@@ -32,20 +37,35 @@ router = APIRouter()
 
 
 @router.get("/status")
-def status(config: Config = Depends(get_config)):
-    """Health-check endpoint; also confirms the loaded test type."""
-    return {"status": "ok", "test_type": config.test_type}
+def status(request: Request, sequence: list[str] | None = Depends(get_sequence)):
+    """Health-check endpoint; also confirms the loaded test type.
+
+    A sequence asked about as a whole - no stage named - lists its stages
+    instead, as /api/config does.
+    """
+    if sequence is not None:
+        return {"status": "ok", "sequence": sequence}
+    return {"status": "ok", "test_type": get_config(request).test_type}
 
 
 @router.get("/config")
 def get_test_config(
-    config: Config = Depends(get_config), x_secret: bytes = Depends(get_x_secret)
+    request: Request,
+    sequence: list[str] | None = Depends(get_sequence),
+    x_secret: bytes = Depends(get_x_secret),
 ):
     """Return test parameters for the frontend.
 
     Only id and label are sent per stimulus - path, system, and item are
     withheld to keep listeners blind to the underlying system under test.
+    When several configs are served and no stage is named, returns the
+    sequence manifest instead: the stage ids, in the order to run them.
     """
+    if sequence is not None:
+        return {"sequence": sequence}
+    # Resolved here rather than through Depends: a manifest request names no
+    # stage, so get_config would have rejected it before the check above.
+    config = get_config(request)
     if isinstance(config, MOSConfig):
         return _get_mos_test_config(config)
     if isinstance(config, DMOSConfig):

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from listen_and_rate.config import load_config
+from listen_and_rate.config import load_config, load_sequence
 
 from ._helpers import (
     minimal_config,
@@ -80,6 +80,91 @@ def test_experiment_id_in_yaml_overrides_the_filename(tmp_path, test_audio_file)
     data["experiment_id"] = "chosen-name"
     result = load_config(write_config(tmp_path, data, name="myexperiment.yaml"))
     assert result.experiment_id == "chosen-name"
+
+
+def test_sequence_rejects_two_configs_sharing_an_experiment_id(
+    tmp_path, test_audio_file
+):
+    # Each stage writes to results/<experiment_id>/, so two stages sharing an
+    # id would pool two tests' results into one directory.
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    data = minimal_config(str(test_audio_file))
+    with pytest.raises(ValueError, match="'config'"):
+        load_sequence([write_config(first, data), write_config(second, data)])
+
+
+def test_sequence_rejects_experiment_ids_differing_only_in_case(
+    tmp_path, test_audio_file
+):
+    # On a case-insensitive filesystem (macOS, Windows, and the hosts using
+    # them) results/Study and results/study are one directory - and the
+    # bundle's stages/Study and stages/study are too.
+    # Separate directories, so that writing the two files does not itself
+    # collide on such a filesystem.
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    data = minimal_config(str(test_audio_file))
+    with pytest.raises(ValueError, match="'study'"):
+        load_sequence(
+            [
+                write_config(first, data, name="Study.yaml"),
+                write_config(second, data, name="study.yaml"),
+            ]
+        )
+
+
+def test_sequence_rejects_an_explicit_experiment_id_taken_by_a_file_name(
+    tmp_path, test_audio_file
+):
+    # The check is on the resolved ids, so an explicit `experiment_id:` meets
+    # the file-name default of another config.
+    data = minimal_config(str(test_audio_file))
+    with pytest.raises(ValueError, match="'x'"):
+        load_sequence(
+            [
+                write_config(tmp_path, data, name="x.yaml"),
+                write_config(tmp_path, {**data, "experiment_id": "x"}, name="y.yaml"),
+            ]
+        )
+
+
+_DEVICE_FORM = {
+    "fields": [
+        {"key": "device", "label": "Device", "type": "select", "options": ["HP", "SP"]}
+    ]
+}
+
+
+def test_sequence_asks_for_metadata_only_in_the_first_config(tmp_path, test_audio_file):
+    # The form is shown once, before the first test, so a form written in a
+    # later config would never be shown - reject it rather than ignore it.
+    data = minimal_config(str(test_audio_file))
+    with pytest.raises(ValueError, match="'b'.*first config"):
+        load_sequence(
+            [
+                write_config(tmp_path, data, name="a.yaml"),
+                write_config(tmp_path, {**data, "metadata": _DEVICE_FORM}, "b.yaml"),
+            ]
+        )
+
+
+def test_sequence_gives_every_stage_the_first_config_metadata(
+    tmp_path, test_audio_file
+):
+    # Every stage validates and stores the one set of answers against its own
+    # config, so each needs the form the answers were given to.
+    data = minimal_config(str(test_audio_file))
+    first, second = load_sequence(
+        [
+            write_config(tmp_path, {**data, "metadata": _DEVICE_FORM}, "a.yaml"),
+            write_config(tmp_path, data, name="b.yaml"),
+        ]
+    )
+    assert second.metadata == first.metadata
+    assert [f.key for f in second.metadata.fields] == ["device"]
 
 
 def test_duplicate_stimulus_ids_raise_error(tmp_path, test_audio_file):

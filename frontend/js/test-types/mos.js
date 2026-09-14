@@ -17,6 +17,7 @@ import {
 } from '../audio-player.js';
 import { escapeHtml } from '../dom.js';
 import { ratingKeysHint } from '../hints.js';
+import { audioUrl } from '../stage.js';
 import { t } from '../strings.js';
 import { submitPayload } from '../submit.js';
 import { ListeningTest } from './listening-test.js';
@@ -154,7 +155,7 @@ export class MOSTest extends ListeningTest {
 
     // Swap only the src on the persistent <audio>, rewound to the start, and
     // reset the custom player's icon/progress.
-    const url = s.audio_url ?? `/audio/${encodeURIComponent(s.id)}`;
+    const url = audioUrl(s);
     if (this._el.audio.getAttribute('src') !== url) {
       this._el.audio.src = url;
     } else {

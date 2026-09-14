@@ -39,3 +39,18 @@ def test_report_with_results_returns_html(client, config_yaml):
     res = client.get("/report")
     assert res.status_code == 200
     assert "<html>" in res.text
+
+
+def test_report_of_a_sequence_links_each_test_report(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # A sequence holds one report per test, so the page without a stage named
+    # lists them rather than guessing which one was meant.
+    from .api._helpers import _sequence_client
+
+    with _sequence_client(tmp_path, test_audio_file, monkeypatch) as client:
+        index = client.get("/report")
+        assert index.status_code == 200
+        assert 'href="report?stage=a"' in index.text
+        assert 'href="report?stage=b"' in index.text
+        assert "No results yet" in client.get("/report", params={"stage": "b"}).text

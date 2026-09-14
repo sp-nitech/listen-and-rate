@@ -14,6 +14,7 @@
  * server-side YAML config.
  */
 
+import { stageUrl } from '../stage.js';
 import { submitPayload } from '../submit.js';
 import { PairedTrialTest } from './paired-trial-test.js';
 
@@ -43,7 +44,7 @@ export class ABXTest extends PairedTrialTest {
   _xAudioUrl(trial) {
     const [idA, idB] = trial.stimuli.map((s) => s.id);
     const params = new URLSearchParams({ token: trial.x.token, a: idA, b: idB });
-    return `audio_x.php?${params.toString()}`;
+    return stageUrl(`audio_x.php?${params.toString()}`);
   }
 
   // -- build-once structure -------------------------------------------------

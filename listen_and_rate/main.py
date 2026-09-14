@@ -6,13 +6,14 @@ import os
 import secrets
 import shutil
 import tempfile
-from contextlib import asynccontextmanager
+from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
-from .config import load_config_or_exit
+from .config import Config, load_sequence_or_exit
+from .dependencies import Stage
 from .duration import run_configured_duration_check
 from .loudness import (
     run_configured_loudness_check,
@@ -26,22 +27,23 @@ from .routers.audio import serve_abx_x_php_alias
 from .silence import run_configured_silence_check
 from .storage import make_result_saver
 
+# frontend/ files that only the PHP export runs: included by the PHP entry
+# points, never requested by the browser.
+_PHP_ONLY_HELPERS = ("x_token.php", "stage.php")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Load config and build shared state once at startup.
 
-    Reads LISTEN_AND_RATE_CONFIG env var (default: ./config.yaml). All
-    subsequent requests share the same config, result_saver, and audio_map
-    objects.
+def _build_stage(config: Config, cleanup: ExitStack) -> Stage:
+    """Run the startup checks for one config and build what serving it needs.
+
+    A temp cache made for loudness normalization is registered on `cleanup`,
+    so it is removed at shutdown - and also when startup dies part-way (a bad
+    file, Ctrl-C), which would otherwise orphan a full copy of the stimuli
+    under /tmp on every attempt.
     """
-    config_path = os.environ.get("LISTEN_AND_RATE_CONFIG", "./config.yaml")
-    config = load_config_or_exit(config_path)
     run_configured_duration_check(config)
     run_configured_loudness_check(config)
     run_configured_silence_check(config)
-    app.state.config = config
-    app.state.result_saver = make_result_saver(
+    result_saver = make_result_saver(
         config.output.format,
         config.output.path,
         config.experiment_id,
@@ -49,37 +51,45 @@ async def lifespan(app: FastAPI):
         [f.key for f in config.survey.fields],
         config.metrics.enabled_keys(),
     )
-    all_stimuli = config.stimuli_list.entries if config.stimuli_list else []
     # With loudness_normalization configured, pre-normalize every clip into
     # a temp cache once at startup and serve from there; otherwise serve the
     # originals.
-    normalized_cache: Path | None = None
     if config.loudness_normalization is not None:
         normalized_cache = Path(tempfile.mkdtemp(prefix="lar-normalized-"))
-        try:
-            app.state.audio_map = run_configured_loudness_normalization(
-                config, lambda s: normalized_cache / f"{s.id}.wav"
-            )
-        except BaseException:
-            # Startup died mid-normalization (bad file, Ctrl-C): the shutdown
-            # cleanup below never runs, so drop the fresh cache here instead of
-            # orphaning a full copy of the stimuli under /tmp on every attempt.
-            shutil.rmtree(normalized_cache, ignore_errors=True)
-            raise
+        cleanup.callback(shutil.rmtree, normalized_cache, ignore_errors=True)
+        audio_map = run_configured_loudness_normalization(
+            config, lambda s: normalized_cache / f"{s.id}.wav"
+        )
     else:
-        app.state.audio_map = {s.id: s.path for s in all_stimuli}
-    # Used to blind ABX's hidden "X" reference (see x_token.py). Set
-    # LISTEN_AND_RATE_X_SECRET to keep it stable across restarts/reloads and
-    # multiple workers - otherwise each process mints its own random secret,
-    # and tokens issued before a restart (e.g. uvicorn --reload picking up a
-    # file change mid-session) stop verifying, failing that listener's submit.
-    x_secret_env = os.environ.get("LISTEN_AND_RATE_X_SECRET")
-    app.state.x_secret = (
-        x_secret_env.encode() if x_secret_env else secrets.token_bytes(32)
-    )
-    yield
-    if normalized_cache is not None:
-        shutil.rmtree(normalized_cache, ignore_errors=True)
+        all_stimuli = config.stimuli_list.entries if config.stimuli_list else []
+        audio_map = {s.id: s.path for s in all_stimuli}
+    return Stage(config, result_saver, audio_map)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Load config and build shared state once at startup.
+
+    Reads LISTEN_AND_RATE_CONFIG env var (default: ./config.yaml): one config
+    path, or several separated by os.pathsep to run those tests back to back
+    as a sequence. Each config gets one Stage (config, result_saver, and
+    audio_map), shared by every request for it.
+    """
+    config_paths = os.environ.get("LISTEN_AND_RATE_CONFIG", "./config.yaml")
+    configs = load_sequence_or_exit(config_paths.split(os.pathsep))
+    with ExitStack() as cleanup:
+        app.state.stages = {c.experiment_id: _build_stage(c, cleanup) for c in configs}
+        # Used to blind ABX's hidden "X" reference (see x_token.py). Set
+        # LISTEN_AND_RATE_X_SECRET to keep it stable across restarts/reloads
+        # and multiple workers - otherwise each process mints its own random
+        # secret, and tokens issued before a restart (e.g. uvicorn --reload
+        # picking up a file change mid-session) stop verifying, failing that
+        # listener's submit.
+        x_secret_env = os.environ.get("LISTEN_AND_RATE_X_SECRET")
+        app.state.x_secret = (
+            x_secret_env.encode() if x_secret_env else secrets.token_bytes(32)
+        )
+        yield
 
 
 def create_app() -> FastAPI:
@@ -124,23 +134,24 @@ def create_app() -> FastAPI:
         include_in_schema=False,
     )
 
-    def _x_token_php_not_found() -> None:
-        """GET /x_token.php: 404, not the raw PHP source.
+    def _php_helper_not_found() -> None:
+        """GET a PHP-only helper: 404, not the raw PHP source.
 
-        Like config.php/save.php, this file lives under frontend/ for the
-        static-PHP export but has no FastAPI equivalent to serve (it's
+        Like config.php/save.php, these files live under frontend/ for the
+        static-PHP export but have no FastAPI equivalent to serve (they're
         pure functions only, used by config.php/save.php/audio_x.php on the
-        PHP side) - registering it here keeps StaticFiles from serving its
-        source as a plain-text download.
+        PHP side) - registering them here keeps StaticFiles from serving
+        their source as a plain-text download.
         """
         raise HTTPException(status_code=404)
 
-    app.add_api_route(
-        "/x_token.php",
-        _x_token_php_not_found,
-        methods=["GET"],
-        include_in_schema=False,
-    )
+    for helper in _PHP_ONLY_HELPERS:
+        app.add_api_route(
+            f"/{helper}",
+            _php_helper_not_found,
+            methods=["GET"],
+            include_in_schema=False,
+        )
 
     frontend_dir = Path(__file__).parent.parent / "frontend"
     app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")

@@ -35,7 +35,9 @@ export const en = {
   submit_busy: 'Submitting…',
 
   complete_title: 'Thank you!',
+  complete_stage: 'Test {done} of {total} complete',
   complete_body: 'Your ratings have been saved successfully.',
+  complete_next: 'Continue',
 
   resume_title: 'Resume previous session?',
   resume_body: 'An unfinished session was found on this device.',

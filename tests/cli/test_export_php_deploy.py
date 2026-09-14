@@ -21,20 +21,18 @@ _skip_without_symlinks = pytest.mark.skipif(
 
 
 def _run_export(
-    config_yaml: Path,
+    config_yaml: Path | list[Path],
     outdir: Path,
     monkeypatch,
     overwrite: bool = False,
     copy_audio: bool = False,
 ) -> None:
-    """Run `lar-export --config config_yaml --outdir outdir`."""
-    argv = [
-        "lar-export",
-        "--config",
-        str(config_yaml),
-        "--outdir",
-        str(outdir),
-    ]
+    """Run `lar-export --config config_yaml --outdir outdir`.
+
+    A list exports a sequence: every path after one --config, in that order.
+    """
+    paths = config_yaml if isinstance(config_yaml, list) else [config_yaml]
+    argv = ["lar-export", "--config", *map(str, paths), "--outdir", str(outdir)]
     if overwrite:
         argv.append("--overwrite")
     if copy_audio:
@@ -670,7 +668,110 @@ def test_export_php_deploy_produces_expected_bundle_layout(
     mode = stat.S_IMODE((outdir / "results").stat().st_mode)
     assert mode == 0o777
     assert (outdir / "x_token.php").is_file()
+    assert (outdir / "stage.php").is_file()
     assert (outdir / "audio_x.php").is_file()
+
+
+def _sequence_configs(tmp_path, test_audio_file) -> list[Path]:
+    """Write stages a (with the metadata form) then b, both with ./results/."""
+    shutil.copy(test_audio_file, tmp_path / "clip.wav")
+    base = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "stimuli_list": {"entries": [{"id": "s001", "path": "clip.wav"}]},
+    }
+    device = {"fields": [{"key": "device", "label": "Device"}]}
+    return [
+        write_config(tmp_path, {**base, "metadata": device}, name="a.yaml"),
+        write_config(tmp_path, base, name="b.yaml"),
+    ]
+
+
+def test_export_writes_each_stage_of_a_sequence_under_stages(
+    tmp_path, test_audio_file, monkeypatch
+):
+    outdir = tmp_path / "deploy"
+    _run_export(_sequence_configs(tmp_path, test_audio_file), outdir, monkeypatch)
+    # One copy of the page and its scripts, which stage.php points at a stage.
+    assert (outdir / "index.html").is_file()
+    assert (outdir / "stage.php").is_file()
+    assert not (outdir / "config_data.php").exists()
+    sequence = (outdir / "sequence.php").read_text(encoding="utf-8")
+    assert "return ['a', 'b'];" in sequence
+    for stage in ("a", "b"):
+        config_data = (outdir / "stages" / stage / "config_data.php").read_text(
+            encoding="utf-8"
+        )
+        assert f"'experiment_id' => '{stage}'" in config_data
+        # The first config's form, which every stage stores the answers to.
+        assert "'key' => 'device'" in config_data
+        assert (outdir / "stages" / stage / "stimulus_map.php").is_file()
+    assert (outdir / "results" / ".htaccess").is_file()
+
+
+def test_export_puts_each_stage_audio_under_its_own_directory(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # Both stages use clip.wav; each gets its own copy of the path, so stages
+    # that treat one file differently (e.g. normalize it) cannot collide.
+    outdir = tmp_path / "deploy"
+    _run_export(_sequence_configs(tmp_path, test_audio_file), outdir, monkeypatch)
+    for stage in ("a", "b"):
+        text = (outdir / "stages" / stage / "config_data.php").read_text(
+            encoding="utf-8"
+        )
+        assert re.findall(r"'audio_url' => '([^']*)'", text) == [
+            f"stages/{stage}/clip.wav"
+        ]
+        assert (outdir / "stages" / stage / "clip.wav").exists()
+
+
+def test_export_keeps_results_when_switching_between_one_config_and_a_sequence(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # Both shapes keep results at the bundle root, so re-exporting one as the
+    # other must not lose what was collected under either.
+    first, second = _sequence_configs(tmp_path, test_audio_file)
+    outdir = tmp_path / "deploy"
+    collected = outdir / "results" / "a" / "real-listener-session.csv"
+    _run_export(first, outdir, monkeypatch)
+    collected.parent.mkdir(parents=True)
+    collected.write_text("session_id\n", encoding="utf-8")
+    _run_export([first, second], outdir, monkeypatch, overwrite=True)
+    assert collected.is_file()
+    assert not (outdir / "config_data.php").exists()
+    _run_export(first, outdir, monkeypatch, overwrite=True)
+    assert collected.is_file()
+    assert not (outdir / "sequence.php").exists()
+    assert not (outdir / "stages").exists()
+
+
+def test_export_of_a_sequence_that_fails_part_way_can_be_rerun(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # --overwrite has emptied the bundle but for results/ by the time a stage
+    # is written, so the sequence's marker must already be back in place: a
+    # rerun would otherwise refuse the directory as not one this tool wrote.
+    from listen_and_rate.cli import export_php_deploy
+
+    configs = _sequence_configs(tmp_path, test_audio_file)
+    outdir = tmp_path / "deploy"
+    _run_export(configs, outdir, monkeypatch)
+    collected = outdir / "results" / "a" / "real-listener-session.csv"
+    collected.parent.mkdir(parents=True)
+    collected.write_text("session_id\n", encoding="utf-8")
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("a stage failed to write")
+
+    with monkeypatch.context() as m:
+        m.setattr(export_php_deploy, "_write_stage", _boom)
+        with pytest.raises(RuntimeError, match="stage failed"):
+            _run_export(configs, outdir, monkeypatch, overwrite=True)
+    _run_export(configs, outdir, monkeypatch, overwrite=True)
+    assert collected.is_file()
+    assert (outdir / "stages" / "b" / "config_data.php").is_file()
 
 
 def test_export_php_deploy_absolute_output_path_seeds_no_bundle_results_dir(

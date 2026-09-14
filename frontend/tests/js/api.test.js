@@ -12,11 +12,13 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
 import { fetchConfig, submitRatings } from '../../js/api.js';
+import { setStage } from '../../js/stage.js';
 
 const real = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = real;
+  setStage(null);
 });
 
 /** Reply with `body` and `status`, recording what was requested. */
@@ -45,6 +47,13 @@ test('fetchConfig names the status when the config cannot be loaded', async () =
   await assert.rejects(fetchConfig, /503/);
 });
 
+test('fetchConfig asks for the stage the page is running', async () => {
+  const calls = stubFetch({ body: { test_type: 'mos' } });
+  setStage('b');
+  await fetchConfig();
+  assert.equal(calls[0].url, 'config.php?stage=b');
+});
+
 // -- submitRatings -----------------------------------------------------------
 
 test('submitRatings posts the payload as JSON', async () => {
@@ -53,6 +62,13 @@ test('submitRatings posts the payload as JSON', async () => {
   assert.equal(calls[0].url, 'save.php');
   assert.equal(calls[0].init.method, 'POST');
   assert.deepEqual(JSON.parse(calls[0].init.body), { session_id: 's1', test_type: 'mos' });
+});
+
+test('submitRatings posts to the stage the page is running', async () => {
+  const calls = stubFetch({ body: { status: 'ok' } });
+  setStage('b');
+  await submitRatings({ session_id: 's1', test_type: 'mos' });
+  assert.equal(calls[0].url, 'save.php?stage=b');
 });
 
 test("submitRatings surfaces FastAPI's detail", async () => {

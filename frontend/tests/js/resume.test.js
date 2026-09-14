@@ -10,7 +10,14 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { isResumable, pruneExpiredRecords, recordKey } from '../../js/resume.js';
+import {
+  buildRecord,
+  clearStageRecords,
+  findResumableStage,
+  isResumable,
+  pruneExpiredRecords,
+  recordKey,
+} from '../../js/resume.js';
 
 const realLocalStorage = globalThis.localStorage;
 
@@ -72,6 +79,48 @@ test('maxAgeMs of 0 makes every record unresumable', () => {
   assert.equal(isResumable(record, 'v1', 0, 0), false);
 });
 
+// -- findResumableStage ------------------------------------------------------
+
+/** A delivered stage config, as far as resume reads it. */
+const stageConfig = (id, version = 'v1', maxAgeMs = 500) => ({
+  experiment_id: id,
+  config_version: version,
+  resume: { max_age_ms: maxAgeMs },
+});
+
+test('a page load with nothing saved starts at the first stage', () => {
+  assert.equal(findResumableStage([stageConfig('a'), stageConfig('b')], new Map(), 1000), null);
+});
+
+test('a page load resumes at the first stage that has a resumable record', () => {
+  // A submitted stage's record is gone, so the saved one past it is where
+  // the session stopped.
+  const configs = [stageConfig('a'), stageConfig('b')];
+  const record = { fingerprint: 'v1', savedAt: 900 };
+  const found = findResumableStage(configs, new Map([[recordKey('b'), record]]), 1000);
+  assert.deepEqual(found, { index: 1, record });
+});
+
+test('a record from a changed config does not decide where a page load starts', () => {
+  const configs = [stageConfig('a'), stageConfig('b', 'v2')];
+  const records = new Map([[recordKey('b'), { fingerprint: 'v1', savedAt: 900 }]]);
+  assert.equal(findResumableStage(configs, records, 1000), null);
+});
+
+// -- clearStageRecords -------------------------------------------------------
+
+test("starting over clears every stage's record and leaves other experiments' alone", () => {
+  // Otherwise the next load would find a later stage's record and skip the
+  // stages before it again.
+  const store = fakeLocalStorage([
+    [recordKey('a'), withWindow(900, 500)],
+    [recordKey('b'), withWindow(900, 500)],
+    [recordKey('other'), withWindow(900, 500)],
+  ]);
+  clearStageRecords([stageConfig('a'), stageConfig('b')]);
+  assert.deepEqual([...store.keys()], [recordKey('other')]);
+});
+
 // -- recordKey ---------------------------------------------------------------
 
 test('records are namespaced per experiment', () => {
@@ -81,6 +130,24 @@ test('records are namespaced per experiment', () => {
 test('an absent experiment id still yields a usable key', () => {
   assert.equal(recordKey(null), recordKey(undefined));
   assert.equal(typeof recordKey(undefined), 'string');
+});
+
+// -- buildRecord -------------------------------------------------------------
+
+test('a record freezes the config it was saved from, with its fingerprint', () => {
+  const config = stageConfig('a');
+  const record = buildRecord(config, 's1', { device: 'HP' }, { currentIndex: 2 }, 900);
+  assert.deepEqual(record, {
+    v: 1,
+    fingerprint: 'v1',
+    savedAt: 900,
+    sessionId: 's1',
+    config,
+    metadata: { device: 'HP' },
+    progress: { currentIndex: 2 },
+  });
+  // Readable back by the same rules that judge any saved session.
+  assert.equal(isResumable(record, 'v1', 1000, 500), true);
 });
 
 // -- pruneExpiredRecords -----------------------------------------------------

@@ -21,7 +21,10 @@
  * JSON: <results dir>/{experiment_id}/{session_id}.json - one object per session
  *
  * The experiment_id naming the directory comes from config_data.php, not from
- * the body: this bundle serves one experiment (see experiment_id_for).
+ * the body: each config the bundle serves is one experiment (see
+ * experiment_id_for). A sequence bundle serves several, one per stage, and
+ * reads the requested stage's config_data.php and stimulus_map.php instead
+ * (see stage.php); results still go under this bundle's own directory.
  *
  * Expected POST body:
  *   {
@@ -42,6 +45,7 @@
  * bottom) - not when a test merely requires this file for its functions.
  */
 
+require_once __DIR__ . '/stage.php';
 require_once __DIR__ . '/x_token.php';
 
 // AB/XAB outcome tokens: the winner/closer column records which SIDE of the
@@ -1151,7 +1155,13 @@ function handle_save_request(): void
     // Read output format/path, metadata field definitions, and the
     // AUTHORITATIVE test type from config_data.php - never trust the
     // client-submitted test_type for deciding how to validate/store.
-    $config_data_path = __DIR__ . '/config_data.php';
+    $stage_dir = stage_data_dir(__DIR__, $_GET);
+    if ($stage_dir === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Stage not found']);
+        return;
+    }
+    $config_data_path = $stage_dir . '/config_data.php';
     $config_data      = is_file($config_data_path) ? include $config_data_path : [];
     if (!is_array($config_data)) {
         $config_data = [];
@@ -1202,7 +1212,7 @@ function handle_save_request(): void
         }
 
         // Build stimulus lookup: id → {system, item} for enriching ratings.
-        $stimulus_map_path = __DIR__ . '/stimulus_map.php';
+        $stimulus_map_path = $stage_dir . '/stimulus_map.php';
         $stimulus_map = is_file($stimulus_map_path) ? include $stimulus_map_path : [];
         if (!is_array($stimulus_map)) {
             $stimulus_map = [];

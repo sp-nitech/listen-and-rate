@@ -335,11 +335,12 @@ async function preflight(stages) {
  *
  * @param {HTMLElement} container
  * @param {Object} config - The stage's delivered config.
+ * @param {string[]} sequence - Every stage's experiment_id, in order.
  * @param {{sessionId: string, metadata: Object}} session
  * @param {Object|null} progress - Saved progress to restore, or null.
  * @returns {Promise<void>}
  */
-async function runStage(container, config, session, progress) {
+async function runStage(container, config, sequence, session, progress) {
   applyConfigChrome(config);
   const TestClass = testClassFor(config);
   container.innerHTML = '';
@@ -361,7 +362,14 @@ async function runStage(container, config, session, progress) {
     if (config.resume.max_age_ms <= 0) return;
     saveRecord(
       key,
-      buildRecord(config, session.sessionId, session.metadata, test.getProgress(), Date.now())
+      buildRecord(
+        config,
+        sequence,
+        session.sessionId,
+        session.metadata,
+        test.getProgress(),
+        Date.now()
+      )
     );
   };
 
@@ -475,10 +483,13 @@ async function main() {
   // the stages already submitted included, so a resumed session's bar
   // starts where they left it.
   const spans = stageSpans(configs.map(pageCount));
+  // Saved with every record, so only this same sequence resumes it.
+  const sequence = configs.map((config) => config.experiment_id);
   for (const [i, { stageId, config }] of stages.entries()) {
     setStage(stageId);
     setStageSpan(spans[start.index + i]);
-    await runStage(container, config, session, i === 0 ? (start.resumed?.progress ?? null) : null);
+    const progress = i === 0 ? (start.resumed?.progress ?? null) : null;
+    await runStage(container, config, sequence, session, progress);
     const next = stages[i + 1];
     if (!next) break;
     // Hand the session on before asking for the click: a tab closed on the
@@ -486,7 +497,7 @@ async function main() {
     if (next.config.resume.max_age_ms > 0) {
       saveRecord(
         recordKey(next.config.experiment_id),
-        buildRecord(next.config, session.sessionId, session.metadata, null, Date.now())
+        buildRecord(next.config, sequence, session.sessionId, session.metadata, null, Date.now())
       );
     }
     showStageProgress(1);

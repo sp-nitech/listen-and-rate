@@ -191,12 +191,16 @@ def _clear_outdir_except_results(
 def _audio_url(audio_path: Path) -> str:
     """Return a web-relative URL for an audio file.
 
+    '/'-separated whichever OS exports the bundle: it is a URL, and
+    audio_x.php also joins it onto the server's own path, where a Windows
+    separator would name no file.
+
     Raises ValueError if the path is outside the current working directory,
     because such paths cannot be expressed as web-relative URLs.
     """
     cwd = Path.cwd()
     try:
-        return str(audio_path.relative_to(cwd))
+        return audio_path.relative_to(cwd).as_posix()
     except ValueError:
         raise ValueError(
             f"Audio path is outside the working directory and cannot be exported:\n"
@@ -484,7 +488,8 @@ def _stage_audio_urls(config: Config, stage_subdir: Path) -> dict[str, str]:
     urls = {}
     for s in config.stimuli_list.entries:
         url = Path(_audio_url(Path(s.path)))
-        urls[s.id] = str(stage_subdir / (url.with_suffix(".wav") if normalize else url))
+        url = url.with_suffix(".wav") if normalize else url
+        urls[s.id] = (stage_subdir / url).as_posix()
     return urls
 
 

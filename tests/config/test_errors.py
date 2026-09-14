@@ -74,3 +74,20 @@ def test_load_sequence_or_exit_formats_a_stage_config_error(tmp_path):
     message = str(excinfo.value)
     assert "test_type" in message
     assert _PYDANTIC_URL not in message
+
+
+def test_load_sequence_or_exit_names_the_config_that_is_wrong(
+    tmp_path, test_audio_file
+):
+    # Configs in a sequence often share their fields, so the error alone
+    # cannot say which of them to fix.
+    good = write_config(tmp_path, minimal_config(str(test_audio_file)), "a.yaml")
+    bad_data = minimal_config(str(test_audio_file))
+    bad_data["bogus_key"] = 1
+    bad = write_config(tmp_path, bad_data, "b.yaml")
+    with pytest.raises(SystemExit) as excinfo:
+        load_sequence_or_exit([good, bad])
+    message = str(excinfo.value)
+    assert "bogus_key" in message
+    assert f"In {bad}" in message
+    assert str(good) not in message

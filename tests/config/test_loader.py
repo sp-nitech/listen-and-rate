@@ -167,6 +167,17 @@ def test_sequence_gives_every_stage_the_first_config_metadata(
     assert [f.key for f in second.metadata.fields] == ["device"]
 
 
+def test_sequence_names_the_config_a_load_error_came_from(tmp_path, test_audio_file):
+    # Not only field validation: a missing audio file, a count out of range and
+    # the like come from load_config too, and say nothing of the file they
+    # are about. The note does, leaving the error itself as it was.
+    good = write_config(tmp_path, minimal_config(str(test_audio_file)), "a.yaml")
+    bad = write_config(tmp_path, minimal_config("./nonexistent.wav"), "b.yaml")
+    with pytest.raises(FileNotFoundError) as excinfo:
+        load_sequence([good, bad])
+    assert excinfo.value.__notes__ == [f"In {bad}"]
+
+
 def test_duplicate_stimulus_ids_raise_error(tmp_path, test_audio_file):
     data = {
         "test_type": "mos",

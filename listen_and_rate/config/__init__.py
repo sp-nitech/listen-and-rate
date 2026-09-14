@@ -27,7 +27,6 @@ from .errors import format_config_error
 from .loader import (
     Config,
     load_config,
-    load_config_or_exit,
     load_sequence,
     load_sequence_or_exit,
 )
@@ -68,7 +67,6 @@ __all__ = [
     "build_xab_trials",
     "format_config_error",
     "load_config",
-    "load_config_or_exit",
     "load_report_config_or_exit",
     "load_sequence",
     "load_sequence_or_exit",

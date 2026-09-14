@@ -181,6 +181,9 @@ def test_export_php_deploy_audio_url_is_cwd_relative(
     cwd = Path.cwd()
     for u in urls:
         assert (cwd / u).exists()
+        # A URL whichever OS exported it: audio_x.php also joins it onto the
+        # server's own path, where a Windows separator names no file.
+        assert "\\" not in u
 
 
 def test_export_php_deploy_config_data_excludes_system(

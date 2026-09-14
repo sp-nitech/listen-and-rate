@@ -386,18 +386,17 @@ def load_config(config_path: str | Path) -> Config:
     return config
 
 
-def load_config_or_exit(config_path: str | Path) -> Config:
-    """load_config, but turn a config-file ValidationError into a clean exit.
+def _load_named(config_path: str | Path) -> Config:
+    """load_config, but any failure is noted with the file it came from.
 
-    Used at the app/CLI boundaries so an experimenter's config typo prints a
-    short, URL-free message (see format_config_error) and exits, instead of a
-    stack trace ending in pydantic's errors.pydantic.dev link. load_config
-    itself still raises ValidationError, which the test suite relies on.
+    Several configs often share their fields, so an error alone cannot say
+    which of them to fix. A note leaves the exception itself as it was.
     """
     try:
         return load_config(config_path)
-    except ValidationError as exc:
-        raise SystemExit(format_config_error(exc)) from None
+    except Exception as exc:
+        exc.add_note(f"In {config_path}")
+        raise
 
 
 def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
@@ -412,7 +411,7 @@ def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
     a copy of the form: every stage then validates and writes them exactly as
     a lone config does.
     """
-    configs = [load_config(p) for p in config_paths]
+    configs = [_load_named(p) for p in config_paths]
     # Compared ignoring case: on a case-insensitive filesystem (macOS,
     # Windows, and the hosts using them) results/Study and results/study are
     # one directory, as are the bundle's stages/Study and stages/study.
@@ -440,9 +439,16 @@ def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
 def load_sequence_or_exit(config_paths: Sequence[str | Path]) -> list[Config]:
     """load_sequence, but turn a config-file ValidationError into a clean exit.
 
-    The sequence counterpart of load_config_or_exit, for the same boundaries.
+    Used at the app/CLI boundaries - for one config or several - so an
+    experimenter's config typo prints a short, URL-free message (see
+    format_config_error) naming the file, and exits, instead of a stack trace
+    ending in pydantic's errors.pydantic.dev link. load_config and
+    load_sequence themselves still raise ValidationError, which the test
+    suite relies on.
     """
     try:
         return load_sequence(config_paths)
     except ValidationError as exc:
-        raise SystemExit(format_config_error(exc)) from None
+        # The notes name the file (see _load_named).
+        notes = getattr(exc, "__notes__", [])
+        raise SystemExit("\n".join([format_config_error(exc), *notes])) from None

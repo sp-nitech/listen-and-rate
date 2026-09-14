@@ -96,15 +96,45 @@ test('a page load resumes at the first stage that has a resumable record', () =>
   // A submitted stage's record is gone, so the saved one past it is where
   // the session stopped.
   const configs = [stageConfig('a'), stageConfig('b')];
-  const record = { fingerprint: 'v1', savedAt: 900 };
+  const record = { fingerprint: 'v1', sequence: ['a', 'b'], savedAt: 900 };
   const found = findResumableStage(configs, new Map([[recordKey('b'), record]]), 1000);
   assert.deepEqual(found, { index: 1, record });
 });
 
 test('a record from a changed config does not decide where a page load starts', () => {
   const configs = [stageConfig('a'), stageConfig('b', 'v2')];
-  const records = new Map([[recordKey('b'), { fingerprint: 'v1', savedAt: 900 }]]);
+  const records = new Map([
+    [recordKey('b'), { fingerprint: 'v1', sequence: ['a', 'b'], savedAt: 900 }],
+  ]);
   assert.equal(findResumableStage(configs, records, 1000), null);
+});
+
+test('a record saved under a different sequence does not decide where a page load starts', () => {
+  // Stage b was reached after a, which is submitted. Served now as [b, a],
+  // resuming b would run a again - under a session a already holds results
+  // for. Served as [c, b], it would skip c.
+  const record = { fingerprint: 'v1', sequence: ['a', 'b'], savedAt: 900 };
+  const records = new Map([[recordKey('b'), record]]);
+  for (const ids of [
+    ['b', 'a'],
+    ['c', 'b'],
+  ]) {
+    assert.equal(
+      findResumableStage(
+        ids.map((id) => stageConfig(id)),
+        records,
+        1000
+      ),
+      null
+    );
+  }
+});
+
+test('a record saved before sequences existed still resumes its lone config', () => {
+  // It carries no sequence, so it stands for the one config it froze.
+  const record = { fingerprint: 'v1', savedAt: 900, config: stageConfig('a') };
+  const found = findResumableStage([stageConfig('a')], new Map([[recordKey('a'), record]]), 1000);
+  assert.deepEqual(found, { index: 0, record });
 });
 
 // -- clearStageRecords -------------------------------------------------------
@@ -134,12 +164,13 @@ test('an absent experiment id still yields a usable key', () => {
 
 // -- buildRecord -------------------------------------------------------------
 
-test('a record freezes the config it was saved from, with its fingerprint', () => {
+test('a record freezes the config it was saved from, with its fingerprint and sequence', () => {
   const config = stageConfig('a');
-  const record = buildRecord(config, 's1', { device: 'HP' }, { currentIndex: 2 }, 900);
+  const record = buildRecord(config, ['a', 'b'], 's1', { device: 'HP' }, { currentIndex: 2 }, 900);
   assert.deepEqual(record, {
     v: 1,
     fingerprint: 'v1',
+    sequence: ['a', 'b'],
     savedAt: 900,
     sessionId: 's1',
     config,

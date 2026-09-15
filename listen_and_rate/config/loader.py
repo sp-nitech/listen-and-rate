@@ -8,8 +8,9 @@ from pathlib import Path
 from typing import Annotated
 
 import yaml
-from pydantic import Field, TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter
 
+from ..errors import UserError
 from ..ids import is_valid_id
 from ._utils import _AUDIO_EXTENSIONS, _duplicates, _normalize, _safe_id
 from .ab import ABConfig, build_ab_trials
@@ -22,7 +23,7 @@ from .base import (
 )
 from .cmos import CMOSConfig
 from .dmos import DMOSConfig, build_dmos_trials
-from .errors import format_config_error
+from .errors import config_file_errors
 from .mos import MOSConfig
 from .mushra import MUSHRAConfig, build_mushra_trials
 from .xab import XABConfig, build_xab_trials
@@ -79,7 +80,7 @@ def _expand_stimuli_dirs(dirs_config: StimuliDirsConfig) -> list[StimulusConfig]
         common = set.intersection(*stems_per_dir.values())
         if not common:
             raise ValueError(
-                "No common audio files found across all systems in stimuli_dirs. "
+                "no common audio files found across all systems in stimuli_dirs. "
                 "Ensure each system directory contains files with matching names."
             )
         all_stems = set.union(*stems_per_dir.values())
@@ -142,7 +143,7 @@ def _check_no_basename_conflicts(stimuli: list[StimulusConfig]) -> None:
             ", ".join(sorted(paths)) for _, paths in sorted(duplicated.items())
         )
         raise ValueError(
-            "Stimulus files in the same directory must not share a basename "
+            "stimulus files in the same directory must not share a basename "
             f"(paths differing only in extension): {detail}. Rename the files "
             "so their basenames differ."
         )
@@ -176,15 +177,15 @@ def _check_audio_and_measure_durations(
     durations: dict[str, float] = {}
     for stimulus in stimuli:
         if not Path(stimulus.path).is_file():
-            raise FileNotFoundError(f"Audio file not found: {stimulus.path}")
+            raise FileNotFoundError(f"audio file not found: {stimulus.path}")
         try:
             info = sf.info(stimulus.path)
         except Exception as exc:
             raise ValueError(
-                f"Not a readable audio file: {stimulus.path} ({exc})"
+                f"not a readable audio file: {stimulus.path} ({exc})"
             ) from None
         if info.frames == 0:
-            raise ValueError(f"Audio file has no audio samples: {stimulus.path}")
+            raise ValueError(f"audio file has no audio samples: {stimulus.path}")
         durations[stimulus.id] = round(info.frames / info.samplerate, 3)
     return durations
 
@@ -202,7 +203,7 @@ def load_config(config_path: str | Path) -> Config:
     if not isinstance(data, dict):
         found = "an empty file" if data is None else f"a {type(data).__name__}"
         raise ValueError(
-            f"Config file must be a YAML mapping of config fields, got {found}: {path}"
+            f"config file must be a YAML mapping of config fields, got {found}"
         )
 
     # Accept test_type/output.format in any case - "MOS" is commonly written
@@ -233,7 +234,7 @@ def load_config(config_path: str | Path) -> Config:
     if not config.experiment_id:
         if not is_valid_id(path.stem):
             raise ValueError(
-                f"Config filename {path.stem!r} cannot name the results "
+                f"config filename {path.stem!r} cannot name the results "
                 "directory: it must contain only letters, digits, '.', '-', "
                 "or '_'. Either rename the file, or set `experiment_id:` in "
                 "it to the name the results directory should have."
@@ -268,7 +269,7 @@ def load_config(config_path: str | Path) -> Config:
 
     if config.stimuli_list is None or not config.stimuli_list.entries:
         raise ValueError(
-            "No audio stimuli found. Check the paths and that files use a "
+            "no audio stimuli found. Check the paths and that files use a "
             "supported format (.wav, .mp3, .flac, .ogg)."
         )
 
@@ -311,7 +312,7 @@ def load_config(config_path: str | Path) -> Config:
         )
         if not dmos_trials:
             raise ValueError(
-                "No item is present in both the reference and a test "
+                "no item is present in both the reference and a test "
                 "system. This test type requires at least one paired item"
             )
         n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
@@ -329,7 +330,7 @@ def load_config(config_path: str | Path) -> Config:
         )
         if not trials:
             raise ValueError(
-                "No item is present in both systems. This test type requires "
+                "no item is present in both systems. This test type requires "
                 "at least one paired item"
             )
         n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
@@ -347,7 +348,7 @@ def load_config(config_path: str | Path) -> Config:
         )
         if not xab_trials:
             raise ValueError(
-                "No item is present in the reference and both test "
+                "no item is present in the reference and both test "
                 "systems. This test type requires at least one complete "
                 "item"
             )
@@ -372,7 +373,7 @@ def load_config(config_path: str | Path) -> Config:
         )
         if not mushra_trials:
             raise ValueError(
-                "No item has a stimulus for every rateable system. This "
+                "no item has a stimulus for every rateable system. This "
                 "test type requires at least one complete item"
             )
         n = config.stimuli_dirs.items_per_session if config.stimuli_dirs else None
@@ -387,16 +388,13 @@ def load_config(config_path: str | Path) -> Config:
 
 
 def _load_named(config_path: str | Path) -> Config:
-    """load_config, but any failure is noted with the file it came from.
+    """load_config, but what is wrong with the file names it.
 
     Several configs often share their fields, so an error alone cannot say
-    which of them to fix. A note leaves the exception itself as it was.
+    which of them to fix (see config_file_errors).
     """
-    try:
+    with config_file_errors(config_path):
         return load_config(config_path)
-    except Exception as exc:
-        exc.add_note(f"In {config_path}")
-        raise
 
 
 def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
@@ -420,8 +418,8 @@ def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
     for config in configs:
         key = config.experiment_id.casefold()
         if key in seen:
-            raise ValueError(
-                f"Two configs share the experiment_id {config.experiment_id!r}. "
+            raise UserError(
+                f"two configs share the experiment_id {config.experiment_id!r}. "
                 "Each test in a sequence needs its own results directory, so "
                 "rename one file or set `experiment_id:` in it."
             )
@@ -436,21 +434,3 @@ def load_sequence(config_paths: Sequence[str | Path]) -> list[Config]:
                 stacklevel=2,
             )
     return [first] + [c.model_copy(update={"metadata": first.metadata}) for c in later]
-
-
-def load_sequence_or_exit(config_paths: Sequence[str | Path]) -> list[Config]:
-    """load_sequence, but turn a config-file ValidationError into a clean exit.
-
-    Used at the app/CLI boundaries - for one config or several - so an
-    experimenter's config typo prints a short, URL-free message (see
-    format_config_error) naming the file, and exits, instead of a stack trace
-    ending in pydantic's errors.pydantic.dev link. load_config and
-    load_sequence themselves still raise ValidationError, which the test
-    suite relies on.
-    """
-    try:
-        return load_sequence(config_paths)
-    except ValidationError as exc:
-        # The notes name the file (see _load_named).
-        notes = getattr(exc, "__notes__", [])
-        raise SystemExit("\n".join([format_config_error(exc), *notes])) from None

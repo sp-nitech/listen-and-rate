@@ -71,6 +71,42 @@ test('unreachable audio is listed, and a save problem shared by stages once', as
   });
 });
 
+test("each test type's audio is found where its trials hold it", async () => {
+  const s = (id) => ({ id });
+  const configs = {
+    mos: { stimuli: [s('m')] },
+    dmos: { trials: [{ reference: s('r'), test: s('t') }] },
+    cmos: { trials: [{ stimuli: [s('c1'), s('c2')] }] },
+    ab: { trials: [{ stimuli: [s('a1'), s('a2')] }] },
+    // X is always one of the trial's own A/B, so it is not fetched again.
+    abx: { trials: [{ stimuli: [s('x1'), s('x2')] }] },
+    xab: { trials: [{ reference: s('xr'), stimuli: [s('x3'), s('x4')] }] },
+    mushra: {
+      trials: [
+        { reference: s('hr'), systems: [s('h1')], anchor: s('ha') },
+        { reference: s('hr2'), systems: [s('h2')], anchor: null },
+      ],
+    },
+  };
+  for (const [testType, fields] of Object.entries(configs)) {
+    const calls = stubFetch();
+    await preflight([
+      { stage: new Stage(null), config: { test_type: testType, ...fields }, withPractice: false },
+    ]);
+    const heads = calls.filter((c) => c.startsWith('HEAD')).map((c) => c.split('/').pop());
+    const expected = {
+      mos: ['m'],
+      dmos: ['r', 't'],
+      cmos: ['c1', 'c2'],
+      ab: ['a1', 'a2'],
+      abx: ['x1', 'x2'],
+      xab: ['xr', 'x3', 'x4'],
+      mushra: ['hr', 'h1', 'ha', 'hr2', 'h2'],
+    }[testType];
+    assert.deepEqual(heads, expected, testType);
+  }
+});
+
 test('practice audio is checked only where the practice will run', async () => {
   const config = mos(['s1'], { practice_stimuli: [{ id: 'p1' }] });
   for (const withPractice of [false, true]) {

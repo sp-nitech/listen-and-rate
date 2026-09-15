@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from listen_and_rate.config import ReportConfig, load_report_config_or_exit
+from listen_and_rate.config import ReportConfig, load_report_config
+from listen_and_rate.errors import UserError
 
 from .._helpers import write_config
 
@@ -154,34 +155,43 @@ def test_groups_label_required():
         ReportConfig(groups=[{"metadata_filter": {"device": "Headphones"}}])
 
 
-def test_load_report_config_or_exit_reads_yaml(tmp_path):
+def test_load_report_config_reads_yaml(tmp_path):
     path = write_config(
         tmp_path, {"confidence": 0.9, "labels": {"A": "Proposed"}}, name="report.yaml"
     )
-    rc = load_report_config_or_exit(path)
+    rc = load_report_config(path)
     assert rc.confidence == 0.9
     assert rc.labels == {"A": "Proposed"}
 
 
-def test_load_report_config_or_exit_empty_file_uses_defaults(tmp_path):
+def test_load_report_config_empty_file_uses_defaults(tmp_path):
     path = tmp_path / "report.yaml"
     path.write_text("", encoding="utf-8")
-    rc = load_report_config_or_exit(path)
+    rc = load_report_config(path)
     assert rc == ReportConfig()
 
 
-def test_load_report_config_or_exit_exits_cleanly_on_bad_value(tmp_path):
+def test_load_report_config_names_the_file_before_a_bad_value(tmp_path):
     path = write_config(tmp_path, {"confidence": 2}, name="report.yaml")
-    with pytest.raises(SystemExit) as excinfo:
-        load_report_config_or_exit(path)
+    with pytest.raises(UserError) as excinfo:
+        load_report_config(path)
+    message = str(excinfo.value)
+    assert message.startswith(f"{path}: invalid configuration (1 error):")
     # Clean, URL-free message (see format_config_error).
-    assert "errors.pydantic.dev" not in str(excinfo.value)
+    assert "errors.pydantic.dev" not in message
 
 
-def test_load_report_config_or_exit_exits_on_unknown_field(tmp_path):
+def test_load_report_config_rejects_an_unknown_field(tmp_path):
     path = write_config(tmp_path, {"nonsense": True}, name="report.yaml")
-    with pytest.raises(SystemExit):
-        load_report_config_or_exit(path)
+    with pytest.raises(UserError, match="nonsense"):
+        load_report_config(path)
+
+
+def test_load_report_config_says_a_missing_file_is_not_found(tmp_path):
+    path = tmp_path / "report.yaml"
+    with pytest.raises(UserError) as excinfo:
+        load_report_config(path)
+    assert str(excinfo.value) == f"{path}: config file not found"
 
 
 # -- metrics_filter ---------------------------------------------------------

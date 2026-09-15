@@ -7,6 +7,8 @@ import re
 import pandas as pd
 import pytest
 
+from listen_and_rate.errors import UserError
+
 from ._helpers import (
     AB_CSV_ROWS,
     ABX_CSV_ROWS,
@@ -136,8 +138,10 @@ def test_generate_report_mixed_csv_and_json(tmp_path):
 
 
 def test_generate_report_missing_file(tmp_path):
-    with pytest.raises(FileNotFoundError):
-        generate_report_html([tmp_path / "nonexistent.csv"])
+    missing = tmp_path / "nonexistent.csv"
+    with pytest.raises(UserError) as excinfo:
+        generate_report_html([missing])
+    assert str(excinfo.value) == f"{missing}: result file not found"
 
 
 def test_generate_report_no_mos_rows(tmp_path):
@@ -151,7 +155,7 @@ def test_generate_report_no_mos_rows(tmp_path):
             "rating": 4,
         }
     ]
-    with pytest.raises(ValueError, match="No MOS rows"):
+    with pytest.raises(UserError, match="no MOS rows"):
         generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
 
 
@@ -161,7 +165,7 @@ def test_generate_report_no_mos_rows(tmp_path):
 def test_generate_report_mixed_test_types_raises_error(tmp_path):
     mos_path = _write_csv(tmp_path / "mos.csv", CSV_ROWS)
     ab_path = _write_csv(tmp_path / "ab.csv", AB_CSV_ROWS)
-    with pytest.raises(ValueError, match="Mixed test_type"):
+    with pytest.raises(UserError, match="mixed test_type"):
         generate_report_html([mos_path, ab_path])
 
 

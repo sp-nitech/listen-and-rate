@@ -10,11 +10,12 @@
  * through this table - the researcher writes that directly in whichever
  * language they choose, independent of ui_language.
  *
- * The current language is module-level state, set once by app.js's main()
- * right after the config is fetched (before any DOM is touched, since the
- * resume prompt itself needs translated strings) - not threaded as a
+ * The current language is module-level state, set by app.js's main() right
+ * after the configs are fetched (before any DOM is touched, since the resume
+ * prompt itself needs translated strings) and again as each stage of a
+ * sequence starts (see screens.js's applyConfigChrome) - not threaded as a
  * parameter through every constructor/helper down the call chain, since
- * exactly one language is active per page load, never per-component.
+ * exactly one language is active at a time, never per-component.
  */
 
 import { en } from './strings/en.js';
@@ -31,7 +32,7 @@ export function setLanguage(lang) {
 
 /**
  * The language setLanguage() actually resolved to ('en'/'ja') - for a caller
- * (e.g. app.js's document.documentElement.lang) that wants the resolved
+ * (e.g. screens.js's document.documentElement.lang) that wants the resolved
  * value itself, rather than re-deriving the same fallback rule from whatever
  * raw config.ui_language it was given.
  */

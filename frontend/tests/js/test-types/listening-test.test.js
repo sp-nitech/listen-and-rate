@@ -143,7 +143,7 @@ test('the sum over the pages is the time the test took', () => {
   assert.equal(total, 15);
 });
 
-test('saving progress banks the running clock without double counting', () => {
+test('saved progress includes the running clock without double counting', () => {
   const test = new StubTest().start();
   tick(4);
   assert.equal(test.getProgress().metrics[0][1], 4);

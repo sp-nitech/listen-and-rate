@@ -516,30 +516,3 @@ def test_silence_check_verbose_prints_even_when_nothing_is_exceeded(tmp_path, ca
     )
     run_configured_silence_check(config)
     assert "A__i1" in capsys.readouterr().out
-
-
-def test_serve_startup_runs_the_audio_checks_in_order(tmp_path, monkeypatch):
-    # Order matters twice over. Duration goes first because its lengths are
-    # already read and it does not depend on playback level, so the cheapest
-    # and coarsest check fails fast. Silence goes after loudness because its
-    # floor is absolute, so silence figures taken from clips whose levels
-    # disagree may say more about the level difference.
-    from fastapi.testclient import TestClient
-
-    from listen_and_rate import main
-
-    called: list[str] = []
-    monkeypatch.setattr(
-        main, "run_configured_duration_check", lambda c: called.append("duration")
-    )
-    monkeypatch.setattr(
-        main, "run_configured_loudness_check", lambda c: called.append("loudness")
-    )
-    monkeypatch.setattr(
-        main, "run_configured_silence_check", lambda c: called.append("silence")
-    )
-    _config(tmp_path, {"leading": {"per_stimulus": {"threshold": 0.1}}}, {"A": 0.05})
-    monkeypatch.setenv("LISTEN_AND_RATE_CONFIG", str(tmp_path / "config.yaml"))
-    with TestClient(main.create_app()):
-        pass
-    assert called == ["duration", "loudness", "silence"]

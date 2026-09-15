@@ -24,6 +24,11 @@ const DMOS_LABELS_DEFAULT = {
 };
 
 export class DMOSTest extends PairedTrialTest {
+  /** Each trial's reference and the test stimulus rated against it. */
+  static audioStimuli(config) {
+    return config.trials.flatMap((trial) => [trial.reference, trial.test]);
+  }
+
   /**
    * @param {Object} config - Server config from /api/config (has `trials`).
    * @param {string} sessionId - UUID identifying this listener's session.

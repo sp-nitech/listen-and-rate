@@ -138,7 +138,7 @@ export class MOSTest extends ListeningTest {
       if (!this.played.has(s.id)) {
         this.played.add(s.id);
         this._syncRatingState();
-        this._onChange?.();
+        this.onChange();
       }
     });
 
@@ -198,7 +198,7 @@ export class MOSTest extends ListeningTest {
 
     this._syncNextEnabled();
     this._updateProgressBar();
-    this._onChange?.();
+    this.onChange();
   }
 
   /** The resume record's two halves: ratings by stimulus id, and heard ids. */

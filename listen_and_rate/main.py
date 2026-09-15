@@ -12,19 +12,16 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
-from .config import Config, load_sequence_or_exit
+from .checks import run_configured_checks
+from .config import Config, load_sequence
 from .dependencies import Stage
-from .duration import run_configured_duration_check
-from .loudness import (
-    run_configured_loudness_check,
-    run_configured_loudness_normalization,
-)
+from .errors import exit_on_user_error
+from .loudness import run_configured_loudness_normalization
 from .routers import api
 from .routers import audio as audio_router
 from .routers import report as report_router
 from .routers.api import get_test_config, submit
 from .routers.audio import serve_abx_x_php_alias
-from .silence import run_configured_silence_check
 from .storage import make_result_saver
 
 # frontend/ files that only the PHP export runs: included by the PHP entry
@@ -40,9 +37,7 @@ def _build_stage(config: Config, cleanup: ExitStack) -> Stage:
     file, Ctrl-C), which would otherwise orphan a full copy of the stimuli
     under /tmp on every attempt.
     """
-    run_configured_duration_check(config)
-    run_configured_loudness_check(config)
-    run_configured_silence_check(config)
+    run_configured_checks(config)
     result_saver = make_result_saver(
         config.output.format,
         config.output.path,
@@ -73,10 +68,12 @@ async def lifespan(app: FastAPI):
     Reads LISTEN_AND_RATE_CONFIG env var (default: ./config.yaml): one config
     path, or several separated by os.pathsep to run those tests back to back
     as a sequence. Each config gets one Stage (config, result_saver, and
-    audio_map), shared by every request for it.
+    audio_map), shared by every request for it. A config that cannot be
+    loaded ends startup with its message, as the CLIs do (see errors.py).
     """
     config_paths = os.environ.get("LISTEN_AND_RATE_CONFIG", "./config.yaml")
-    configs = load_sequence_or_exit(config_paths.split(os.pathsep))
+    with exit_on_user_error():
+        configs = load_sequence(config_paths.split(os.pathsep))
     with ExitStack() as cleanup:
         app.state.stages = {c.experiment_id: _build_stage(c, cleanup) for c in configs}
         # Used to blind ABX's hidden "X" reference (see x_token.py). Set

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 from listen_and_rate.analysis import generate_report_html
@@ -14,9 +15,10 @@ from listen_and_rate.analysis._results import (
 from listen_and_rate.config import (
     Config,
     ReportConfig,
-    load_report_config_or_exit,
-    load_sequence_or_exit,
+    load_report_config,
+    load_sequence,
 )
+from listen_and_rate.errors import UserError, exit_on_user_error
 from listen_and_rate.storage import METADATA_COLUMN_PREFIX, SURVEY_COLUMN_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,10 @@ logger = logging.getLogger(__name__)
 # The report's base content width in pixels; report-config scale.width is a
 # multiplier on this (scale.height likewise multiplies each chart's height).
 BASE_WIDTH = 900
+
+
+# Said of a results directory, given or derived from a config, that holds none.
+_NO_RESULT_FILES = "no result files (.csv or .json) found"
 
 
 def _result_paths_in(directory: Path) -> list[Path]:
@@ -98,17 +104,20 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+    with exit_on_user_error():
+        _report(parser, args)
 
+
+def _report(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Write the report(s) main() was asked for, one per config given."""
     report = (
-        load_report_config_or_exit(args.report_config)
-        if args.report_config
-        else ReportConfig()
+        load_report_config(args.report_config) if args.report_config else ReportConfig()
     )
 
     # A sequence's configs are loaded together, so a later test's report gets
     # the metadata labels its config shares with the first (see
     # load_sequence) - loading it alone would leave them out.
-    configs = load_sequence_or_exit(args.config) if args.config else []
+    configs = load_sequence(args.config) if args.config else []
     if len(configs) > 1:
         if args.results:
             parser.error(
@@ -131,15 +140,17 @@ def _write_report(
     config: Config | None,
 ) -> None:
     """Write one report: for `config`'s results, or for --results alone (None)."""
+    paths: Sequence[str | Path]
     if args.results:
         if args.root:
             parser.error("--root cannot be combined with --results")
         if len(args.results) == 1 and Path(args.results[0]).is_dir():
             paths = _result_paths_in(Path(args.results[0]))
             if not paths:
-                raise FileNotFoundError(f"No CSV/JSON files found in {args.results[0]}")
+                raise UserError(f"{args.results[0]}: {_NO_RESULT_FILES}")
         else:
-            paths = [Path(p) for p in args.results]
+            # As written, so a file that is not there is named as it was typed.
+            paths = list(args.results)
     elif config is not None:
         # Both deployments store results at <deployment root>/<output.path>/
         # <config name> (save.php resolves output.path against its bundle
@@ -158,7 +169,7 @@ def _write_report(
             derived_dir = output_path / config.experiment_id
         paths = _result_paths_in(derived_dir)
         if not paths:
-            raise FileNotFoundError(f"No CSV/JSON files found in {derived_dir}")
+            raise UserError(f"{derived_dir}: {_NO_RESULT_FILES}")
     elif args.root:
         parser.error("--root requires --config")
     else:
@@ -169,7 +180,9 @@ def _write_report(
 
     # Default the report location to the results' own directory, so both
     # deployment modes work without an explicit --output.
-    out_path = Path(args.output) if args.output else paths[0].parent / "report.html"
+    out_path = (
+        Path(args.output) if args.output else Path(paths[0]).parent / "report.html"
+    )
 
     # The report config's explicit order wins (and must be complete); otherwise
     # fall back to the experiment config's stimuli_dirs order (tolerant).

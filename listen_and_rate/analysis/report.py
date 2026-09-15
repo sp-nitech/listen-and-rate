@@ -7,10 +7,12 @@ row-filtered section per group into a single page (see _filter_group_rows).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import partial
 from html import escape as _escape_html
 from pathlib import Path
 
+from ..errors import UserError
 from ..storage import (
     METADATA_COLUMN_PREFIX,
     METRICS_COLUMN_PREFIX,
@@ -233,7 +235,7 @@ def _apply_metrics_filter(sub, group: dict, label: str):
             continue
         column_name = prefix + key
         if column_name not in sub.columns:
-            raise ValueError(
+            raise UserError(
                 f"group {label!r}: {key!r} is not a {kind_label} in the results"
             )
         sub = sub[_METRIC_MATCHERS[key](sub[column_name], value)]
@@ -305,17 +307,17 @@ def _filter_group_rows(df, group: dict):
         for key, value in (group.get(kind) or {}).items():
             column_name = prefix + key
             if column_name not in sub.columns:
-                raise ValueError(
+                raise UserError(
                     f"group {label!r}: {key!r} is not a {kind_label} in the results"
                 )
             sub = sub[_matches_glob(sub[column_name], value)]
     if sub.empty:
-        raise ValueError(f"group {label!r} matched no rows in the results")
+        raise UserError(f"group {label!r} matched no rows in the results")
     return sub
 
 
 def generate_report_html(
-    paths: list[Path],
+    paths: Sequence[str | Path],
     title: str = "Listening Test Results",
     confidence: float = 0.95,
     font_family: str = "sans-serif",
@@ -393,8 +395,10 @@ def generate_report_html(
         ) from exc
 
     missing = [str(p) for p in paths if not Path(p).is_file()]
+    if len(missing) == 1:
+        raise UserError(f"{missing[0]}: result file not found")
     if missing:
-        raise FileNotFoundError(f"Result file(s) not found: {', '.join(missing)}")
+        raise UserError(f"result files not found: {', '.join(missing)}")
 
     frames = {Path(p): _read_result_file(p) for p in paths}
     _check_tool_versions({p: _versions_in(f) for p, f in frames.items()})
@@ -418,8 +422,8 @@ def generate_report_html(
         "mushra",
     }
     if len(known_types) > 1:
-        raise ValueError(
-            f"Mixed test_type values in result files: {sorted(test_types_present)}"
+        raise UserError(
+            f"mixed test_type values in result files: {sorted(test_types_present)}"
         )
 
     if require_full_order and system_order is not None:
@@ -429,7 +433,7 @@ def generate_report_html(
         )
         missing = sorted(_systems_in(check_df) - set(system_order))
         if missing:
-            raise ValueError(
+            raise UserError(
                 f"order is missing system(s) present in the results: {missing}"
             )
 
@@ -455,7 +459,7 @@ def generate_report_html(
         if "test_type" in df.columns:
             df = df[df["test_type"] == "mos"]
         if df.empty:
-            raise ValueError("No MOS rows found in the provided result file(s)")
+            raise UserError("no MOS rows found in the result files")
         typed_df = df
         render = partial(_generate_mos_report, **common)
     elif "dmos" in known_types:

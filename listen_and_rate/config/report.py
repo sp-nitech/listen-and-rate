@@ -12,12 +12,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, field_validator
 from pydantic_core import PydanticCustomError
 
 from ._utils import _coerce_scalar_to_str, _duplicates
 from .base import _StrictModel
-from .errors import format_config_error
+from .errors import config_file_errors
 
 # stimuli_filter's fixed key allowlist: the stimulus-side result columns. This
 # is what keeps outcome columns (rating/winner/...) structurally unfilterable.
@@ -189,16 +189,13 @@ class ReportConfig(_StrictModel):
         return v
 
 
-def load_report_config_or_exit(config_path: str | Path) -> ReportConfig:
-    """Load and validate a report config YAML; clean-exit on a bad file.
+def load_report_config(config_path: str | Path) -> ReportConfig:
+    """Load and validate a report config YAML. An empty file yields the defaults.
 
-    Mirrors config.loader.load_sequence_or_exit: a typo in this hand-written file
-    prints a short, URL-free message (see format_config_error) and exits rather
-    than a stack trace. An empty file yields the defaults.
+    What is wrong with the file is a UserError naming it (see
+    config_file_errors), like an experiment config.
     """
-    with open(Path(config_path), encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    try:
+    with config_file_errors(config_path):
+        with open(Path(config_path), encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
         return ReportConfig.model_validate(data)
-    except ValidationError as exc:
-        raise SystemExit(format_config_error(exc)) from None

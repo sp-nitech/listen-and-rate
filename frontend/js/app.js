@@ -19,8 +19,9 @@ import {
 } from './screens.js';
 import { chooseStart, openSession, planStages, runStages } from './sequence.js';
 import { Stage } from './stage.js';
-import { runStage, testClassFor } from './stage-runner.js';
+import { runStage } from './stage-runner.js';
 import { setLanguage } from './strings.js';
+import { testClassFor } from './test-types/registry.js';
 import { mountTheme } from './theme.js';
 
 async function main() {

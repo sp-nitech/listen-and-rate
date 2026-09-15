@@ -24,15 +24,10 @@ from .base import (
 from .cmos import CMOSConfig
 from .dmos import DMOSConfig, DMOSTrial, build_dmos_trials
 from .errors import format_config_error
-from .loader import (
-    Config,
-    load_config,
-    load_sequence,
-    load_sequence_or_exit,
-)
+from .loader import Config, load_config, load_sequence
 from .mos import MOSConfig
 from .mushra import MUSHRAConfig, MUSHRATrial, build_mushra_trials
-from .report import FontConfig, ReportConfig, ScaleConfig, load_report_config_or_exit
+from .report import FontConfig, ReportConfig, ScaleConfig, load_report_config
 from .two_system import TwoSystemComparisonConfig
 from .xab import XABConfig, XABTrial, build_xab_trials
 
@@ -67,7 +62,6 @@ __all__ = [
     "build_xab_trials",
     "format_config_error",
     "load_config",
-    "load_report_config_or_exit",
+    "load_report_config",
     "load_sequence",
-    "load_sequence_or_exit",
 ]

@@ -58,7 +58,7 @@ def test_analyze_failure_names_the_version_difference_as_a_possible_cause(
     # worth knowing, so the note rides along with whatever error was raised.
     rows = [{"tool_version": "9.9.0", **r, "test_type": "nonsense"} for r in CSV_ROWS]
     csv_path = _write_csv(tmp_path / "s1.csv", rows)
-    with pytest.raises(Exception) as excinfo:
+    with pytest.raises(SystemExit) as excinfo:
         _run_analyze(
             monkeypatch,
             "--results",
@@ -66,8 +66,8 @@ def test_analyze_failure_names_the_version_difference_as_a_possible_cause(
             "--output",
             str(tmp_path / "r.html"),
         )
-    notes = getattr(excinfo.value, "__notes__", [])
-    assert any("9.9.0" in n and __version__ in n for n in notes), notes
+    message = str(excinfo.value)
+    assert "9.9.0" in message and __version__ in message, message
 
 
 def test_analyze_failure_on_matching_versions_adds_no_note(tmp_path, monkeypatch):
@@ -75,7 +75,7 @@ def test_analyze_failure_on_matching_versions_adds_no_note(tmp_path, monkeypatch
         {"tool_version": __version__, **r, "test_type": "nonsense"} for r in CSV_ROWS
     ]
     csv_path = _write_csv(tmp_path / "s1.csv", rows)
-    with pytest.raises(Exception) as excinfo:
+    with pytest.raises(SystemExit) as excinfo:
         _run_analyze(
             monkeypatch,
             "--results",
@@ -83,7 +83,7 @@ def test_analyze_failure_on_matching_versions_adds_no_note(tmp_path, monkeypatch
             "--output",
             str(tmp_path / "r.html"),
         )
-    assert getattr(excinfo.value, "__notes__", []) == []
+    assert str(excinfo.value) == "no MOS rows found in the result files"
 
 
 def test_analyze_results_writes_html(tmp_path, monkeypatch):
@@ -120,8 +120,17 @@ def test_analyze_results_with_directory(tmp_path, monkeypatch):
 
 
 def test_analyze_results_missing_file_raises(tmp_path, monkeypatch):
-    with pytest.raises(FileNotFoundError):
-        _run_analyze(monkeypatch, "--results", str(tmp_path / "none.csv"))
+    missing = tmp_path / "none.csv"
+    with pytest.raises(SystemExit) as excinfo:
+        _run_analyze(monkeypatch, "--results", str(missing))
+    assert str(excinfo.value) == f"{missing}: result file not found"
+
+
+def test_analyze_results_names_a_missing_file_as_it_was_written(monkeypatch):
+    # The path the user typed is the one they will look for in the message.
+    with pytest.raises(SystemExit) as excinfo:
+        _run_analyze(monkeypatch, "--results", "./none.csv")
+    assert str(excinfo.value) == "./none.csv: result file not found"
 
 
 def test_analyze_results_default_output_next_to_results_dir(tmp_path, monkeypatch):
@@ -219,7 +228,7 @@ def test_analyze_results_of_a_sequence_takes_no_single_output_or_results(
     assert message in capsys.readouterr().err
 
 
-def test_analyze_results_derived_dir_without_files_raises(
+def test_analyze_results_names_a_derived_dir_without_files(
     tmp_path, test_audio_file, monkeypatch
 ):
     config_yaml = write_config(
@@ -232,8 +241,11 @@ def test_analyze_results_derived_dir_without_files_raises(
             "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
         },
     )
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(SystemExit) as excinfo:
         _run_analyze(monkeypatch, "--config", str(config_yaml))
+    assert str(excinfo.value) == (
+        f"{tmp_path / 'results' / 'config'}: no result files (.csv or .json) found"
+    )
 
 
 def test_analyze_results_without_results_or_config_exits_with_usage_error(
@@ -449,7 +461,7 @@ def test_report_config_order_missing_system_raises(tmp_path, monkeypatch):
     csv_path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
     report_yaml = _write_report_config(tmp_path, {"order": ["A"]})  # missing B
     out_path = tmp_path / "report.html"
-    with pytest.raises(ValueError, match="B"):
+    with pytest.raises(SystemExit, match="order is missing system.*B"):
         _run_analyze(
             monkeypatch,
             "--results",

@@ -137,7 +137,7 @@ def test_xab_no_complete_item_fails_at_load(tmp_path, test_audio_file):
     dref, da, db = three_system_dirs(tmp_path, test_audio_file, items=("utt1",))
     (dref / "utt1.wav").unlink()
     shutil.copy(test_audio_file, dref / "other.wav")
-    with pytest.raises(ValueError, match="No common audio files"):
+    with pytest.raises(ValueError, match="no common audio files"):
         load_config(write_config(tmp_path, _xab_dirs_data(dref, da, db)))
 
 

@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 
 from .. import __version__
+from ..errors import UserError
 from ..storage import (
     METADATA_COLUMN_PREFIX,
     METRICS_COLUMN_PREFIX,
@@ -31,7 +32,7 @@ UNKNOWN_VERSION = "unknown"
 _NAMES_SHOWN = 3
 
 
-class ResultVersionMismatch(ValueError):
+class ResultVersionMismatch(UserError):
     """Result files were produced by different releases of the tool."""
 
 
@@ -143,7 +144,7 @@ def _check_tool_versions(by_file: dict) -> None:
             for release, names in sorted(by_release.items())
         )
         raise ResultVersionMismatch(
-            f"Result files disagree on the version that produced them: {listing}. "
+            f"result files disagree on the version that produced them: {listing}. "
             "Mixing them would silently drop or misread rows. "
             "Analyze each version's results separately."
         )

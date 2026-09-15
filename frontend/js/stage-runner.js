@@ -10,31 +10,7 @@ import { practiceItems, runPracticeStage } from './practice.js';
 import { buildRecord, clearRecord, recordKey, saveRecord } from './resume.js';
 import { applyConfigChrome, promptRetry } from './screens.js';
 import { t } from './strings.js';
-import { ABTest } from './test-types/ab.js';
-import { ABXTest } from './test-types/abx.js';
-import { CMOSTest } from './test-types/cmos.js';
-import { DMOSTest } from './test-types/dmos.js';
-import { MOSTest } from './test-types/mos.js';
-import { MUSHRATest } from './test-types/mushra.js';
-import { XABTest } from './test-types/xab.js';
-
-/** Map test_type strings to their corresponding test class constructors. */
-const testTypeMap = {
-  mos: MOSTest,
-  dmos: DMOSTest,
-  cmos: CMOSTest,
-  ab: ABTest,
-  abx: ABXTest,
-  xab: XABTest,
-  mushra: MUSHRATest,
-};
-
-/** Return the test class for the config's test_type; throws on an unknown one. */
-export function testClassFor(config) {
-  const TestClass = testTypeMap[config.test_type];
-  if (!TestClass) throw new Error(`Unknown test type: "${config.test_type}"`);
-  return TestClass;
-}
+import { testClassFor } from './test-types/registry.js';
 
 /**
  * Run one stage - practice (unless resumed), the test, then the survey -
@@ -127,7 +103,7 @@ export async function runStage(container, { stage, config }, sequence, session, 
     }
 
     const test = new TestClass(config, session.sessionId, onSubmit, stage);
-    test._onChange = () => persist(test);
+    test.onChange = () => persist(test);
     test.render(container);
     if (progress) test.restoreProgress(progress);
   });

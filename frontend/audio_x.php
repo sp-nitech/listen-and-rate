@@ -17,6 +17,7 @@
  * touches superglobals/output, and only when this file is executed directly.
  */
 
+require_once __DIR__ . '/stage.php';
 require_once __DIR__ . '/x_token.php';
 
 /** Build id => audio_url from config_data.php's stimuli list. */
@@ -118,7 +119,12 @@ function stream_audio_with_range(string $path): void
 // Only run when this file is executed directly as an HTTP entry point (see
 // save.php for the same guard and rationale).
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
-    $data = include __DIR__ . '/config_data.php';
+    $stageDir = stage_data_dir(__DIR__, $_GET);
+    if ($stageDir === null) {
+        http_response_code(404);
+        exit;
+    }
+    $data = include $stageDir . '/config_data.php';
     $secret = hex2bin($data['x_secret'] ?? '');
 
     $token = $_GET['token'] ?? '';

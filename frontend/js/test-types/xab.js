@@ -25,8 +25,8 @@ export class XABTest extends PairedTrialTest {
    * @param {string} sessionId - UUID identifying this listener's session.
    * @param {Function} onSubmit - Async callback invoked with (sessionId, testType, {choices}).
    */
-  constructor(config, sessionId, onSubmit) {
-    super(config, sessionId, onSubmit);
+  constructor(config, sessionId, onSubmit, stage) {
+    super(config, sessionId, onSubmit, stage);
     // choices: trial index → closer local index (0/1)
     // played: trial index → Set of local indices (0/1/'x') played to completion
     this.shortcuts = config.shortcuts ?? {

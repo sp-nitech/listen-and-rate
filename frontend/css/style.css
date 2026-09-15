@@ -28,7 +28,7 @@
   --color-primary-hover: #4338ca;
   --color-primary-light: #eef2ff;
   --color-success: #16a34a;
-  --color-success-light: #dcfce7;
+  --color-success-light: #bbf7d0;
   --color-text: #1e293b;
   --color-text-muted: #64748b;
   --color-error: #dc2626;
@@ -1121,10 +1121,12 @@ audio {
   color: var(--color-text-muted);
 }
 
-.resume-actions {
+/* The row of buttons under a centered screen's text - shared by the resume
+   prompt and the screen between the stages of a sequence. */
+.screen-actions {
   display: flex;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 /* -- Error screen ------------------------------------------------------- */

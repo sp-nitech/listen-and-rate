@@ -141,14 +141,6 @@ def test_mushra_submit_incomplete_item_returns_400(
         assert res.status_code == 400
 
 
-def test_mushra_submit_empty_ratings_returns_400(
-    tmp_path, test_audio_file, monkeypatch
-):
-    with _mushra_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
-        res = tc.post("/api/submit", json={"session_id": "s1", "test_type": "mushra"})
-        assert res.status_code == 400
-
-
 def test_mushra_config_includes_practice_trials(tmp_path, test_audio_file, monkeypatch):
     with _mushra_client(
         tmp_path, test_audio_file, monkeypatch, practice=_PRACTICE

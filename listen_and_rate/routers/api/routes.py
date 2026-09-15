@@ -17,7 +17,14 @@ from ...config import (
     MOSConfig,
     XABConfig,
 )
-from ...dependencies import get_config, get_result_saver, get_x_secret
+from ...dependencies import (
+    SequenceManifest,
+    Stage,
+    get_config,
+    get_result_saver,
+    get_stage_or_manifest,
+    get_x_secret,
+)
 from ...models import SubmitRequest
 from ...storage import ResultExistsError, ResultSaver
 from .ab import _get_ab_test_config, _submit_ab
@@ -32,20 +39,32 @@ router = APIRouter()
 
 
 @router.get("/status")
-def status(config: Config = Depends(get_config)):
-    """Health-check endpoint; also confirms the loaded test type."""
-    return {"status": "ok", "test_type": config.test_type}
+def status(target: Stage | SequenceManifest = Depends(get_stage_or_manifest)):
+    """Health-check endpoint; also confirms the loaded test type.
+
+    A sequence asked about as a whole - no stage named - lists its stages
+    instead, as /api/config does.
+    """
+    if isinstance(target, SequenceManifest):
+        return {"status": "ok", "sequence": target.stage_ids}
+    return {"status": "ok", "test_type": target.config.test_type}
 
 
 @router.get("/config")
 def get_test_config(
-    config: Config = Depends(get_config), x_secret: bytes = Depends(get_x_secret)
+    target: Stage | SequenceManifest = Depends(get_stage_or_manifest),
+    x_secret: bytes = Depends(get_x_secret),
 ):
     """Return test parameters for the frontend.
 
     Only id and label are sent per stimulus - path, system, and item are
     withheld to keep listeners blind to the underlying system under test.
+    When several configs are served and no stage is named, returns the
+    sequence manifest instead: the stage ids, in the order to run them.
     """
+    if isinstance(target, SequenceManifest):
+        return {"sequence": target.stage_ids}
+    config = target.config
     if isinstance(config, MOSConfig):
         return _get_mos_test_config(config)
     if isinstance(config, DMOSConfig):

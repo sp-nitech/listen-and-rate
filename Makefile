@@ -42,7 +42,7 @@ export-copy-force:
 
 .PHONY: serve
 serve:
-	LISTEN_AND_RATE_CONFIG=$(CONFIG) uv run --no-sync uvicorn $(PROJECT).main:app --host $(HOST) --port $(PORT)
+	LISTEN_AND_RATE_CONFIG=$$(echo $(CONFIG) | tr ' ' :) uv run --no-sync uvicorn $(PROJECT).main:app --host $(HOST) --port $(PORT)
 
 .PHONY: report
 report:

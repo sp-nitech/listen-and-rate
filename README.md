@@ -113,6 +113,12 @@ make export CONFIG=/path/to/your/config.yaml DEPLOY=/path/to/your/public_html/my
 This creates a self-contained `my-test/` directory containing your configuration, stimuli, and the required PHP scripts.
 Open the experiment URL in your browser or share it with your participants.
 
+Multiple configuration files can be provided to run a series of tests sequentially from the same experiment URL.
+
+```sh
+make export CONFIG="/path/to/your/config1.yaml /path/to/your/config2.yaml" DEPLOY=/path/to/your/public_html/my-test
+```
+
 To update the experiment, regenerate the bundle with
 
 ```sh

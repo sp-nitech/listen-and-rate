@@ -26,8 +26,8 @@ import { t } from '../strings.js';
 import { ListeningTest } from './listening-test.js';
 
 export class PairedTrialTest extends ListeningTest {
-  constructor(config, sessionId, onSubmit) {
-    super(config, sessionId, onSubmit);
+  constructor(config, sessionId, onSubmit, stage) {
+    super(config, sessionId, onSubmit, stage);
     this.trials = config.trials;
     this.choices = new Map();
     this.played = new Map(); // trial index → Set of played local indices
@@ -94,14 +94,9 @@ export class PairedTrialTest extends ListeningTest {
     this._el.next.addEventListener('click', () => this._nextOrSubmit());
   }
 
-  /** Resolve a stimulus's audio URL (server audio_url, else the FastAPI /audio route). */
-  _audioUrl(s) {
-    return s.audio_url ?? `/audio/${encodeURIComponent(s.id)}`;
-  }
-
   /** A clip descriptor {url, id} for _trialAudioClips; id resolves the served duration. */
   _clip(s) {
-    return { url: this._audioUrl(s), id: s.id };
+    return { url: this.stage.audioUrl(s), id: s.id };
   }
 
   /** One blinded audio card (persistent custom player; only its src changes per trial). */

@@ -180,32 +180,6 @@ def test_reference_flag_rejected_for_mos_config(tmp_path, test_audio_file):
         load_config(write_config(tmp_path, data))
 
 
-def test_reference_flag_rejected_for_ab_config(tmp_path, test_audio_file):
-    da, db = two_system_dirs(tmp_path, test_audio_file)
-    data = stimuli_dirs_data(
-        [
-            {"path": str(da), "system": "A", "reference": True},
-            {"path": str(db), "system": "B"},
-        ],
-        test_type="ab",
-    )
-    with pytest.raises(ValidationError, match="reference"):
-        load_config(write_config(tmp_path, data))
-
-
-def test_reference_flag_rejected_for_abx_config(tmp_path, test_audio_file):
-    da, db = two_system_dirs(tmp_path, test_audio_file)
-    data = stimuli_dirs_data(
-        [
-            {"path": str(da), "system": "A", "reference": True},
-            {"path": str(db), "system": "B"},
-        ],
-        test_type="abx",
-    )
-    with pytest.raises(ValidationError, match="reference"):
-        load_config(write_config(tmp_path, data))
-
-
 @pytest.mark.parametrize("test_type", ["mos", "dmos", "cmos", "ab", "abx"])
 def test_anchor_flag_rejected_for_non_mushra_configs(
     tmp_path, test_audio_file, test_type

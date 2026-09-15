@@ -179,7 +179,7 @@ class ReportConfig(_StrictModel):
 def load_report_config_or_exit(config_path: str | Path) -> ReportConfig:
     """Load and validate a report config YAML; clean-exit on a bad file.
 
-    Mirrors config.loader.load_config_or_exit: a typo in this hand-written file
+    Mirrors config.loader.load_sequence_or_exit: a typo in this hand-written file
     prints a short, URL-free message (see format_config_error) and exits rather
     than a stack trace. An empty file yields the defaults.
     """

@@ -203,11 +203,6 @@ def test_generate_mos_report_yaxis_still_says_mos(tmp_path):
 # -- DMOS -------------------------------------------------------------------
 
 
-def test_generate_dmos_report_returns_html(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", DMOS_CSV_ROWS)])
-    assert "<html>" in html
-
-
 def test_generate_dmos_report_yaxis_says_dmos(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", DMOS_CSV_ROWS)])
     _, layout = _plotly_call_args(html)
@@ -215,11 +210,6 @@ def test_generate_dmos_report_yaxis_says_dmos(tmp_path):
 
 
 # -- MUSHRA -----------------------------------------------------------------
-
-
-def test_generate_mushra_report_returns_html(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", MUSHRA_CSV_ROWS)])
-    assert "<html>" in html
 
 
 def test_generate_mushra_report_boxplot_range_clears_the_ends_of_the_scale(tmp_path):

@@ -4,7 +4,7 @@
  */
 export const ja = {
   metadata_textPlaceholder: '半角英数字・ハイフン・ピリオドのみ使用可',
-  metadata_startTest: 'テストを開始',
+  metadata_startTest: '試験を開始',
 
   practice_startTest: '本番を開始',
 
@@ -25,7 +25,9 @@ export const ja = {
   submit_busy: '送信中…',
 
   complete_title: 'ありがとうございました！',
-  complete_body: '評価が正常に保存されました。',
+  complete_stage: '{total} 件中 {done} 件目の試験が終わりました',
+  complete_body: '評価は正常に保存されました。',
+  complete_next: '次の試験を始める',
 
   resume_title: '前回の続きから再開しますか？',
   resume_body: 'このデバイスに未完了のセッションが見つかりました。',

@@ -1,0 +1,42 @@
+/**
+ * The shared progress bar, measured across every stage of a sequence.
+ *
+ * Each stage counts its own pages in its trial counter ("Trial 1 / 4"),
+ * while the bar at the top of the page shows how far the whole session has
+ * come: every stage takes a share of the bar in proportion to its pages, and
+ * a stage places its progress within its share (see stage.js's Stage). A
+ * lone config is a sequence of one, so its share is the whole bar.
+ */
+
+/**
+ * Return how many pages a delivered config presents: one per stimulus for
+ * MOS, one per trial for the other test types.
+ *
+ * @param {Object} config
+ * @returns {number}
+ */
+export function pageCount(config) {
+  return (config.stimuli ?? config.trials ?? []).length;
+}
+
+/**
+ * Return each stage's share of the bar, in proportion to its pages.
+ *
+ * @param {number[]} pageCounts - Each stage's page count, in order.
+ * @returns {Array<{start: number, width: number}>} Fractions of the whole bar.
+ */
+export function stageSpans(pageCounts) {
+  const total = pageCounts.reduce((sum, n) => sum + n, 0);
+  let start = 0;
+  return pageCounts.map((n) => {
+    const span = { start, width: total > 0 ? n / total : 0 };
+    start += span.width;
+    return span;
+  });
+}
+
+/** Fill the shared bar (if the page has one) to `fraction` (0 to 1) of its width. */
+export function paintProgressBar(fraction) {
+  const bar = document.getElementById('progress-bar');
+  if (bar) bar.style.width = `${fraction * 100}%`;
+}

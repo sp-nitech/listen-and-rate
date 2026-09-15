@@ -12,9 +12,10 @@ from listen_and_rate.analysis._results import (
     version_difference_note,
 )
 from listen_and_rate.config import (
+    Config,
     ReportConfig,
-    load_config_or_exit,
     load_report_config_or_exit,
+    load_sequence_or_exit,
 )
 from listen_and_rate.storage import METADATA_COLUMN_PREFIX, SURVEY_COLUMN_PREFIX
 
@@ -42,8 +43,9 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "results",
-        nargs="*",
+        "--results",
+        nargs="+",
+        metavar="PATH",
         help=(
             "Result CSV/JSON file(s) or a results directory. May be omitted "
             "when --config is given: the directory is then derived from the "
@@ -52,12 +54,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--config",
+        nargs="+",
         metavar="PATH",
         help=(
             "Path to the YAML config file used to collect these results. "
             "When given, systems/pairs are shown in stimuli_dirs.systems' "
-            "order instead of alphabetically. With no positional results "
-            "argument it also locates the results directory."
+            "order instead of alphabetically. Without --results it also "
+            "locates the results directory. Give a sequence's configs, in "
+            "order, to write one report per test next to its own results."
         ),
     )
     parser.add_argument(
@@ -68,15 +72,19 @@ def main() -> None:
             "against: results are read from <root>/<output.path>/<config "
             "name>. Point it at the exported PHP bundle's directory, or at "
             "wherever a FastAPI deployment's working directory was copied. "
-            "Requires --config. It cannot be combined with a positional "
-            "results argument or an absolute output.path."
+            "Requires --config. It cannot be combined with --results or an "
+            "absolute output.path."
         ),
     )
     parser.add_argument(
         "--output",
         default=None,
         metavar="PATH",
-        help="Output HTML path (default: report.html next to the results)",
+        help=(
+            "Output HTML path (default: report.html next to the results). "
+            "Not with several --config, whose reports each go next to their "
+            "own results."
+        ),
     )
     parser.add_argument(
         "--report-config",
@@ -97,11 +105,35 @@ def main() -> None:
         else ReportConfig()
     )
 
-    config = load_config_or_exit(args.config) if args.config else None
+    # A sequence's configs are loaded together, so a later test's report gets
+    # the metadata labels its config shares with the first (see
+    # load_sequence) - loading it alone would leave them out.
+    configs = load_sequence_or_exit(args.config) if args.config else []
+    if len(configs) > 1:
+        if args.results:
+            parser.error(
+                "--results cannot be combined with several --config: each "
+                "test's results are found from its own config"
+            )
+        if args.output:
+            parser.error(
+                "--output cannot be combined with several --config: each "
+                "test's report is written next to its own results"
+            )
+    for config in configs or [None]:
+        _write_report(parser, args, report, config)
 
+
+def _write_report(
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+    report: ReportConfig,
+    config: Config | None,
+) -> None:
+    """Write one report: for `config`'s results, or for --results alone (None)."""
     if args.results:
         if args.root:
-            parser.error("--root cannot be combined with a positional results argument")
+            parser.error("--root cannot be combined with --results")
         if len(args.results) == 1 and Path(args.results[0]).is_dir():
             paths = _result_paths_in(Path(args.results[0]))
             if not paths:
@@ -131,8 +163,8 @@ def main() -> None:
         parser.error("--root requires --config")
     else:
         parser.error(
-            "Pass result files/a results directory, or --config to derive "
-            "the directory from the config's output.path"
+            "Pass --results (result files or a results directory), or "
+            "--config to derive the directory from the config's output.path"
         )
 
     # Default the report location to the results' own directory, so both

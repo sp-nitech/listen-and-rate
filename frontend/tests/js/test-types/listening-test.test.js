@@ -1,5 +1,6 @@
 /**
- * Tests for dwell-time accumulation (config.metrics.dwell_time).
+ * Tests for the page-level bookkeeping every test type shares: dwell-time
+ * accumulation (config.metrics.dwell_time) and the progress bar.
  *
  * The sum of a session's dwell times is meant to be the length of the test,
  * which only holds if every stretch on a page is counted exactly once: both
@@ -14,6 +15,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 
+import { Stage } from '../../../js/stage.js';
 import { ListeningTest } from '../../../js/test-types/listening-test.js';
 
 let now = 0;
@@ -35,8 +37,8 @@ function tick(seconds) {
 
 /** A ListeningTest with every DOM and answer hook stubbed out. */
 class StubTest extends ListeningTest {
-  constructor({ dwellTime = true, trials = 3 } = {}) {
-    super({ metrics: { dwell_time: dwellTime } }, 'session', () => {});
+  constructor({ dwellTime = true, trials = 3, isPractice = false, stage } = {}) {
+    super({ metrics: { dwell_time: dwellTime }, isPractice }, 'session', () => {}, stage);
     this.trials = trials;
     this.submitted = false;
   }
@@ -184,4 +186,33 @@ test('nothing is measured when the config does not ask for it', () => {
   test._navigate(1);
   assert.equal(test._dwellOf(0), null);
   assert.deepEqual(test.getProgress().metrics, []);
+});
+
+// -- progress bar -------------------------------------------------------------
+
+/** Install a `document` holding just the progress bar; returns the bar. */
+function stubProgressBar(width) {
+  const bar = { style: { width } };
+  globalThis.document = { getElementById: (id) => (id === 'progress-bar' ? bar : null) };
+  return bar;
+}
+
+afterEach(() => {
+  delete globalThis.document;
+});
+
+test("answering moves the bar within the stage's share of the whole session", () => {
+  const bar = stubProgressBar('0%');
+  new StubTest({
+    trials: 2,
+    stage: new Stage('b', { start: 0.25, width: 0.5 }),
+  })._updateProgressBar();
+  assert.equal(bar.style.width, '75%');
+});
+
+test('practice pages leave the bar where it is', () => {
+  // They are no part of the test, so the bar keeps showing the real progress.
+  const bar = stubProgressBar('40%');
+  new StubTest({ isPractice: true })._updateProgressBar();
+  assert.equal(bar.style.width, '40%');
 });

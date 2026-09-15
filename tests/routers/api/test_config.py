@@ -6,6 +6,7 @@ import json
 
 from ._helpers import (
     _create_app_client,
+    _sequence_client,
 )
 
 
@@ -13,6 +14,38 @@ def test_config_php_alias(client):
     res = client.get("/config.php")
     assert res.status_code == 200
     assert res.json()["title"] == "Test Evaluation"
+
+
+def test_config_lists_the_stages_of_a_sequence(tmp_path, test_audio_file, monkeypatch):
+    with _sequence_client(tmp_path, test_audio_file, monkeypatch) as client:
+        for path in ("/config.php", "/api/config"):
+            res = client.get(path)
+            assert res.status_code == 200
+            assert res.json() == {"sequence": ["a", "b"]}
+
+
+def test_config_serves_the_stage_named_by_the_query(
+    tmp_path, test_audio_file, monkeypatch
+):
+    with _sequence_client(tmp_path, test_audio_file, monkeypatch) as client:
+        stage = client.get("/config.php", params={"stage": "b"}).json()
+        assert stage["experiment_id"] == "b"
+        assert stage["title"] == "Second"
+        # The first config's form, which the second stage stores answers to.
+        assert [f["key"] for f in stage["metadata"]["fields"]] == ["device"]
+
+
+def test_a_lone_config_ignores_the_stage_parameter(client):
+    # There is nothing to choose between, and the PHP bundle of a lone config
+    # cannot check the name without reading its config first - so neither does.
+    res = client.get("/config.php", params={"stage": "anything"})
+    assert res.status_code == 200
+    assert res.json()["title"] == "Test Evaluation"
+
+
+def test_a_sequence_rejects_an_unknown_stage(tmp_path, test_audio_file, monkeypatch):
+    with _sequence_client(tmp_path, test_audio_file, monkeypatch) as client:
+        assert client.get("/config.php", params={"stage": "c"}).status_code == 404
 
 
 def test_save_php_alias(client):
@@ -31,11 +64,28 @@ def test_save_php_alias(client):
     assert res.json()["status"] == "ok"
 
 
+def test_php_only_helpers_are_not_served_as_source(client):
+    # They sit in frontend/ for the PHP export; the static mount would
+    # otherwise hand their source out as a plain-text download.
+    for path in ("/x_token.php", "/stage.php"):
+        assert client.get(path).status_code == 404
+
+
 def test_status_endpoint(client):
     res = client.get("/api/status")
     assert res.status_code == 200
     assert res.json()["status"] == "ok"
     assert res.json()["test_type"] == "mos"
+
+
+def test_status_endpoint_of_a_sequence_lists_its_stages(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # A health check names no stage, so it answers for the server as a whole.
+    with _sequence_client(tmp_path, test_audio_file, monkeypatch) as client:
+        res = client.get("/api/status")
+        assert res.status_code == 200
+        assert res.json() == {"status": "ok", "sequence": ["a", "b"]}
 
 
 def test_config_endpoint(client):

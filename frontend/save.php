@@ -21,7 +21,10 @@
  * JSON: <results dir>/{experiment_id}/{session_id}.json - one object per session
  *
  * The experiment_id naming the directory comes from config_data.php, not from
- * the body: this bundle serves one experiment (see experiment_id_for).
+ * the body: each config the bundle serves is one experiment (see
+ * experiment_id_for), and the request names its stage - see stage.php for
+ * where the stage's config_data.php and stimulus_map.php are read from.
+ * Results still go under this bundle's own directory.
  *
  * Expected POST body:
  *   {
@@ -42,6 +45,7 @@
  * bottom) - not when a test merely requires this file for its functions.
  */
 
+require_once __DIR__ . '/stage.php';
 require_once __DIR__ . '/x_token.php';
 
 // AB/XAB outcome tokens: the winner/closer column records which SIDE of the
@@ -128,14 +132,10 @@ function prefix_keys(string $prefix, array $values): array
  * relative path is resolved against this bundle's own directory (the YAML
  * default './results/' therefore keeps the historical <bundle>/results
  * location), and an absolute path is used as-is (e.g. to keep results
- * outside the web root). A missing/empty output_path - a config_data.php
- * generated before this field existed - falls back to <bundle>/results.
+ * outside the web root).
  */
-function resolve_results_dir(string $baseDir, ?string $outputPath): string
+function resolve_results_dir(string $baseDir, string $outputPath): string
 {
-    if ($outputPath === null || $outputPath === '') {
-        return $baseDir . '/results';
-    }
     if ($outputPath[0] === '/') {
         return rtrim($outputPath, '/');
     }
@@ -586,10 +586,6 @@ function build_json_result(array $data, array $meta, array $stimulusMap, string 
  * before session_id. Analysis refuses to combine result files that disagree
  * on it, because a rename or a changed column meaning would otherwise be
  * averaged in silently. Mirrors CSVResultSaver._BASE_FIELDS.
- *
- * An older bundle carries no version. The column is still written, empty, so
- * that "produced before this was recorded" stays distinguishable from
- * "produced by a version we know".
  */
 function prepend_tool_version_columns(array $fields, array $rows, string $version): array
 {
@@ -1151,13 +1147,19 @@ function handle_save_request(): void
     // Read output format/path, metadata field definitions, and the
     // AUTHORITATIVE test type from config_data.php - never trust the
     // client-submitted test_type for deciding how to validate/store.
-    $config_data_path = __DIR__ . '/config_data.php';
+    $stage_dir = stage_data_dir(__DIR__, $_GET);
+    if ($stage_dir === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Stage not found']);
+        return;
+    }
+    $config_data_path = $stage_dir . '/config_data.php';
     $config_data      = is_file($config_data_path) ? include $config_data_path : [];
     if (!is_array($config_data)) {
         $config_data = [];
     }
 
-    $results_dir = resolve_results_dir(__DIR__, $config_data['output_path'] ?? null);
+    $results_dir = resolve_results_dir(__DIR__, $config_data['output_path']);
 
     // GET: pre-flight check - verify the results directory exists and is writable.
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -1202,7 +1204,7 @@ function handle_save_request(): void
         }
 
         // Build stimulus lookup: id → {system, item} for enriching ratings.
-        $stimulus_map_path = __DIR__ . '/stimulus_map.php';
+        $stimulus_map_path = $stage_dir . '/stimulus_map.php';
         $stimulus_map = is_file($stimulus_map_path) ? include $stimulus_map_path : [];
         if (!is_array($stimulus_map)) {
             $stimulus_map = [];
@@ -1264,7 +1266,7 @@ function handle_save_request(): void
         // Baked in by `lar-export`. PHP cannot read the Python package's
         // version at request time, and the version that exported this bundle
         // is the one whose behaviour produced these results anyway.
-        $tool_version = (string) ($config_data['tool_version'] ?? '');
+        $tool_version = $config_data['tool_version'];
         $ts        = date('c');
 
         if ($output_format === 'json') {

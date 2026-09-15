@@ -170,12 +170,6 @@ def test_dmos_submit_mismatched_item_returns_400(
         assert res.status_code == 400
 
 
-def test_dmos_submit_empty_ratings_returns_400(tmp_path, test_audio_file, monkeypatch):
-    with _dmos_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
-        res = tc.post("/api/submit", json={"session_id": "s1", "test_type": "dmos"})
-        assert res.status_code == 400
-
-
 def test_dmos_submit_unknown_stimulus_id_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):

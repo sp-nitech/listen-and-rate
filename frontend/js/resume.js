@@ -21,6 +21,41 @@ export function recordKey(experimentId) {
   return `${RECORD_KEY_PREFIX}${experimentId ?? ''}`;
 }
 
+/**
+ * Build the record saved for a session of `config`.
+ *
+ * The whole delivered config is frozen in (see the top of this file), and its
+ * fingerprint beside it for isResumable(). No separate window field: pruning
+ * reads it back off config.resume, the window of the experiment that saved
+ * the record - not of whichever experiment prunes next.
+ *
+ * `sequence` is the stages the session runs, in order, so the record is only
+ * resumed by the same sequence (see findResumableStage).
+ *
+ * `progress` is the test's getProgress(), or null for a stage of a sequence
+ * that has been handed its session but not started (see app.js): nothing to
+ * restore yet, only the session id and metadata answers to carry on with.
+ *
+ * @param {Object} config - The delivered config the session runs.
+ * @param {string[]} sequence - Every stage's experiment_id, in order.
+ * @param {string} sessionId
+ * @param {Object} metadata - The listener's metadata answers.
+ * @param {Object|null} progress
+ * @param {number} now - Date.now().
+ */
+export function buildRecord(config, sequence, sessionId, metadata, progress, now) {
+  return {
+    v: 1,
+    fingerprint: config.config_version,
+    sequence,
+    savedAt: now,
+    sessionId,
+    config,
+    metadata,
+    progress,
+  };
+}
+
 /** Load and parse the saved record, or null if absent/corrupt. */
 export function loadRecord(key) {
   try {
@@ -134,4 +169,58 @@ export function isResumable(record, freshVersion, now, maxAgeMs) {
     typeof record.savedAt === 'number' &&
     now - record.savedAt < maxAgeMs
   );
+}
+
+/**
+ * Find the stage a page load should pick up from: the first whose saved
+ * record is resumable against its freshly fetched config.
+ *
+ * A stage's record is cleared once it is submitted, so in a sequence the
+ * stages before the one found are done. A lone config is a sequence of one.
+ *
+ * That holds only for the sequence the record was saved under, so a record
+ * whose stages differ from those served now - reordered, one added, or
+ * another sequence sharing the stage - is passed over: resuming it could
+ * run a submitted stage again, whose results the session already holds, or
+ * skip a stage it never saw.
+ *
+ * @param {Object[]} configs - Each stage's freshly fetched config, in order.
+ * @param {Map<string, Object>} records - pruneExpiredRecords()'s survivors.
+ * @param {number} now - Date.now().
+ * @returns {{index: number, record: Object}|null} null to start afresh.
+ */
+export function findResumableStage(configs, records, now) {
+  const sequence = configs.map((config) => config.experiment_id);
+  for (const [index, config] of configs.entries()) {
+    const record = records.get(recordKey(config.experiment_id)) ?? null;
+    if (
+      isResumable(record, config.config_version, now, config.resume.max_age_ms) &&
+      isSavedUnder(record, sequence)
+    ) {
+      return { index, record };
+    }
+  }
+  return null;
+}
+
+/** Whether `record` was saved under exactly these stages, in this order. */
+function isSavedUnder(record, sequence) {
+  const saved = record.sequence;
+  return (
+    Array.isArray(saved) &&
+    saved.length === sequence.length &&
+    saved.every((id, i) => id === sequence[i])
+  );
+}
+
+/**
+ * Remove every stage's saved record, so the next page load starts the
+ * sequence over from its first stage with a new session. Clearing only the
+ * record that was offered would let a later stage's record be found instead,
+ * skipping the stages before it again.
+ *
+ * @param {Object[]} configs - Each stage's config, in order.
+ */
+export function clearStageRecords(configs) {
+  for (const config of configs) clearRecord(recordKey(config.experiment_id));
 }

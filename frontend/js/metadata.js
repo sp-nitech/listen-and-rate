@@ -17,6 +17,11 @@ import { t } from './strings.js';
 
 const _TEXT_PATTERN = /^[a-zA-Z0-9.-]+$/;
 
+/** Whether a {title, description, fields} form block has anything to display. */
+export function hasFormPage(form) {
+  return !!form?.description || form?.fields?.length > 0;
+}
+
 export class MetadataPage {
   /**
    * @param {Array<{key:string, label:string, type:string, options?:string[], required:boolean}>} fields

@@ -33,6 +33,7 @@ import {
   practiceBadgeHtml,
   practiceBannerHtml,
 } from '../practice.js';
+import { Stage } from '../stage.js';
 import { t } from '../strings.js';
 
 export class ListeningTest {
@@ -40,11 +41,15 @@ export class ListeningTest {
    * @param {Object} config - Server config from /api/config.
    * @param {string} sessionId - UUID identifying this listener's session.
    * @param {Function} onSubmit - Async callback invoked with (sessionId, testType, answers).
+   * @param {Stage} [stage] - The stage the test runs as: where its audio is
+   *   fetched from and its share of the progress bar. A lone config's page by
+   *   default.
    */
-  constructor(config, sessionId, onSubmit) {
+  constructor(config, sessionId, onSubmit, stage = new Stage(null)) {
     this.config = config;
     this.sessionId = sessionId;
     this.onSubmit = onSubmit;
+    this.stage = stage;
     this.currentIndex = 0;
     this._boundKeydown = this._handleKeydown.bind(this);
     // Dwell-time measurement (config.metrics.dwell_time); see _flushDwell for
@@ -159,9 +164,10 @@ export class ListeningTest {
   }
 
   _updateProgressBar() {
-    const pct = (this._answeredCount() / this._trialCount()) * 100;
-    const bar = document.getElementById('progress-bar');
-    if (bar) bar.style.width = `${pct}%`;
+    // Practice pages are no part of the test, so they leave the bar showing
+    // the real progress.
+    if (this.config.isPractice) return;
+    this.stage.showProgress(this._answeredCount() / this._trialCount());
   }
 
   /** Move to an adjacent page; forward navigation is blocked while unanswered. */

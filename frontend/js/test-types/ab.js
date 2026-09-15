@@ -22,8 +22,8 @@ export class ABTest extends PairedTrialTest {
    * @param {string} sessionId - UUID identifying this listener's session.
    * @param {Function} onSubmit - Async callback invoked with (sessionId, testType, {choices}).
    */
-  constructor(config, sessionId, onSubmit) {
-    super(config, sessionId, onSubmit);
+  constructor(config, sessionId, onSubmit, stage) {
+    super(config, sessionId, onSubmit, stage);
     this.allowTie = config.allow_tie ?? true;
     // choices: trial index → preferred local index (0/1) or 'tie'
     this.shortcuts = config.shortcuts ?? {

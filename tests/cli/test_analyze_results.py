@@ -59,7 +59,13 @@ def test_analyze_failure_names_the_version_difference_as_a_possible_cause(
     rows = [{"tool_version": "9.9.0", **r, "test_type": "nonsense"} for r in CSV_ROWS]
     csv_path = _write_csv(tmp_path / "s1.csv", rows)
     with pytest.raises(Exception) as excinfo:
-        _run_analyze(monkeypatch, str(csv_path), "--output", str(tmp_path / "r.html"))
+        _run_analyze(
+            monkeypatch,
+            "--results",
+            str(csv_path),
+            "--output",
+            str(tmp_path / "r.html"),
+        )
     notes = getattr(excinfo.value, "__notes__", [])
     assert any("9.9.0" in n and __version__ in n for n in notes), notes
 
@@ -70,14 +76,20 @@ def test_analyze_failure_on_matching_versions_adds_no_note(tmp_path, monkeypatch
     ]
     csv_path = _write_csv(tmp_path / "s1.csv", rows)
     with pytest.raises(Exception) as excinfo:
-        _run_analyze(monkeypatch, str(csv_path), "--output", str(tmp_path / "r.html"))
+        _run_analyze(
+            monkeypatch,
+            "--results",
+            str(csv_path),
+            "--output",
+            str(tmp_path / "r.html"),
+        )
     assert getattr(excinfo.value, "__notes__", []) == []
 
 
 def test_analyze_results_writes_html(tmp_path, monkeypatch):
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
-    _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
+    _run_analyze(monkeypatch, "--results", str(csv_path), "--output", str(out_path))
     assert out_path.exists()
     assert "<html>" in out_path.read_text(encoding="utf-8")
 
@@ -90,7 +102,7 @@ def test_analyze_report_saved_hint_is_logged_not_printed(
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
     with caplog.at_level(logging.INFO, logger="listen_and_rate"):
-        _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
+        _run_analyze(monkeypatch, "--results", str(csv_path), "--output", str(out_path))
 
     assert any("Report saved" in record.message for record in caplog.records)
     captured = capsys.readouterr()
@@ -103,13 +115,13 @@ def test_analyze_results_with_directory(tmp_path, monkeypatch):
     results_dir.mkdir()
     _write_csv(results_dir / "s1.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
-    _run_analyze(monkeypatch, str(results_dir), "--output", str(out_path))
+    _run_analyze(monkeypatch, "--results", str(results_dir), "--output", str(out_path))
     assert out_path.exists()
 
 
 def test_analyze_results_missing_file_raises(tmp_path, monkeypatch):
     with pytest.raises(FileNotFoundError):
-        _run_analyze(monkeypatch, str(tmp_path / "none.csv"))
+        _run_analyze(monkeypatch, "--results", str(tmp_path / "none.csv"))
 
 
 def test_analyze_results_default_output_next_to_results_dir(tmp_path, monkeypatch):
@@ -118,20 +130,20 @@ def test_analyze_results_default_output_next_to_results_dir(tmp_path, monkeypatc
     results_dir = tmp_path / "results"
     results_dir.mkdir()
     _write_csv(results_dir / "s1.csv", CSV_ROWS)
-    _run_analyze(monkeypatch, str(results_dir))
+    _run_analyze(monkeypatch, "--results", str(results_dir))
     assert (results_dir / "report.html").exists()
 
 
 def test_analyze_results_default_output_next_to_result_files(tmp_path, monkeypatch):
     csv_path = _write_csv(tmp_path / "s1.csv", CSV_ROWS)
-    _run_analyze(monkeypatch, str(csv_path))
+    _run_analyze(monkeypatch, "--results", str(csv_path))
     assert (tmp_path / "report.html").exists()
 
 
 def test_analyze_results_derives_results_dir_from_config(
     tmp_path, test_audio_file, monkeypatch
 ):
-    """With no positional results argument, the results directory (and the
+    """Without --results, the results directory (and the
     default report location) come from --config's output.path - the FastAPI
     deployment's layout, where `make report CONFIG=...` should just work."""
     config_yaml = write_config(
@@ -153,6 +165,58 @@ def test_analyze_results_derives_results_dir_from_config(
     report = results_dir / "report.html"
     assert report.exists()
     assert "<html>" in report.read_text(encoding="utf-8")
+
+
+def _sequence_configs(tmp_path, test_audio_file) -> list[Path]:
+    """Write stages a (asking the metadata form) then b, sharing one output.path."""
+    base = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    device = {"fields": [{"key": "device", "label": "Playback device"}]}
+    return [
+        write_config(tmp_path, {**base, "metadata": device}, name="a.yaml"),
+        write_config(tmp_path, base, name="b.yaml"),
+    ]
+
+
+def test_analyze_results_writes_one_report_per_test_of_a_sequence(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # Loaded as one sequence, the second test knows the labels of the form
+    # asked before the first - its own config never states them.
+    configs = _sequence_configs(tmp_path, test_audio_file)
+    rows = [{**r, "metadata_device": "Headphones"} for r in CSV_ROWS]
+    for stage in ("a", "b"):
+        (tmp_path / "results" / stage).mkdir(parents=True)
+        _write_csv(tmp_path / "results" / stage / "s1.csv", rows)
+
+    _run_analyze(monkeypatch, "--config", *map(str, configs))
+
+    for stage in ("a", "b"):
+        html = (tmp_path / "results" / stage / "report.html").read_text(
+            encoding="utf-8"
+        )
+        assert ">Playback device</td>" in html
+
+
+@pytest.mark.parametrize("option", ["--output", "--results"])
+def test_analyze_results_of_a_sequence_takes_no_single_output_or_results(
+    tmp_path, test_audio_file, monkeypatch, capsys, option
+):
+    # Each test's results and report have their own place; one path given
+    # for all of them could only be wrong for all but one.
+    configs = _sequence_configs(tmp_path, test_audio_file)
+    with pytest.raises(SystemExit) as excinfo:
+        _run_analyze(
+            monkeypatch, "--config", *map(str, configs), option, str(tmp_path / "x")
+        )
+    assert excinfo.value.code == 2
+    message = f"{option} cannot be combined with several --config"
+    assert message in capsys.readouterr().err
 
 
 def test_analyze_results_derived_dir_without_files_raises(
@@ -240,7 +304,7 @@ def test_analyze_results_root_requires_config(tmp_path, monkeypatch, capsys):
     assert "--config" in capsys.readouterr().err
 
 
-def test_analyze_results_root_with_positional_results_exits_with_usage_error(
+def test_analyze_results_root_with_results_exits_with_usage_error(
     tmp_path, test_audio_file, monkeypatch, capsys
 ):
     config_yaml = write_config(
@@ -257,6 +321,7 @@ def test_analyze_results_root_with_positional_results_exits_with_usage_error(
     with pytest.raises(SystemExit) as excinfo:
         _run_analyze(
             monkeypatch,
+            "--results",
             str(csv_path),
             "--config",
             str(config_yaml),
@@ -319,6 +384,7 @@ def test_analyze_results_config_flag_orders_systems(
     out_path = tmp_path / "report.html"
     _run_analyze(
         monkeypatch,
+        "--results",
         str(csv_path),
         "--config",
         str(config_yaml),
@@ -351,6 +417,7 @@ def test_report_config_applies_labels_order_and_confidence(tmp_path, monkeypatch
     out_path = tmp_path / "report.html"
     _run_analyze(
         monkeypatch,
+        "--results",
         str(csv_path),
         "--report-config",
         str(report_yaml),
@@ -368,6 +435,7 @@ def test_report_config_scale_applies(tmp_path, monkeypatch):
     out_path = tmp_path / "report.html"
     _run_analyze(
         monkeypatch,
+        "--results",
         str(csv_path),
         "--report-config",
         str(report_yaml),
@@ -384,6 +452,7 @@ def test_report_config_order_missing_system_raises(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="B"):
         _run_analyze(
             monkeypatch,
+            "--results",
             str(csv_path),
             "--report-config",
             str(report_yaml),
@@ -395,7 +464,7 @@ def test_report_config_order_missing_system_raises(tmp_path, monkeypatch):
 def test_report_config_is_optional(tmp_path, monkeypatch):
     csv_path = _write_csv(tmp_path / "s.csv", CSV_ROWS)
     out_path = tmp_path / "report.html"
-    _run_analyze(monkeypatch, str(csv_path), "--output", str(out_path))
+    _run_analyze(monkeypatch, "--results", str(csv_path), "--output", str(out_path))
     html = out_path.read_text(encoding="utf-8")
     assert "max-width:900px" in html  # default scale = 1.0
     assert "\u03b1=0.05" in html  # default confidence 0.95
@@ -431,6 +500,7 @@ def test_report_config_groups_render_stacked_sections(tmp_path, monkeypatch):
     out_path = tmp_path / "report.html"
     _run_analyze(
         monkeypatch,
+        "--results",
         str(csv_path),
         "--report-config",
         str(report_yaml),

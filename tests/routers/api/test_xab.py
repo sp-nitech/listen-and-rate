@@ -106,12 +106,6 @@ def test_xab_submit_happy_path(tmp_path, test_audio_file, monkeypatch):
         ]
 
 
-def test_xab_submit_missing_choices_returns_400(tmp_path, test_audio_file, monkeypatch):
-    with _xab_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
-        res = tc.post("/api/submit", json={"session_id": "s1", "test_type": "xab"})
-        assert res.status_code == 400
-
-
 def test_xab_submit_tie_returns_400(tmp_path, test_audio_file, monkeypatch):
     """XAB is forced-choice: selected_stimulus_id=None (AB's tie) is rejected."""
     with _xab_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
@@ -167,28 +161,6 @@ def test_xab_submit_reference_in_pair_returns_400(
                 "session_id": "s1",
                 "test_type": "xab",
                 "choices": [{"stimulus_ids": pair, "selected_stimulus_id": pair[1]}],
-            },
-        )
-        assert res.status_code == 400
-
-
-def test_xab_submit_unknown_stimulus_id_returns_400(
-    tmp_path, test_audio_file, monkeypatch
-):
-    with _xab_client(tmp_path, test_audio_file, monkeypatch, n_items=1) as tc:
-        trial = tc.get("/api/config").json()["trials"][0]
-        good_id = trial["stimuli"][0]["id"]
-        res = tc.post(
-            "/api/submit",
-            json={
-                "session_id": "s1",
-                "test_type": "xab",
-                "choices": [
-                    {
-                        "stimulus_ids": [good_id, "nonexistent"],
-                        "selected_stimulus_id": good_id,
-                    }
-                ],
             },
         )
         assert res.status_code == 400

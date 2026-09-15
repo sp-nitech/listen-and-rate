@@ -14,6 +14,7 @@ from ._helpers import (
     _create_app_client,
     _dmos_client,
     _mushra_client,
+    _sequence_client,
     _xab_client,
 )
 
@@ -37,6 +38,27 @@ def test_submit_happy_path(client, config_yaml):
     assert "system" in rows[0]
     assert "item" in rows[0]
     assert "stimulus_id" not in rows[0]
+
+
+def test_submit_stores_each_stage_of_a_sequence_in_its_own_directory(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # One session, one set of metadata answers: the stages' results join on
+    # the session_id, and each can be filtered by the answers on its own.
+    body = {
+        "session_id": "sess-seq",
+        "test_type": "mos",
+        "metadata": {"device": "Headphones"},
+        "ratings": [{"stimulus_id": "s001", "rating": 4}],
+    }
+    with _sequence_client(tmp_path, test_audio_file, monkeypatch) as client:
+        for stage in ("a", "b"):
+            res = client.post("/save.php", params={"stage": stage}, json=body)
+            assert res.status_code == 200
+    for stage in ("a", "b"):
+        path = tmp_path / "results" / stage / "sess-seq.csv"
+        rows = list(csv.DictReader(path.open()))
+        assert rows[0]["metadata_device"] == "Headphones"
 
 
 def test_submit_same_session_id_twice_returns_409(client):

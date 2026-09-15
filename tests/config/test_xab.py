@@ -27,13 +27,6 @@ def _xab_dirs_data(dref, da, db, **kwargs) -> dict:
 # -- XAB config -------------------------------------------------------------
 
 
-def test_load_valid_xab_config(tmp_path, test_audio_file):
-    dref, da, db = three_system_dirs(tmp_path, test_audio_file)
-    result = load_config(write_config(tmp_path, _xab_dirs_data(dref, da, db)))
-    assert result.test_type == "xab"
-    assert result.reference_system == "sys_ref"
-
-
 def test_xab_has_no_allow_tie_field(tmp_path, test_audio_file):
     dref, da, db = three_system_dirs(tmp_path, test_audio_file)
     result = load_config(write_config(tmp_path, _xab_dirs_data(dref, da, db)))

@@ -15,8 +15,6 @@
  * resume prompt itself needs translated strings) - not threaded as a
  * parameter through every constructor/helper down the call chain, since
  * exactly one language is active per page load, never per-component.
- * theme.js already uses the same kind of module-level singleton for its own
- * one-per-page setting.
  */
 
 import { en } from './strings/en.js';

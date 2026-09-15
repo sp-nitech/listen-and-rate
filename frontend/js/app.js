@@ -21,6 +21,7 @@ import { chooseStart, openSession, planStages, runStages } from './sequence.js';
 import { Stage } from './stage.js';
 import { runStage, testClassFor } from './stage-runner.js';
 import { setLanguage } from './strings.js';
+import { mountTheme } from './theme.js';
 
 async function main() {
   const container = document.getElementById('app');
@@ -80,4 +81,11 @@ async function main() {
   });
 }
 
+// First, so the toggle works whatever becomes of loading the test.
+mountTheme(
+  document.documentElement,
+  document.getElementById('theme-toggle'),
+  localStorage,
+  matchMedia('(prefers-color-scheme: light)')
+);
 main().catch((err) => showLoadError(document.getElementById('app'), err));

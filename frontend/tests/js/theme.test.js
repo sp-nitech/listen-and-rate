@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { mountTheme, themeFor } from '../../js/theme.js';
+import { guardedStorage, mountTheme, themeFor } from '../../js/theme.js';
 
 // -- themeFor -----------------------------------------------------------------
 
@@ -27,7 +27,7 @@ test('a saved value that is no theme counts as no choice', () => {
 // -- mountTheme ---------------------------------------------------------------
 
 /** The page's parts mountTheme touches, each only as far as it uses them. */
-function page({ saved = null, systemLight = false } = {}) {
+function page({ saved = null, systemLight = false, storage: given } = {}) {
   const attributes = new Map();
   const root = {
     getAttribute: (name) => attributes.get(name) ?? null,
@@ -41,7 +41,7 @@ function page({ saved = null, systemLight = false } = {}) {
     addEventListener: (type, fn) => (listeners[type] = fn),
   };
   const store = new Map(saved === null ? [] : [['theme', saved]]);
-  const storage = {
+  const storage = given ?? {
     getItem: (key) => store.get(key) ?? null,
     setItem: (key, value) => store.set(key, value),
   };
@@ -76,5 +76,37 @@ test('a choice made with the toggle is saved and outlasts a system change', () =
   assert.equal(p.theme(), 'dark');
   assert.equal(p.store.get('theme'), 'dark');
   p.systemChangesTo(true);
+  assert.equal(p.theme(), 'dark');
+});
+
+// -- guardedStorage -----------------------------------------------------------
+
+/** What reading localStorage does in a browser that refuses to store anything. */
+const refused = () => {
+  throw new DOMException('Access is denied for this document.', 'SecurityError');
+};
+
+test('storage the browser refuses reads as no choice and keeps nothing', () => {
+  const storage = guardedStorage(refused);
+  assert.equal(storage.getItem('theme'), null);
+  assert.doesNotThrow(() => storage.setItem('theme', 'light'));
+});
+
+test('storage the browser allows is read and written through', () => {
+  const store = new Map();
+  const storage = guardedStorage(() => ({
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, value) => store.set(key, value),
+  }));
+  storage.setItem('theme', 'light');
+  assert.equal(storage.getItem('theme'), 'light');
+});
+
+test('without storage the theme follows the system and the toggle still works', () => {
+  // Only the choice goes unsaved: the page itself, and the test on it, run.
+  const p = page({ systemLight: true, storage: guardedStorage(refused) });
+  p.mount();
+  assert.equal(p.theme(), 'light');
+  p.click();
   assert.equal(p.theme(), 'dark');
 });

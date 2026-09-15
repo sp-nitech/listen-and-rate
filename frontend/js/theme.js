@@ -32,12 +32,44 @@ export function themeFor(saved, prefersLight) {
 }
 
 /**
+ * Storage that never throws, for the theme's one saved choice.
+ *
+ * A browser that refuses to store anything throws a SecurityError on merely
+ * reading localStorage, and a full storage throws on a write. Either way the
+ * choice is only a convenience: it then reads as never made and is not kept,
+ * so the theme follows the system and the toggle still works on this page -
+ * and nothing about the theme can keep the test from loading.
+ *
+ * @param {() => Storage} open - returns the storage; reading it may throw
+ * @returns {{getItem: Function, setItem: Function}}
+ */
+export function guardedStorage(open) {
+  return {
+    getItem(key) {
+      try {
+        return open().getItem(key);
+      } catch {
+        return null;
+      }
+    },
+    setItem(key, value) {
+      try {
+        open().setItem(key, value);
+      } catch {
+        // Not kept: the choice lasts as long as this page.
+      }
+    },
+  };
+}
+
+/**
  * Show the theme, follow the system's changes until the listener chooses,
  * and make the toggle save their choice.
  *
  * @param {HTMLElement} root - the element whose data-theme the CSS reads
  * @param {HTMLElement|null} button - the toggle
- * @param {Storage} storage - where the choice is kept
+ * @param {{getItem: Function, setItem: Function}} storage - where the choice
+ *   is kept (see guardedStorage)
  * @param {MediaQueryList} systemLight - the system's prefers-color-scheme: light
  */
 export function mountTheme(root, button, storage, systemLight) {

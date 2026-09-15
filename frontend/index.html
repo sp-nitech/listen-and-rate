@@ -10,7 +10,12 @@
          js/theme.js, which runs as a module and so too late for this. -->
     <script>
     {
-      const saved = localStorage.getItem('theme');
+      let saved = null;
+      try {
+        saved = localStorage.getItem('theme');
+      } catch {
+        // A browser refusing storage: no saved choice (see guardedStorage).
+      }
       const light = saved === 'light'
         || (saved !== 'dark' && matchMedia('(prefers-color-scheme: light)').matches);
       if (light) document.documentElement.setAttribute('data-theme', 'light');

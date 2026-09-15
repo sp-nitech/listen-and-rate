@@ -22,7 +22,7 @@ import { Stage } from './stage.js';
 import { runStage } from './stage-runner.js';
 import { setLanguage } from './strings.js';
 import { testClassFor } from './test-types/registry.js';
-import { mountTheme } from './theme.js';
+import { guardedStorage, mountTheme } from './theme.js';
 
 async function main() {
   const container = document.getElementById('app');
@@ -82,11 +82,13 @@ async function main() {
   });
 }
 
-// First, so the toggle works whatever becomes of loading the test.
+// First, so the toggle works whatever becomes of loading the test. The
+// storage is guarded: a browser refusing it must not keep the test from
+// loading, as it would if reading localStorage threw here.
 mountTheme(
   document.documentElement,
   document.getElementById('theme-toggle'),
-  localStorage,
+  guardedStorage(() => localStorage),
   matchMedia('(prefers-color-scheme: light)')
 );
 main().catch((err) => showLoadError(document.getElementById('app'), err));

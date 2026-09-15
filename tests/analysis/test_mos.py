@@ -235,8 +235,11 @@ def test_generate_mos_report_includes_pairwise_pvalue_table(tmp_path):
 
 def test_generate_mos_report_two_systems_single_pairwise_row(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
-    assert html.count(" vs ") == 1
-    assert "A vs B" in html
+    # Counted in the table alone: the embedded plotly.js has a " vs " of its own.
+    start = html.index(">Significance tests</h3>")
+    table = html[start : html.index("</table>", start)]
+    assert table.count(" vs ") == 1
+    assert "A vs B" in table
 
 
 # -- chart title / font / width ---------------------------------------------

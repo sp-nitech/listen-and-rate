@@ -63,6 +63,13 @@ function resetPlayButton(btn) {
 }
 
 export class MUSHRATest extends PairedTrialTest {
+  /** Each trial's reference, its systems, and its anchor when it has one. */
+  static audioStimuli(config) {
+    return config.trials.flatMap((trial) =>
+      [trial.reference, ...trial.systems, trial.anchor].filter(Boolean)
+    );
+  }
+
   /**
    * @param {Object} config - Server config from /api/config (has `trials`).
    * @param {string} sessionId - UUID identifying this listener's session.
@@ -260,7 +267,7 @@ export class MUSHRATest extends PairedTrialTest {
             range.setAttribute('aria-disabled', 'false');
             range.tabIndex = 0;
           }
-          this._onChange?.();
+          this.onChange();
         }
       });
       audio.addEventListener('pause', () => {
@@ -283,7 +290,7 @@ export class MUSHRATest extends PairedTrialTest {
         const played = this._playedSet(this.currentIndex);
         if (!played.has(localIndex)) {
           played.add(localIndex);
-          this._onChange?.();
+          this.onChange();
         }
         this._setSystemPlayButtonsEnabled(true);
         this._el.steps?.classList.add('played');
@@ -521,7 +528,7 @@ export class MUSHRATest extends PairedTrialTest {
     this.choices.get(trialIndex).set(stimulusId, value);
     this._syncNextEnabled();
     this._updateProgressBar();
-    this._onChange?.();
+    this.onChange();
   }
 
   /**

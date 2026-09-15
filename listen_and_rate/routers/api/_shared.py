@@ -26,7 +26,7 @@ from ...config import (
     build_ab_trials,
 )
 from ...config._utils import _duplicates
-from ...models import SubmitRequest
+from ...models import ChoiceEntry, RatingEntry, SubmitRequest
 from ...rng import rng
 from ...storage import METRIC_DECIMALS, OUTCOME_A, OUTCOME_B, ResultSaver
 
@@ -38,6 +38,20 @@ T = TypeVar("T")
 # browser's JS regex (whose $ does not) rejects it - letting a crafted request
 # store a value the form itself refuses, newline and all.
 _METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9.-]+\Z")
+
+# First characters a spreadsheet reads as the start of a formula (OWASP's CSV
+# injection list, less the tab and carriage return that a User-Agent outside
+# printable ASCII is already refused for). The User-Agent is the one free text
+# in the results - the metadata text fields above allow no such value - and no
+# browser's starts with one, so one that does is crafted and is not recorded.
+# Kept in sync with frontend/save.php.
+_FORMULA_PREFIXES = ("=", "+", "-", "@")
+
+# The most of a User-Agent kept. A browser's own runs to a few hundred
+# characters at most, so only a padded one is cut - a server lets a header grow
+# to kilobytes, every one of which would repeat on each row of the CSV. Kept in
+# sync with frontend/save.php.
+_USER_AGENT_MAX_LENGTH = 512
 
 
 def _validate_metadata(
@@ -182,8 +196,8 @@ def _test_config_response(config: Config, **extras: object) -> dict:
             "description": config.survey.description,
             "fields": [f.model_dump() for f in config.survey.fields],
         },
-        # Which per-answer measurements to take; the frontend measures only
-        # what is enabled here, and the submit handlers store only that too.
+        # Which metrics to record; the frontend measures dwell_time only when
+        # it is enabled here, and the submit handlers store only these.
         "metrics": config.metrics.model_dump(),
         # How long a session interrupted mid-test may be resumed for, in the
         # milliseconds the browser compares against Date.now() (the config is
@@ -225,23 +239,49 @@ def _require_non_empty(values: list, name: str) -> None:
         raise HTTPException(status_code=400, detail=f"{name} must be a non-empty list")
 
 
-def _metrics_row(entry: object, config: Config) -> dict:
-    """Build the `metrics` sub-dict for one answer, or {} to store none.
+def _metrics_row(entry: RatingEntry | ChoiceEntry, config: Config) -> dict:
+    """Build the `metrics` sub-dict of one answer's own readings, or {}.
 
-    Only the metrics the config opts into are kept, so a client that sends a
-    value the experiment did not ask for cannot slip it into the results. The
-    key is omitted entirely when nothing is collected, which keeps the stored
-    shape (and the CSV header) identical to before this existed.
+    That is dwell_time, the one metric the page measures per answer. The
+    metrics read once per submission are _session_metrics' instead, and are
+    stored beside the forms. Only what the config opts into is kept, so a
+    client that sends a value the experiment did not ask for cannot slip it
+    into the results. The key is omitted entirely when nothing is collected,
+    which keeps the stored shape (and the CSV header) identical to before
+    this existed.
 
     Rounded to METRIC_DECIMALS: the browser reports sub-microsecond floats,
     and the digits below that are noise rather than measurement.
     """
-    measured = {}
-    for key in config.metrics.enabled_keys():
-        value = getattr(entry, key, None)
-        if value is not None:
-            measured[key] = round(float(value), METRIC_DECIMALS)
-    return {"metrics": measured} if measured else {}
+    if not config.metrics.dwell_time or entry.dwell_time is None:
+        return {}
+    return {"metrics": {"dwell_time": round(entry.dwell_time, METRIC_DECIMALS)}}
+
+
+def _session_metrics(body: SubmitRequest, config: Config) -> dict[str, str]:
+    """Build the metrics read once per submission, or {}.
+
+    That is user_agent, taken from the request rather than the body (see
+    SubmitRequest). Left out when the request carried none, which the CSV
+    saver writes as a blank cell, or one that is not printable ASCII, or one
+    a spreadsheet would read as a formula (see _FORMULA_PREFIXES), and cut to
+    _USER_AGENT_MAX_LENGTH. Only what the config opts into is kept.
+
+    Printable ASCII is all a browser sends, as HTTP asks of a header value.
+    Anything else is crafted, and would not be stored alike by both
+    deployments: read here as Latin-1 it turns into different text, and in
+    save.php it is not valid UTF-8 at all. Within ASCII, too, a character is
+    a byte, so the cut falls in the same place in both.
+    """
+    agent = body._user_agent
+    if (
+        not config.metrics.user_agent
+        or not agent
+        or not (agent.isascii() and agent.isprintable())
+        or agent.startswith(_FORMULA_PREFIXES)
+    ):
+        return {}
+    return {"user_agent": agent[:_USER_AGENT_MAX_LENGTH]}
 
 
 def _require_answered_once(keys: list[str], name: str, unit: str) -> None:
@@ -275,7 +315,8 @@ def _save_and_ok(
     The shared tail of every _submit_* handler - rows are the already
     validated, storage-shaped dicts built by the type-specific validator.
     The metadata and survey forms share one validator (same field schema,
-    different collection timing).
+    different collection timing). Being the one tail, it is also where the
+    metrics read once per submission are taken.
     """
     metadata = _validate_metadata(config.metadata.fields, body.metadata)
     survey = _validate_metadata(config.survey.fields, body.survey)
@@ -285,6 +326,7 @@ def _save_and_ok(
         records=rows,
         metadata=metadata,
         survey=survey,
+        metrics=_session_metrics(body, config),
     )
     return {"status": "ok", "session_id": body.session_id}
 

@@ -5,33 +5,7 @@
  * the listener with a session they cannot finish.
  */
 
-/**
- * Return the flat list of stimuli to preflight-check, regardless of test type.
- *
- * @param {Object} config
- * @returns {Array<{id: string, audio_url?: string}>}
- */
-export function flatStimuli(config) {
-  // ABX's hidden "X" reference is deliberately excluded here - it's always a
-  // duplicate of one of this same trial's own A/B stimuli (already checked
-  // below), fetched through a different resolver URL, so probing it
-  // separately would be redundant.
-  if (config.test_type === 'dmos') {
-    return config.trials.flatMap((trial) => [trial.reference, trial.test]);
-  }
-  if (config.test_type === 'cmos' || config.test_type === 'ab' || config.test_type === 'abx') {
-    return config.trials.flatMap((trial) => trial.stimuli);
-  }
-  if (config.test_type === 'xab') {
-    return config.trials.flatMap((trial) => [trial.reference, ...trial.stimuli]);
-  }
-  if (config.test_type === 'mushra') {
-    return config.trials.flatMap((trial) =>
-      [trial.reference, ...trial.systems, trial.anchor].filter(Boolean)
-    );
-  }
-  return config.stimuli;
-}
+import { testClassFor } from './test-types/registry.js';
 
 /**
  * HEAD-request each audio URL in parallel.
@@ -85,18 +59,19 @@ async function checkSaveEndpoint(url) {
 export async function preflight(stages) {
   const checks = await Promise.all(
     stages.map(({ stage, config, withPractice }) => {
-      // Practice stimuli/trials are sampled independently of the session's,
-      // so they may reference audio files the session list doesn't -
-      // preflight them too, reusing flatStimuli on a config-shaped view of
-      // the subset.
+      // Each test type knows where its trials hold their audio. Practice
+      // stimuli/trials are sampled independently of the session's, so they
+      // may reference audio files the session list doesn't - preflight them
+      // too, through the same method on a config-shaped view of the subset.
+      const TestClass = testClassFor(config);
       const practice = withPractice
-        ? flatStimuli({
+        ? TestClass.audioStimuli({
             ...config,
             stimuli: config.practice_stimuli,
             trials: config.practice_trials,
           })
         : [];
-      const urls = [...practice, ...flatStimuli(config)].map((s) => stage.audioUrl(s));
+      const urls = [...practice, ...TestClass.audioStimuli(config)].map((s) => stage.audioUrl(s));
       return Promise.all([checkAudioFiles(urls), checkSaveEndpoint(stage.url('save.php'))]);
     })
   );

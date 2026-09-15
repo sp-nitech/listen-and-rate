@@ -26,6 +26,15 @@ import { t } from '../strings.js';
 import { ListeningTest } from './listening-test.js';
 
 export class PairedTrialTest extends ListeningTest {
+  /**
+   * A trial's own stimuli (CMOS, AB, ABX). ABX's hidden X is left out: it is
+   * always one of the same trial's A/B, fetched through another URL, so
+   * checking it separately would be redundant.
+   */
+  static audioStimuli(config) {
+    return config.trials.flatMap((trial) => trial.stimuli);
+  }
+
   constructor(config, sessionId, onSubmit, stage) {
     super(config, sessionId, onSubmit, stage);
     this.trials = config.trials;
@@ -133,7 +142,7 @@ export class PairedTrialTest extends ListeningTest {
       if (!played.has(localIndex)) {
         played.add(localIndex);
         if (this._canChoose(this.currentIndex)) this._enableChoosing();
-        this._onChange?.();
+        this.onChange();
       }
     });
   }
@@ -192,7 +201,7 @@ export class PairedTrialTest extends ListeningTest {
     this._syncChoiceButtons();
     this._syncNextEnabled();
     this._updateProgressBar();
-    this._onChange?.();
+    this.onChange();
   }
 
   /**

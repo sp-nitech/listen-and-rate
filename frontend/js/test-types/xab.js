@@ -20,6 +20,11 @@ import { PairedTrialTest } from './paired-trial-test.js';
 const SAMPLE_LETTERS = ['A', 'B'];
 
 export class XABTest extends PairedTrialTest {
+  /** Each trial's reference X and its A/B. */
+  static audioStimuli(config) {
+    return config.trials.flatMap((trial) => [trial.reference, ...trial.stimuli]);
+  }
+
   /**
    * @param {Object} config - Server config from /api/config (has `trials`).
    * @param {string} sessionId - UUID identifying this listener's session.

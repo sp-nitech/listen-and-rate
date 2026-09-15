@@ -43,14 +43,18 @@ OUTCOME_B = "b"
 OUTCOME_TIE = "="
 
 
-def _metric_cell(value: float | None) -> str:
-    """Render one metric for CSV: fixed decimals, or blank when unmeasured.
+def _metric_cell(value: float | str | None) -> str:
+    """Render one metric for CSV: a number to fixed decimals, text as it is.
 
     Fixed rather than str(float)'s shortest form so the column lines up and a
     whole number keeps its decimals - and so it matches PHP, whose own
-    float-to-string would write 9.0 as "9".
+    float-to-string would write 9.0 as "9". Blank when unmeasured.
     """
-    return "" if value is None else f"{value:.{METRIC_DECIMALS}f}"
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return f"{value:.{METRIC_DECIMALS}f}"
 
 
 def _csv_cell(value: object) -> object:
@@ -93,8 +97,14 @@ class ResultSaver(ABC):
         records: list[dict],
         metadata: dict[str, str] | None = None,
         survey: dict[str, str] | None = None,
+        metrics: dict[str, str] | None = None,
     ) -> None:
-        """Persist one session's records; called once per POST /api/submit."""
+        """Persist one session's records; called once per POST /api/submit.
+
+        metrics holds the metrics read once per session (user_agent), stored
+        like the form answers. The ones measured per answer (dwell_time) come
+        inside each record's own "metrics" instead - see MetricsConfig.
+        """
         ...
 
 
@@ -113,10 +123,11 @@ class CSVResultSaver(ResultSaver):
 
     A record's `metrics` sub-dict is flattened out to METRICS_COLUMN_PREFIX
     columns rather than written as one column holding a dict, mirroring how
-    the form answers are namespaced. It comes last because it measures how the
-    record was produced, so it reads after the outcome itself. The JSON saver
-    keeps it nested instead, matching metadata/survey's own split between the
-    two formats.
+    the form answers are namespaced, and the session's metrics are repeated
+    on every row among them, as the form answers are. They come last because
+    they describe how the answers were given, so they read after the outcome
+    itself. The JSON saver keeps them nested instead, matching
+    metadata/survey's own split between the two formats.
     """
 
     # tool_version comes first because it belongs to the software rather than
@@ -149,12 +160,14 @@ class CSVResultSaver(ResultSaver):
         records: list[dict],
         metadata: dict[str, str] | None = None,
         survey: dict[str, str] | None = None,
+        metrics: dict[str, str] | None = None,
     ) -> None:
         """Write one row per record to {experiment_id}/{session_id}.csv."""
         path = self._dir / f"{session_id}.csv"
         ts = datetime.now().astimezone().isoformat(timespec="seconds")
         meta = metadata or {}
         answers = survey or {}
+        session_metrics = metrics or {}
         meta_fields = [METADATA_COLUMN_PREFIX + k for k in self._metadata_keys]
         survey_fields = [SURVEY_COLUMN_PREFIX + k for k in self._survey_keys]
         metrics_fields = [METRICS_COLUMN_PREFIX + k for k in self._metrics_keys]
@@ -177,7 +190,7 @@ class CSVResultSaver(ResultSaver):
             writer = csv.DictWriter(f, fieldnames=fields)
             writer.writeheader()
             for r in records:
-                measured = r.get("metrics") or {}
+                measured = {**(r.get("metrics") or {}), **session_metrics}
                 row = {
                     TOOL_VERSION_COLUMN: __version__,
                     "session_id": session_id,
@@ -213,6 +226,7 @@ class JSONResultSaver(ResultSaver):
         records: list[dict],
         metadata: dict[str, str] | None = None,
         survey: dict[str, str] | None = None,
+        metrics: dict[str, str] | None = None,
     ) -> None:
         """Write this session's records to {experiment_id}/{session_id}.json."""
         self._dir.mkdir(parents=True, exist_ok=True)
@@ -223,6 +237,9 @@ class JSONResultSaver(ResultSaver):
             "test_type": test_type,
             "metadata": metadata or {},
             "survey": survey or {},
+            # Omitted rather than written empty, as a record's own "metrics"
+            # is, so a file without them keeps the shape it had before.
+            **({"metrics": metrics} if metrics else {}),
             "records": records,
         }
         try:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from .ids import is_valid_id
 
@@ -59,6 +59,9 @@ class SubmitRequest(BaseModel):
     choices: list[ChoiceEntry] = Field(default_factory=list)  # CMOS, AB, ABX, XAB
     metadata: dict[str, str] = Field(default_factory=dict)  # pre-test form answers
     survey: dict[str, str] = Field(default_factory=dict)  # post-test form answers
+    # The request's User-Agent header, set by the route. Private so no body can
+    # set it: the page never sends one, so a value in the body is a crafted one.
+    _user_agent: str | None = PrivateAttr(default=None)
 
     @field_validator("session_id")
     @classmethod

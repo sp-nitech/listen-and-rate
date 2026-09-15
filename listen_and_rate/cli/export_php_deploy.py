@@ -12,6 +12,7 @@ from collections.abc import Collection
 from pathlib import Path
 
 from listen_and_rate import __version__
+from listen_and_rate.checks import run_configured_checks
 from listen_and_rate.config import (
     ABXConfig,
     Config,
@@ -19,14 +20,10 @@ from listen_and_rate.config import (
     MUSHRAConfig,
     StimulusConfig,
     XABConfig,
-    load_sequence_or_exit,
+    load_sequence,
 )
-from listen_and_rate.duration import run_configured_duration_check
-from listen_and_rate.loudness import (
-    run_configured_loudness_check,
-    run_configured_loudness_normalization,
-)
-from listen_and_rate.silence import run_configured_silence_check
+from listen_and_rate.errors import UserError, exit_on_user_error
+from listen_and_rate.loudness import run_configured_loudness_normalization
 
 logger = logging.getLogger(__name__)
 
@@ -121,25 +118,26 @@ def _seed_results_dir(outdir: Path, results_subpath: Path | None) -> None:
         f.write(content)
 
 
-def _assert_not_the_frontend_source(outdir: Path) -> None:
+def _assert_not_the_frontend_source(outdir: str | Path) -> None:
     """Refuse an --outdir at or inside this package's own frontend directory.
 
     The bundle's static assets are copied out of _FRONTEND_DIR, so exporting
     into it would delete the very files the next step reads - leaving neither
-    a working bundle nor the source it was built from.
+    a working bundle nor the source it was built from. `outdir` is named as
+    the user wrote it.
     """
-    resolved = outdir.resolve()
+    resolved = Path(outdir).resolve()
     frontend = _FRONTEND_DIR.resolve()
     if resolved == frontend or frontend in resolved.parents:
-        raise ValueError(
-            f"Refusing to export into {outdir}: that is the frontend source "
-            f"directory this bundle is built from ({frontend}). Choose a "
-            "separate output directory."
+        raise UserError(
+            f"{outdir}: is the frontend source directory this bundle is built "
+            f"from ({frontend}), so exporting into it would delete what it "
+            "reads. Choose a separate output directory."
         )
 
 
 def _clear_outdir_except_results(
-    outdir: Path, results_subpaths: Collection[Path | None]
+    outdir: str | Path, results_subpaths: Collection[Path | None]
 ) -> None:
     """Remove everything in outdir except the results directories.
 
@@ -165,16 +163,17 @@ def _clear_outdir_except_results(
     inside = [p for p in results_subpaths if p is not None]
     for results_subpath in inside:
         if not results_subpath.parts:
-            raise ValueError(
+            raise UserError(
                 f"output.path ({results_subpath}) puts the results at the bundle "
                 "root, so regenerating the bundle cannot preserve them. Use a "
                 "subdirectory (the default is './results/'), or an absolute "
                 "path outside the bundle."
             )
-    entries = list(outdir.iterdir())
-    if entries and not any((outdir / m).exists() for m in _BUNDLE_MARKERS):
-        raise FileExistsError(
-            f"{outdir} is not empty and does not look like a bundle this tool "
+    root = Path(outdir)
+    entries = list(root.iterdir())
+    if entries and not any((root / m).exists() for m in _BUNDLE_MARKERS):
+        raise UserError(
+            f"{outdir}: is not empty and does not look like a bundle this tool "
             f"wrote (none of {', '.join(_BUNDLE_MARKERS)} is in it), so "
             "--overwrite will not clear it. Point --outdir at a new or "
             "previously exported directory, or empty this one yourself."
@@ -203,10 +202,10 @@ def _audio_url(audio_path: Path) -> str:
     try:
         return audio_path.relative_to(cwd).as_posix()
     except ValueError:
-        raise ValueError(
-            f"Audio path is outside the working directory and cannot be exported:\n"
-            f"  {audio_path}\n"
-            f"Move the file inside the project directory or use a symlink."
+        raise UserError(
+            f"{audio_path}: outside the working directory, so the bundle cannot "
+            "link it. Move the file inside the project directory or use a "
+            "symlink."
         ) from None
 
 
@@ -388,7 +387,7 @@ def _build_config_data(
     return {
         "experiment_id": config.experiment_id,
         "ui_language": config.ui_language,
-        # Which per-answer measurements save.php should keep; mirrors the
+        # Which metrics save.php should keep; mirrors the
         # FastAPI config response (see _test_config_response).
         "metrics": config.metrics.model_dump(),
         # How long an interrupted session may be resumed for, in browser
@@ -597,12 +596,15 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+    with exit_on_user_error():
+        _export(args)
 
-    configs = load_sequence_or_exit(args.config)
+
+def _export(args: argparse.Namespace) -> None:
+    """Write the bundle main() was asked for (see its docstring)."""
+    configs = load_sequence(args.config)
     for config in configs:
-        run_configured_duration_check(config)
-        run_configured_loudness_check(config)
-        run_configured_silence_check(config)
+        run_configured_checks(config)
     stage_subdirs = [Path("stages", c.experiment_id) for c in configs]
     # Resolved before outdir is touched: an audio file outside the working
     # directory fails here, leaving an existing bundle as it was.
@@ -611,15 +613,15 @@ def main() -> None:
     ]
 
     outdir = Path(args.outdir)
-    _assert_not_the_frontend_source(outdir)
+    _assert_not_the_frontend_source(args.outdir)
     results_subpaths = {_bundle_results_subpath(c.output.path) for c in configs}
     if outdir.exists():
         if not args.overwrite:
-            raise FileExistsError(
-                f"{outdir} already exists. "
-                f"Pass --overwrite to regenerate it, or remove it manually."
+            raise UserError(
+                f"{args.outdir}: already exists. Pass --overwrite to regenerate "
+                "it, or remove it yourself."
             )
-        _clear_outdir_except_results(outdir, results_subpaths)
+        _clear_outdir_except_results(args.outdir, results_subpaths)
     outdir.mkdir(parents=True, exist_ok=True)
     _copy_static_assets(outdir)
     # Before any stage: sequence.php is also what marks the directory as a

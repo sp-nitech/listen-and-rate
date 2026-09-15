@@ -153,7 +153,7 @@ function base_config_response(array $data, array $extras): array
         'experiment_id' => $data['experiment_id'],
         // Which language the built-in UI chrome renders in ('en'/'ja').
         'ui_language' => $data['ui_language'],
-        // Which per-answer measurements the frontend should take.
+        // Which metrics this experiment records (the page measures dwell_time).
         'metrics' => $data['metrics'],
         // How long an interrupted session may be resumed for, in the
         // milliseconds the browser compares against Date.now(); the export

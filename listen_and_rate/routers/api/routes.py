@@ -6,7 +6,7 @@ canonical order: MOS, DMOS, CMOS, AB, ABX, XAB, MUSHRA.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from ...config import (
     ABConfig,
@@ -86,12 +86,14 @@ def submit(
     config: Config = Depends(get_config),
     saver: ResultSaver = Depends(get_result_saver),
     x_secret: bytes = Depends(get_x_secret),
+    user_agent: str | None = Header(default=None),
 ):
     """Validate and persist a complete set of listener responses.
 
     Returns 409 when results for the session_id already exist - collected
     data is never overwritten (see storage.ResultExistsError).
     """
+    body._user_agent = user_agent or None
     try:
         if isinstance(config, MOSConfig):
             return _submit_mos(body, config, saver)

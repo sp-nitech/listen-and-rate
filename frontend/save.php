@@ -56,6 +56,28 @@ const OUTCOME_A   = 'a';
 const OUTCOME_B   = 'b';
 const OUTCOME_TIE = '=';
 
+/**
+ * Decimals a metric is stored with. Mirrors listen_and_rate/storage.py's
+ * METRIC_DECIMALS - two, because what these measure is noisier than that.
+ */
+const METRIC_DECIMALS = 2;
+
+/**
+ * First characters a spreadsheet reads as the start of a formula, less the
+ * tab and carriage return that a User-Agent outside printable ASCII is
+ * already refused for. A browser's User-Agent never starts with one, so one
+ * that does is crafted and is not recorded. Mirrors
+ * listen_and_rate/routers/api/_shared.py's _FORMULA_PREFIXES.
+ */
+const FORMULA_PREFIXES = ['=', '+', '-', '@'];
+
+/**
+ * The most of a User-Agent kept. A browser's own runs to a few hundred
+ * characters at most, so only a padded one is cut. Mirrors
+ * listen_and_rate/routers/api/_shared.py's _USER_AGENT_MAX_LENGTH.
+ */
+const USER_AGENT_MAX_LENGTH = 512;
+
 // -- Shared helpers ------------------------------------------------------
 
 /** Thrown by the helpers below to signal a request-level error with an HTTP status. */
@@ -82,12 +104,6 @@ class SaveRequestError extends RuntimeException
  * '.' and '..' are excluded separately: the dot is allowed so an id like
  * "config.mos" works, and those two are directory references, not names.
  */
-/**
- * Decimals a metric is stored with. Mirrors listen_and_rate/storage.py's
- * METRIC_DECIMALS - two, because what these measure is noisier than that.
- */
-const METRIC_DECIMALS = 2;
-
 function is_valid_id(string $s): bool
 {
     if ($s === '.' || $s === '..') {
@@ -327,25 +343,53 @@ function submitted_answers(string $testType, array $data): array
     return is_array($answers) ? array_values($answers) : [];
 }
 
-/** One answer's metrics, keeping only the opted-in keys and rounding to ms. */
+/**
+ * One answer's own metrics, keeping only the opted-in keys, rounded to ms.
+ *
+ * That is dwell_time, the one metric the page measures per answer. A
+ * user_agent in the answer is ignored: the page never sends one, so it is a
+ * crafted one (see session_metrics). Mirrors _metrics_row in
+ * listen_and_rate/routers/api/_shared.py.
+ */
 function answer_metrics(array $answer, array $keys): array
 {
-    $measured = [];
-    foreach ($keys as $key) {
-        $value = $answer[$key] ?? null;
-        if (is_numeric($value)) {
-            $measured[$key] = round((float) $value, METRIC_DECIMALS);
-        }
+    $value = $answer['dwell_time'] ?? null;
+    if (!in_array('dwell_time', $keys, true) || !is_numeric($value)) {
+        return [];
     }
-    return $measured;
+    return ['dwell_time' => round((float) $value, METRIC_DECIMALS)];
+}
+
+/**
+ * The metrics read once per submission, keeping only the opted-in keys.
+ *
+ * That is user_agent, the request's User-Agent header. Left out when the
+ * request carried none, or one that is not printable ASCII - a byte beyond
+ * it would leave the result file invalid UTF-8, which json_encode refuses -
+ * or one a spreadsheet would read as a formula (see FORMULA_PREFIXES), and
+ * cut to USER_AGENT_MAX_LENGTH, bytes being characters within ASCII. Stored
+ * like the form answers: once in JSON, on every row in CSV. Mirrors
+ * _session_metrics in listen_and_rate/routers/api/_shared.py.
+ */
+function session_metrics(string $userAgent, array $keys): array
+{
+    if (
+        !in_array('user_agent', $keys, true)
+        || preg_match('/\A[\x20-\x7E]+\z/', $userAgent) !== 1
+        || in_array($userAgent[0], FORMULA_PREFIXES, true)
+    ) {
+        return [];
+    }
+    return ['user_agent' => substr($userAgent, 0, USER_AGENT_MAX_LENGTH)];
 }
 
 /**
  * Append metrics_* columns to a built CSV table, mirroring the Python saver's
- * layout: last, after the answer columns, because they measure how the answer
- * was produced.
+ * layout: last, after the answer columns, because they describe how the
+ * answers were given rather than what they were. The session's metrics
+ * repeat on every row, as the form answers do.
  */
-function append_metrics_columns(array $fields, array $rows, array $answers, array $keys): array
+function append_metrics_columns(array $fields, array $rows, array $answers, array $session, array $keys): array
 {
     if ($keys === []) {
         return [$fields, $rows];
@@ -354,25 +398,24 @@ function append_metrics_columns(array $fields, array $rows, array $answers, arra
         $fields[] = 'metrics_' . $key;
     }
     foreach ($rows as $i => $row) {
-        $measured = answer_metrics($answers[$i] ?? [], $keys);
+        $measured = answer_metrics($answers[$i] ?? [], $keys) + $session;
         foreach ($keys as $key) {
             // Fixed decimals, not PHP's float-to-string: that would write 9.0
-            // as "9" where the FastAPI saver writes "9.00".
-            $row[] = isset($measured[$key])
-                ? sprintf('%.' . METRIC_DECIMALS . 'f', $measured[$key])
-                : '';
+            // as "9" where the FastAPI saver writes "9.00". Text as it is.
+            $value = $measured[$key] ?? '';
+            $row[] = is_float($value) ? sprintf('%.' . METRIC_DECIMALS . 'f', $value) : $value;
         }
         $rows[$i] = $row;
     }
     return [$fields, $rows];
 }
 
-/** Nest a "metrics" object inside each built JSON entry (Python keeps it nested too). */
+/**
+ * Nest each answer's own metrics inside its built JSON entry (Python keeps
+ * them nested too). The session's metrics go beside the forms instead.
+ */
 function append_metrics_json(array $entries, array $answers, array $keys): array
 {
-    if ($keys === []) {
-        return $entries;
-    }
     foreach ($entries as $i => $entry) {
         $measured = answer_metrics($answers[$i] ?? [], $keys);
         if ($measured !== []) {
@@ -483,7 +526,7 @@ function open_result_file_exclusive(string $path, string $cannotWriteMessage)
     throw new SaveRequestError(500, $cannotWriteMessage);
 }
 
-/** @throws SaveRequestError (409) if the file exists, (500) if it cannot be written. */
+/** @throws SaveRequestError (409) if the file exists, (500) if it cannot be encoded or written. */
 function write_json_file(string $path, array $jsonData): void
 {
     // PHP cannot tell an empty list from an empty map, so json_encode would
@@ -494,13 +537,26 @@ function write_json_file(string $path, array $jsonData): void
             $jsonData[$key] = (object) $jsonData[$key];
         }
     }
+    // Encoded before the file is opened, so a value json_encode refuses (a
+    // string that is not valid UTF-8) fails the request instead of leaving
+    // an empty file behind - one reported as saved, that the report cannot
+    // read, and that would turn the listener's retry into a 409.
+    try {
+        $json = json_encode(
+            $jsonData,
+            // PRESERVE_ZERO_FRACTION so a whole-number metric stays 9.0 rather
+            // than collapsing to 9, and UNESCAPED_SLASHES so "/" stays "/"
+            // rather than "\/" - both matching what json.dump writes. The "\/"
+            // guards "</script>" in HTML, and this file is never embedded in a
+            // page.
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+        );
+    } catch (JsonException $e) {
+        throw new SaveRequestError(500, 'Cannot encode the results: ' . $e->getMessage());
+    }
     $fp = open_result_file_exclusive($path, "Cannot write {$path}");
-    $written = @fwrite($fp, json_encode(
-        $jsonData,
-        // PRESERVE_ZERO_FRACTION so a whole-number metric stays 9.0 rather
-        // than collapsing to 9, matching what json.dump writes.
-        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION
-    ));
+    $written = @fwrite($fp, $json);
     fclose($fp);
     if ($written === false) {
         throw new SaveRequestError(500, "Cannot write {$path}");
@@ -668,7 +724,7 @@ function pair_row_fields(bool $withPresentedAsX = false): array
 function order_result_keys(array $result, string $version): array
 {
     $ordered = ['tool_version' => $version];
-    foreach (['session_id', 'timestamp', 'test_type', 'metadata', 'survey', 'records'] as $key) {
+    foreach (['session_id', 'timestamp', 'test_type', 'metadata', 'survey', 'metrics', 'records'] as $key) {
         if (array_key_exists($key, $result)) {
             $ordered[$key] = $result[$key];
         }
@@ -1263,6 +1319,7 @@ function handle_save_request(): void
         $form      = array_merge(prefix_keys('metadata_', $meta), prefix_keys('survey_', $survey));
         $form_keys    = array_keys($form);
         $metrics_keys = enabled_metrics($config_data);
+        $session_metrics = session_metrics((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), $metrics_keys);
         // Baked in by `lar-export`. PHP cannot read the Python package's
         // version at request time, and the version that exported this bundle
         // is the one whose behaviour produced these results anyway.
@@ -1278,9 +1335,13 @@ function handle_save_request(): void
                 'xab' => build_xab_json_result($data, $meta, $stimulus_map, $ts, $config_data['reference_system'] ?? ''),
                 'mushra' => build_json_result($data, $meta, $stimulus_map, $ts),
             };
-            // Survey answers and per-answer metrics are attached here, once,
+            // Survey answers and metrics are attached here, once,
             // rather than threaded through every per-test-type builder.
             $json_data['survey'] = $survey;
+            // Omitted rather than written empty, as JSONResultSaver does.
+            if ($session_metrics !== []) {
+                $json_data['metrics'] = $session_metrics;
+            }
             // Every builder returns its rows under 'records', whatever key the
             // client sent them under - matching JSONResultSaver.
             $json_data['records'] = append_metrics_json(
@@ -1303,6 +1364,7 @@ function handle_save_request(): void
                 $fields,
                 $rows,
                 submitted_answers($test_type, $data),
+                $session_metrics,
                 $metrics_keys
             );
             [$fields, $rows] = prepend_tool_version_columns($fields, $rows, $tool_version);

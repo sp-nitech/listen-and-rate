@@ -114,29 +114,20 @@ def test_export_invalid_config_exits_without_pydantic_url(
     assert expected_substring in message
 
 
-def test_export_runs_the_audio_checks_in_order(config_yaml, tmp_path, monkeypatch):
-    # Same gate and same order as the serve path, so an experiment cannot pass
-    # QA on one backend and fail it on the other.
+def test_export_runs_the_shared_audio_checks(config_yaml, tmp_path, monkeypatch):
+    # The same checks the serve path runs (see checks.py, which owns their
+    # order), so an experiment cannot pass QA on one backend and fail it on
+    # the other.
     from listen_and_rate.cli import export_php_deploy
 
-    called: list[str] = []
+    checked: list[str] = []
     monkeypatch.setattr(
         export_php_deploy,
-        "run_configured_duration_check",
-        lambda c: called.append("duration"),
-    )
-    monkeypatch.setattr(
-        export_php_deploy,
-        "run_configured_loudness_check",
-        lambda c: called.append("loudness"),
-    )
-    monkeypatch.setattr(
-        export_php_deploy,
-        "run_configured_silence_check",
-        lambda c: called.append("silence"),
+        "run_configured_checks",
+        lambda c: checked.append(c.experiment_id),
     )
     _run_export(config_yaml, tmp_path / "deploy", monkeypatch)
-    assert called == ["duration", "loudness", "silence"]
+    assert checked == ["config"]
 
 
 def test_export_php_deploy_bakes_in_the_version_that_exported_the_bundle(
@@ -938,8 +929,12 @@ def test_export_php_deploy_does_not_overwrite_existing_outdir_by_default(
     outdir = tmp_path / "deploy"
     outdir.mkdir()
     (outdir / "stale.txt").write_text("leftover from a previous run", encoding="utf-8")
-    with pytest.raises(FileExistsError):
+    with pytest.raises(SystemExit) as excinfo:
         _run_export(config_yaml, outdir, monkeypatch)
+    assert str(excinfo.value) == (
+        f"{outdir}: already exists. Pass --overwrite to regenerate it, or "
+        "remove it yourself."
+    )
     assert (outdir / "stale.txt").exists()
 
 
@@ -1031,6 +1026,16 @@ def test_export_php_deploy_config_data_uses_the_configs_experiment_id(
 # -- destructive-overwrite guards -------------------------------------------
 
 
+def test_export_names_the_output_directory_as_it_was_written(
+    config_yaml, tmp_path, monkeypatch
+):
+    # The path the user typed is the one they will look for in the message.
+    (tmp_path / "deploy").mkdir()
+    with pytest.raises(SystemExit) as excinfo:
+        _run_export(config_yaml, "./deploy/", monkeypatch)
+    assert str(excinfo.value).startswith("./deploy/: already exists.")
+
+
 def test_export_refuses_to_overwrite_a_directory_that_is_not_a_bundle(
     config_yaml, tmp_path, monkeypatch
 ):
@@ -1042,8 +1047,11 @@ def test_export_refuses_to_overwrite_a_directory_that_is_not_a_bundle(
     outdir = tmp_path / "not-a-bundle"
     (outdir / "important").mkdir(parents=True)
     (outdir / "important" / "data.txt").write_text("irreplaceable", encoding="utf-8")
-    with pytest.raises(FileExistsError, match="does not look like"):
+    with pytest.raises(SystemExit) as excinfo:
         _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
+    assert str(excinfo.value).startswith(
+        f"{outdir}: is not empty and does not look like"
+    )
     assert (outdir / "important" / "data.txt").read_text(encoding="utf-8") == (
         "irreplaceable"
     )
@@ -1063,6 +1071,27 @@ def test_export_overwrites_a_bundle_from_before_stages(
     assert (outdir / "sequence.php").is_file()
 
 
+def test_export_names_an_audio_file_outside_the_working_directory(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # The bundle links its audio by a path relative to the working directory,
+    # so a file outside it has no such path.
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    with pytest.raises(SystemExit) as excinfo:
+        _run_export(write_config(project, config), project / "deploy", monkeypatch)
+    assert str(excinfo.value).startswith(
+        f"{test_audio_file}: outside the working directory"
+    )
+
+
 def test_export_refuses_to_write_into_the_frontend_source(
     config_yaml, tmp_path, monkeypatch
 ):
@@ -1073,8 +1102,11 @@ def test_export_refuses_to_write_into_the_frontend_source(
     """
     from listen_and_rate.cli.export_php_deploy import _FRONTEND_DIR
 
-    with pytest.raises(ValueError, match="frontend source"):
+    with pytest.raises(SystemExit) as excinfo:
         _run_export(config_yaml, _FRONTEND_DIR, monkeypatch, overwrite=True)
+    assert str(excinfo.value).startswith(
+        f"{_FRONTEND_DIR}: is the frontend source directory"
+    )
     assert (_FRONTEND_DIR / "index.html").exists()
 
 
@@ -1092,7 +1124,7 @@ def test_export_refuses_to_overwrite_when_results_are_the_bundle_root(
     config_yaml = write_config(tmp_path, config)
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
-    with pytest.raises(ValueError, match="bundle root"):
+    with pytest.raises(SystemExit, match="bundle root"):
         _run_export(config_yaml, outdir, monkeypatch, overwrite=True)
 
 
@@ -1112,7 +1144,7 @@ def test_export_php_deploy_config_data_includes_metrics(
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
-    assert "'metrics' => ['dwell_time' => true]" in text
+    assert "'metrics' => ['dwell_time' => true, 'user_agent' => false]" in text
 
 
 def test_export_php_deploy_config_data_includes_ui_language(

@@ -12,6 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from listen_and_rate.config import load_config, load_sequence
+from listen_and_rate.errors import UserError
 
 from ._helpers import (
     minimal_config,
@@ -92,7 +93,7 @@ def test_sequence_rejects_two_configs_sharing_an_experiment_id(
     first.mkdir()
     second.mkdir()
     data = minimal_config(str(test_audio_file))
-    with pytest.raises(ValueError, match="'config'"):
+    with pytest.raises(UserError, match="'config'"):
         load_sequence([write_config(first, data), write_config(second, data)])
 
 
@@ -108,7 +109,7 @@ def test_sequence_rejects_experiment_ids_differing_only_in_case(
     first.mkdir()
     second.mkdir()
     data = minimal_config(str(test_audio_file))
-    with pytest.raises(ValueError, match="'study'"):
+    with pytest.raises(UserError, match="'study'"):
         load_sequence(
             [
                 write_config(first, data, name="Study.yaml"),
@@ -123,7 +124,7 @@ def test_sequence_rejects_an_explicit_experiment_id_taken_by_a_file_name(
     # The check is on the resolved ids, so an explicit `experiment_id:` meets
     # the file-name default of another config.
     data = minimal_config(str(test_audio_file))
-    with pytest.raises(ValueError, match="'x'"):
+    with pytest.raises(UserError, match="'x'"):
         load_sequence(
             [
                 write_config(tmp_path, data, name="x.yaml"),
@@ -188,15 +189,64 @@ def test_sequence_gives_every_stage_the_first_config_metadata(
     assert [f.key for f in second.metadata.fields] == ["device"]
 
 
-def test_sequence_names_the_config_a_load_error_came_from(tmp_path, test_audio_file):
+def test_sequence_says_two_configs_share_an_id_with_no_file_first(
+    tmp_path, test_audio_file
+):
+    # It is about two files at once, so it is the message alone.
+    data = minimal_config(str(test_audio_file))
+    with pytest.raises(UserError) as excinfo:
+        load_sequence(
+            [
+                write_config(tmp_path, data, name="x.yaml"),
+                write_config(tmp_path, {**data, "experiment_id": "x"}, name="y.yaml"),
+            ]
+        )
+    assert str(excinfo.value).startswith("two configs share the experiment_id 'x'")
+
+
+# -- a config that cannot be loaded ------------------------------------------
+#
+# Configs in a sequence often share their fields, so an error alone cannot say
+# which of them to fix: each names its file first, as the user wrote its path.
+
+
+def test_a_missing_config_file_is_named_once(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(UserError) as excinfo:
+        load_sequence(["./missing.yaml"])
+    assert str(excinfo.value) == "./missing.yaml: config file not found"
+
+
+def test_invalid_yaml_is_placed_at_its_line_and_column(tmp_path):
+    path = tmp_path / "config.yaml"
+    path.write_text('test_type: mos\ntitle: "T\n', encoding="utf-8")
+    with pytest.raises(UserError) as excinfo:
+        load_sequence([str(path)])
+    assert str(excinfo.value).startswith(f"{path}:3:1: invalid YAML: ")
+
+
+def test_an_invalid_config_names_its_file_before_every_error(tmp_path, test_audio_file):
+    good = write_config(tmp_path, minimal_config(str(test_audio_file)), "a.yaml")
+    bad_data = minimal_config(str(test_audio_file))
+    bad_data["bogus_key"] = 1
+    bad = write_config(tmp_path, bad_data, "b.yaml")
+    with pytest.raises(UserError) as excinfo:
+        load_sequence([str(good), str(bad)])
+    message = str(excinfo.value)
+    assert message.startswith(f"{bad}: invalid configuration (1 error):")
+    assert "bogus_key" in message
+    assert "errors.pydantic.dev" not in message
+
+
+def test_a_config_that_fails_to_load_names_its_file(tmp_path, test_audio_file):
     # Not only field validation: a missing audio file, a count out of range and
     # the like come from load_config too, and say nothing of the file they
-    # are about. The note does, leaving the error itself as it was.
+    # are about.
     good = write_config(tmp_path, minimal_config(str(test_audio_file)), "a.yaml")
     bad = write_config(tmp_path, minimal_config("./nonexistent.wav"), "b.yaml")
-    with pytest.raises(FileNotFoundError) as excinfo:
-        load_sequence([good, bad])
-    assert excinfo.value.__notes__ == [f"In {bad}"]
+    with pytest.raises(UserError) as excinfo:
+        load_sequence([str(good), str(bad)])
+    assert str(excinfo.value).startswith(f"{bad}: audio file not found: ")
 
 
 def test_duplicate_stimulus_ids_raise_error(tmp_path, test_audio_file):
@@ -359,7 +409,7 @@ def test_stimuli_dirs_no_common_files_raises_error(tmp_path, test_audio_file):
     shutil.copy(test_audio_file, da / "001.wav")
     shutil.copy(test_audio_file, db / "002.wav")
     data = stimuli_dirs_data([{"path": str(da)}, {"path": str(db)}])
-    with pytest.raises(ValueError, match="No common audio files"):
+    with pytest.raises(ValueError, match="no common audio files"):
         load_config(write_config(tmp_path, data))
 
 
@@ -568,7 +618,7 @@ def test_stimuli_dir_with_only_unsupported_format_is_rejected(tmp_path):
         "instructions": "I",
         "stimuli_dirs": {"systems": [{"path": str(d)}]},
     }
-    with pytest.raises(ValueError, match="No audio stimuli"):
+    with pytest.raises(ValueError, match="no audio stimuli"):
         load_config(write_config(tmp_path, data))
 
 

@@ -7,11 +7,7 @@ from __future__ import annotations
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from listen_and_rate.config import (
-    format_config_error,
-    load_config,
-    load_sequence_or_exit,
-)
+from listen_and_rate.config import format_config_error, load_config
 from listen_and_rate.config.loader import Config
 
 from ._helpers import minimal_config, write_config
@@ -48,6 +44,20 @@ def test_format_config_error_has_no_pydantic_url(mutate, expected_substring):
     assert expected_substring in message
 
 
+def test_format_config_error_counts_the_errors_in_words():
+    one = minimal_config("/tmp/nonexistent.wav")
+    one.pop("title")
+    assert format_config_error(_error_for(one)).startswith(
+        "invalid configuration (1 error):"
+    )
+    two = minimal_config("/tmp/nonexistent.wav")
+    two.pop("title")
+    two.pop("instructions")
+    assert format_config_error(_error_for(two)).startswith(
+        "invalid configuration (2 errors):"
+    )
+
+
 def test_format_config_error_lists_every_error():
     data = minimal_config("/tmp/nonexistent.wav")
     data.pop("title")
@@ -63,21 +73,3 @@ def test_load_config_still_raises_validation_error(tmp_path):
     data["test_type"] = "mos2"
     with pytest.raises(ValidationError):
         load_config(write_config(tmp_path, data))
-
-
-def test_load_sequence_or_exit_names_the_config_that_is_wrong(
-    tmp_path, test_audio_file
-):
-    # Configs in a sequence often share their fields, so the error alone
-    # cannot say which of them to fix.
-    good = write_config(tmp_path, minimal_config(str(test_audio_file)), "a.yaml")
-    bad_data = minimal_config(str(test_audio_file))
-    bad_data["bogus_key"] = 1
-    bad = write_config(tmp_path, bad_data, "b.yaml")
-    with pytest.raises(SystemExit) as excinfo:
-        load_sequence_or_exit([good, bad])
-    message = str(excinfo.value)
-    assert "bogus_key" in message
-    assert _PYDANTIC_URL not in message
-    assert f"In {bad}" in message
-    assert str(good) not in message

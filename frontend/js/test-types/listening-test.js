@@ -38,6 +38,18 @@ import { t } from '../strings.js';
 
 export class ListeningTest {
   /**
+   * Every stimulus whose audio a delivered config (or its practice view)
+   * plays, for preflight to check. One per page by default, as MOS has;
+   * subclasses whose trials hold theirs otherwise override it.
+   *
+   * @param {Object} config
+   * @returns {Array<{id: string, audio_url?: string}>}
+   */
+  static audioStimuli(config) {
+    return config.stimuli;
+  }
+
+  /**
    * @param {Object} config - Server config from /api/config.
    * @param {string} sessionId - UUID identifying this listener's session.
    * @param {Function} onSubmit - Async callback invoked with (sessionId, testType, answers).
@@ -49,6 +61,10 @@ export class ListeningTest {
     this.config = config;
     this.sessionId = sessionId;
     this.onSubmit = onSubmit;
+    // Called after every change worth keeping for resume - an answer, a
+    // playback, a page turn. Whoever runs the test sets it (see
+    // stage-runner.js); until then it does nothing.
+    this.onChange = () => {};
     this.stage = stage;
     this.currentIndex = 0;
     this._boundKeydown = this._handleKeydown.bind(this);
@@ -91,9 +107,7 @@ export class ListeningTest {
    * Add the time since the clock started to the current page's running total.
    *
    * Every settling point goes through here and the clock restarts as it
-   * leaves, so a second call straight after the first adds nothing. That is
-   * what lets one method serve both the navigation boundary and the resume
-   * record's mid-page flush.
+   * leaves, so a second call straight after the first adds nothing.
    *
    * The total accumulates across visits rather than being fixed on the way
    * out. Navigation backwards is allowed, and time spent reconsidering an
@@ -152,7 +166,7 @@ export class ListeningTest {
     this._el.hint.innerHTML = this._shortcutHintHtml(isLast);
     this._syncNextEnabled();
     this._updateProgressBar();
-    this._onChange?.();
+    this.onChange();
   }
 
   /** Enable Next/Submit: current trial answered (intermediate) or all answered (last). */
@@ -198,17 +212,30 @@ export class ListeningTest {
 
   /** Serialize progress for resume: current page, answers, and what was heard. */
   getProgress() {
-    // Bank the running clock first, so the record carries the time already
-    // spent on the current page. This runs on each state change (app.js wires
-    // it to _onChange), so a stretch with no answer, no playback and no
-    // navigation in it is the one thing a closed tab can still lose.
-    this._flushDwell();
     return {
       currentIndex: this.currentIndex,
       answers: this._serializeAnswers(),
       played: this._serializePlayed(),
-      metrics: [...this._dwell],
+      // With the time already spent on the current page, so the record
+      // carries it. The record is saved on each state change (see onChange),
+      // so a stretch with no answer, no playback and no navigation in it is
+      // the one thing a closed tab can still lose.
+      metrics: [...this._dwellSoFar()],
     };
+  }
+
+  /**
+   * Each page's total, the running clock's stretch included - read without
+   * settling it, so saving progress leaves the clock as it was.
+   */
+  _dwellSoFar() {
+    const totals = new Map(this._dwell);
+    if (this._enteredAt !== null) {
+      const index = this.currentIndex;
+      const running = (performance.now() - this._enteredAt) / 1000;
+      totals.set(index, (totals.get(index) ?? 0) + running);
+    }
+    return totals;
   }
 
   /** Restore serialized progress (see getProgress) and re-sync the page. */

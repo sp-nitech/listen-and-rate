@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 
 from .. import __version__
+from ..errors import UserError
 from ..storage import (
     METADATA_COLUMN_PREFIX,
     METRICS_COLUMN_PREFIX,
@@ -31,7 +32,7 @@ UNKNOWN_VERSION = "unknown"
 _NAMES_SHOWN = 3
 
 
-class ResultVersionMismatch(ValueError):
+class ResultVersionMismatch(UserError):
     """Result files were produced by different releases of the tool."""
 
 
@@ -57,13 +58,16 @@ def _read_result_file(path):
             "test_type": data.get("test_type", ""),
             **{k: v for k, v in r.items() if k != "metrics"},
         }
-        # Flatten the nested form objects and each record's metrics into the
-        # same prefixed columns CSV results carry, so filters and the
-        # Participants section behave identically for both formats.
+        # Flatten the nested form objects, the session's metrics and each
+        # record's own metrics into the same prefixed columns CSV results
+        # carry, so filters and the Participants section behave identically
+        # for both formats.
         for k, v in _nested_object(data, "metadata").items():
             row[METADATA_COLUMN_PREFIX + k] = v
         for k, v in _nested_object(data, "survey").items():
             row[SURVEY_COLUMN_PREFIX + k] = v
+        for k, v in _nested_object(data, "metrics").items():
+            row[METRICS_COLUMN_PREFIX + k] = v
         for k, v in _nested_object(r, "metrics").items():
             row[METRICS_COLUMN_PREFIX + k] = v
         rows.append(row)
@@ -140,7 +144,7 @@ def _check_tool_versions(by_file: dict) -> None:
             for release, names in sorted(by_release.items())
         )
         raise ResultVersionMismatch(
-            f"Result files disagree on the version that produced them: {listing}. "
+            f"result files disagree on the version that produced them: {listing}. "
             "Mixing them would silently drop or misread rows. "
             "Analyze each version's results separately."
         )

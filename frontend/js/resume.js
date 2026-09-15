@@ -33,8 +33,9 @@ export function recordKey(experimentId) {
  * resumed by the same sequence (see findResumableStage).
  *
  * `progress` is the test's getProgress(), or null for a stage of a sequence
- * that has been handed its session but not started (see app.js): nothing to
- * restore yet, only the session id and metadata answers to carry on with.
+ * that has been handed its session but not started (see sequence.js's
+ * runStages): nothing to restore yet, only the session id and metadata
+ * answers to carry on with.
  *
  * @param {Object} config - The delivered config the session runs.
  * @param {string[]} sequence - Every stage's experiment_id, in order.

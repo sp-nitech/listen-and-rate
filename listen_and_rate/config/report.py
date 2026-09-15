@@ -50,6 +50,19 @@ class MetricRange(_StrictModel):
     max: float | None = None
 
 
+class MetricsFilter(_StrictModel):
+    """What each recorded metric must match to keep a row, in its own terms.
+
+    Each metric is matched the way its values can be (see MetricsConfig):
+    dwell_time, a duration, by inclusive {min, max} bounds, since a glob over
+    a number means nothing - user_agent, raw text, by glob patterns like the
+    other filters. A key for a metric this tool does not record fails here.
+    """
+
+    dwell_time: MetricRange | None = None
+    user_agent: str | list[str] | None = None
+
+
 class ReportGroupConfig(_StrictModel):
     """One vertically stacked report section: a heading label plus row filters.
 
@@ -63,19 +76,19 @@ class ReportGroupConfig(_StrictModel):
     name stimulus-side columns - item or system - and drop individual
     trial rows.
 
-    metrics_filter is the one numeric filter: its keys name recorded metrics
-    (see MetricsConfig) and its values are inclusive {min, max} bounds rather
-    than patterns, because a glob over a duration means nothing. Like
-    stimuli_filter it drops individual rows, since a metric is measured per
-    answer rather than per session - excluding a whole listener is a different
-    decision, and one this tool leaves to the analyst.
+    metrics_filter keys name recorded metrics, each matched in its own terms
+    (see MetricsFilter). Like stimuli_filter it drops individual rows, since
+    dwell_time is measured per answer - excluding a whole listener is a
+    different decision, and one this tool leaves to the analyst. user_agent,
+    being the same on every row of a session, drops whole sessions all the
+    same.
     """
 
     label: str
     metadata_filter: dict[str, str | list[str]] | None = None
     survey_filter: dict[str, str | list[str]] | None = None
     stimuli_filter: dict[str, str | list[str]] | None = None
-    metrics_filter: dict[str, MetricRange] | None = None
+    metrics_filter: MetricsFilter | None = None
 
     @field_validator(
         "metadata_filter", "survey_filter", "stimuli_filter", mode="before"

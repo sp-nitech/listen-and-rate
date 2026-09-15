@@ -1112,7 +1112,7 @@ def test_export_php_deploy_config_data_includes_metrics(
     outdir = tmp_path / "deploy"
     _run_export(config_yaml, outdir, monkeypatch)
     text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
-    assert "'metrics' => ['dwell_time' => true]" in text
+    assert "'metrics' => ['dwell_time' => true, 'user_agent' => false]" in text
 
 
 def test_export_php_deploy_config_data_includes_ui_language(

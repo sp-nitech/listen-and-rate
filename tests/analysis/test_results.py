@@ -135,6 +135,29 @@ def test_json_metrics_read_as_the_prefixed_columns_csv_carries(tmp_path):
     assert pd.isna(df["metrics_dwell_time"].iloc[1])
 
 
+def test_json_session_metrics_read_onto_every_row(tmp_path):
+    # Stored once beside the forms, and read like them: repeated on every
+    # row, in the same metrics_ columns CSV results carry.
+    path = tmp_path / "s1.json"
+    path.write_text(
+        json.dumps(
+            {
+                "session_id": "s1",
+                "timestamp": "2026-01-01",
+                "test_type": "mos",
+                "metrics": {"user_agent": "Firefox/128.0"},
+                "records": [
+                    {"system": "A", "item": "i1", "rating": 4},
+                    {"system": "B", "item": "i1", "rating": 2},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    df = _read_result_file(path)
+    assert list(df["metrics_user_agent"]) == ["Firefox/128.0", "Firefox/128.0"]
+
+
 def test_version_note_stays_quiet_when_a_file_cannot_be_read(tmp_path):
     # The note runs while an exception is already in flight. Raising here
     # would replace the real failure with a second, less useful one.

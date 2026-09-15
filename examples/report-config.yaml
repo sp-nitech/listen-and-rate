@@ -65,3 +65,6 @@ confidence: 0.95
 #     metrics_filter:
 #       dwell_time:
 #         min: 1.0
+#   - label: Firefox only
+#     metrics_filter:
+#       user_agent: "*Firefox/*"

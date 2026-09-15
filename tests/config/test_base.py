@@ -855,6 +855,7 @@ def test_metrics_defaults_to_collecting_nothing(tmp_path, test_audio_file):
     data = minimal_config(str(test_audio_file))
     result = load_config(write_config(tmp_path, data))
     assert result.metrics.dwell_time is False
+    assert result.metrics.user_agent is False
     assert result.metrics.enabled_keys() == []
 
 
@@ -864,6 +865,16 @@ def test_metrics_dwell_time_can_be_enabled(tmp_path, test_audio_file):
     result = load_config(write_config(tmp_path, data))
     assert result.metrics.dwell_time is True
     assert result.metrics.enabled_keys() == ["dwell_time"]
+
+
+def test_metrics_user_agent_can_be_enabled_and_follows_dwell_time(
+    tmp_path, test_audio_file
+):
+    data = minimal_config(str(test_audio_file))
+    data["metrics"] = {"user_agent": True, "dwell_time": True}
+    result = load_config(write_config(tmp_path, data))
+    assert result.metrics.user_agent is True
+    assert result.metrics.enabled_keys() == ["dwell_time", "user_agent"]
 
 
 def test_metrics_rejects_an_unknown_key(tmp_path, test_audio_file):

@@ -297,8 +297,11 @@ def test_result_saver_is_abstract():
 
 # -- metrics ----------------------------------------------------------------
 #
-# Per-answer, unlike the session-constant metadata/survey - but stored the same
-# way: nested under one key in JSON, flattened to prefixed columns in CSV.
+# Stored the same way as metadata/survey: nested under one key in JSON,
+# flattened to prefixed columns in CSV. A metric read once per session sits
+# beside the forms in JSON, one measured per answer inside each record.
+
+UA = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 
 METRIC_RATINGS = [
     {
@@ -329,6 +332,17 @@ def test_csv_saver_writes_metrics_with_fixed_decimals(tmp_path):
     assert [r["metrics_dwell_time"] for r in rows] == ["2.50", "9.00"]
 
 
+def test_csv_saver_repeats_a_session_metric_on_every_row_as_it_is(tmp_path):
+    """Like the form answers: one value per session, a column on every row."""
+    saver = CSVResultSaver(
+        tmp_path, EXPERIMENT_ID, metrics_keys=["dwell_time", "user_agent"]
+    )
+    saver.save(SESSION_ID, TEST_TYPE, METRIC_RATINGS, metrics={"user_agent": UA})
+    rows = list(csv.DictReader((tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.csv").open()))
+    assert [r["metrics_dwell_time"] for r in rows] == ["2.50", "9.00"]
+    assert [r["metrics_user_agent"] for r in rows] == [UA, UA]
+
+
 def test_csv_saver_flattens_metrics_into_prefixed_columns_last(tmp_path):
     saver = CSVResultSaver(tmp_path, EXPERIMENT_ID, metrics_keys=["dwell_time"])
     saver.save(SESSION_ID, TEST_TYPE, METRIC_RATINGS)
@@ -355,3 +369,24 @@ def test_json_saver_keeps_metrics_nested_in_each_record(tmp_path):
     )
     assert data["records"][0]["metrics"] == {"dwell_time": 2.5}
     assert data["records"][1]["metrics"] == {"dwell_time": 9.0}
+
+
+def test_json_saver_writes_a_session_metric_once_beside_the_forms(tmp_path):
+    JSONResultSaver(tmp_path, EXPERIMENT_ID).save(
+        SESSION_ID, TEST_TYPE, METRIC_RATINGS, metrics={"user_agent": UA}
+    )
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
+    assert data["metrics"] == {"user_agent": UA}
+    assert list(data)[-3:] == ["survey", "metrics", "records"]
+    assert data["records"][0]["metrics"] == {"dwell_time": 2.5}
+
+
+def test_json_saver_omits_the_session_metrics_when_none_are_collected(tmp_path):
+    """So a file from an experiment without them keeps its earlier shape."""
+    JSONResultSaver(tmp_path, EXPERIMENT_ID).save(SESSION_ID, TEST_TYPE, RATINGS)
+    data = json.loads(
+        (tmp_path / EXPERIMENT_ID / f"{SESSION_ID}.json").read_text(encoding="utf-8")
+    )
+    assert "metrics" not in data

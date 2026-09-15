@@ -133,18 +133,26 @@ class SurveyFormConfig(FormPageConfig):
 
 
 class MetricsConfig(_StrictModel):
-    """Optional per-answer measurements of how the listener produced it.
+    """Optional measurements of the listener's session, taken without asking.
 
-    Everything here describes the response *process*, not the response, and
-    each field is opt-in (nothing is recorded by default) because it is data
-    about the listener rather than about the systems under test.
+    Everything here describes how the listener took the test, not their
+    answers, and each field is opt-in (nothing is recorded by default)
+    because it is data about the listener rather than about the systems under
+    test. Each metric has its own granularity and type, so each is stored,
+    reported and filtered by code of its own rather than as one kind of value.
+    Its granularity is set where it is taken: per answer by _metrics_row, per
+    session by _session_metrics (listen_and_rate/routers/api/_shared.py,
+    mirrored by frontend/save.php). In CSV every metric is a metrics_ column
+    on each row. In JSON a per-answer one sits in each record's "metrics", a
+    per-session one in the file's own "metrics", beside the forms.
 
-    `dwell_time` is the seconds the listener spent on the page an answer came
-    from - every visit to it added up, since going back to reconsider is time
-    the test took (see frontend/js/test-types/listening-test.js). Added up
-    over a session it is how long the test itself took, which is the number
-    behind "how long should I tell listeners this takes" and "is fatigue
-    plausible by trial 40".
+    `dwell_time`, per answer, is the seconds the listener spent on the page an
+    answer came from - every visit to it added up, since going back to
+    reconsider is time the test took (see
+    frontend/js/test-types/listening-test.js). Added up over a session it is
+    how long the test itself took, which is the number behind "how long
+    should I tell listeners this takes" and "is fatigue plausible by trial
+    40".
 
     Add it up per page, not per row. One MUSHRA page rates every system at
     once and writes a row for each, all carrying that page's one reading, so
@@ -163,9 +171,16 @@ class MetricsConfig(_StrictModel):
     does any other interruption in front of the screen, so this is a
     quality-control aid - spotting rushed or fatigued listeners - and not a
     measure of the systems.
+
+    `user_agent`, per session, is the browser's User-Agent string, as it
+    arrived with the submission - read by the server, never sent by the page,
+    so a listener cannot fill it in. It is stored raw: naming the browser is
+    left to the report, so a better parser later reads the same results
+    better.
     """
 
     dwell_time: bool = False
+    user_agent: bool = False
 
     def enabled_keys(self) -> list[str]:
         """Return the metric names to record, in declaration (column) order.
@@ -735,7 +750,7 @@ class BaseTestConfig(_StrictModel):
     # page). Same shape as metadata; no fields (the default) means no
     # survey page.
     survey: SurveyFormConfig = Field(default_factory=SurveyFormConfig)
-    # Per-answer measurements of how the listener produced it (dwell time);
+    # Measurements of how the listener took the test (dwell time, user agent);
     # nothing is recorded by default. Sits with metadata/survey as the third
     # thing collected from the listener rather than from the systems.
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)

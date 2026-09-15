@@ -57,13 +57,16 @@ def _read_result_file(path):
             "test_type": data.get("test_type", ""),
             **{k: v for k, v in r.items() if k != "metrics"},
         }
-        # Flatten the nested form objects and each record's metrics into the
-        # same prefixed columns CSV results carry, so filters and the
-        # Participants section behave identically for both formats.
+        # Flatten the nested form objects, the session's metrics and each
+        # record's own metrics into the same prefixed columns CSV results
+        # carry, so filters and the Participants section behave identically
+        # for both formats.
         for k, v in _nested_object(data, "metadata").items():
             row[METADATA_COLUMN_PREFIX + k] = v
         for k, v in _nested_object(data, "survey").items():
             row[SURVEY_COLUMN_PREFIX + k] = v
+        for k, v in _nested_object(data, "metrics").items():
+            row[METRICS_COLUMN_PREFIX + k] = v
         for k, v in _nested_object(r, "metrics").items():
             row[METRICS_COLUMN_PREFIX + k] = v
         rows.append(row)

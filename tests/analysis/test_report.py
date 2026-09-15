@@ -663,8 +663,8 @@ def test_json_metrics_reach_the_filter_and_the_participants_section(tmp_path):
         [p], groups=[{"label": "Slow", "metrics_filter": {"dwell_time": {"min": 400}}}]
     )
     assert "Slow" in html
-    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
-    assert cells == ["dwell_time", "14:03", "14:03", "14:03", "14:03"]
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _dwell_time_table(html))
+    assert cells == ["14:03", "14:03", "14:03", "14:03"]
 
 
 # -- Participants section -----------------------------------------------------
@@ -767,25 +767,20 @@ _SESSION_TIMED_ROWS = _timed_mos_rows(
 )
 
 
-def _metrics_table(html: str) -> str:
-    """Return the HTML of the table under the Participants "Metrics" heading."""
-    start = html.index(">Metrics</h3>")
+def _dwell_time_table(html: str) -> str:
+    """Return the HTML of the table under the Participants "Dwell Time" heading."""
+    start = html.index(">Dwell Time</h3>")
     return html[start : html.index("</table>", start)]
 
 
-def test_participants_section_shows_recorded_metrics(tmp_path):
+def test_dwell_time_summarizes_each_session_total(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", _SESSION_TIMED_ROWS)])
-    assert ">dwell_time</td>" in _metrics_table(html)
-
-
-def test_metrics_summarize_each_session_total(tmp_path):
-    html = generate_report_html([_write_csv(tmp_path / "s.csv", _SESSION_TIMED_ROWS)])
-    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _dwell_time_table(html))
     # Mean 978.87 s, median 843.2 s, min 581.4 s, max 1512.0 s.
-    assert cells == ["dwell_time", "16:19", "14:03", "9:41", "25:12"]
+    assert cells == ["16:19", "14:03", "9:41", "25:12"]
 
 
-def test_metrics_count_a_mushra_page_once(tmp_path):
+def test_dwell_time_counts_a_mushra_page_once(tmp_path):
     # Every system row of a MUSHRA page carries that page's one reading, so
     # adding up the rows would double this two-system session's 843.2 s.
     page_dwell = {"u1": 300.0, "u2": 543.2}
@@ -794,11 +789,11 @@ def test_metrics_count_a_mushra_page_once(tmp_path):
         for row in MUSHRA_CSV_ROWS
     ]
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
-    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
-    assert cells == ["dwell_time", "14:03", "14:03", "14:03", "14:03"]
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _dwell_time_table(html))
+    assert cells == ["14:03", "14:03", "14:03", "14:03"]
 
 
-def test_metrics_leave_out_sessions_without_readings(tmp_path):
+def test_dwell_time_leaves_out_sessions_without_readings(tmp_path):
     # A file from before dwell_time was turned on has no metrics column at
     # all; its session must not count as a zero-length test.
     untimed = _mos_rows([("s4", "A", "u1", 3), ("s4", "B", "u1", 3)])
@@ -808,30 +803,77 @@ def test_metrics_leave_out_sessions_without_readings(tmp_path):
             _write_csv(tmp_path / "untimed.csv", untimed),
         ]
     )
-    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
-    assert cells == ["dwell_time", "16:19", "14:03", "9:41", "25:12"]
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _dwell_time_table(html))
+    assert cells == ["16:19", "14:03", "9:41", "25:12"]
 
 
-def test_metrics_skip_a_metric_with_no_readings(tmp_path):
+def test_dwell_time_absent_with_no_readings(tmp_path):
     rows = _timed_mos_rows([("s1", "A", ""), ("s1", "B", "")])
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
-    assert ">Metrics</h3>" not in html
+    assert ">Dwell Time</h3>" not in html
 
 
-def test_metrics_absent_without_metrics_columns(tmp_path):
+def test_dwell_time_absent_without_its_column(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)])
     assert "Participants" in html
-    assert ">Metrics</h3>" not in html
+    assert ">Dwell Time</h3>" not in html
 
 
-def test_metrics_cover_the_full_data_once_under_groups(tmp_path):
+def test_dwell_time_covers_the_full_data_once_under_groups(tmp_path):
     html = generate_report_html(
         [_write_csv(tmp_path / "s.csv", _SESSION_TIMED_ROWS)],
         groups=[{"label": "OnlyS1", "stimuli_filter": {"session_id": "s1"}}],
     )
-    assert html.count(">Metrics</h3>") == 1
-    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _metrics_table(html))
-    assert cells == ["dwell_time", "16:19", "14:03", "9:41", "25:12"]
+    assert html.count(">Dwell Time</h3>") == 1
+    cells = re.findall(r"<td[^>]*>([^<]*)</td>", _dwell_time_table(html))
+    assert cells == ["16:19", "14:03", "9:41", "25:12"]
+
+
+_FIREFOX = "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+_CHROME = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+)
+
+
+def _browsed_mos_rows(agents: dict[str, str]) -> list[dict]:
+    """Build two MOS rows per session, each carrying its session's user agent."""
+    return [
+        {**row, "metrics_user_agent": agents[row["session_id"]]}
+        for row in _mos_rows(
+            [(sid, system, "u1", 3) for sid in agents for system in ("A", "B")]
+        )
+    ]
+
+
+def _browsers_cells(html: str) -> list[str]:
+    start = html.index(">Browsers</h3>")
+    return re.findall(
+        r"<td[^>]*>([^<]*)</td>", html[start : html.index("</table>", start)]
+    )
+
+
+def test_browsers_count_each_session_once(tmp_path):
+    rows = _browsed_mos_rows({"s1": _FIREFOX, "s2": _CHROME, "s3": _FIREFOX})
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
+    assert _browsers_cells(html) == ["Chrome", "1", "Firefox", "2"]
+
+
+def test_browsers_count_an_unrecognized_agent_as_other_and_skip_a_blank(tmp_path):
+    rows = _browsed_mos_rows({"s1": "garbage", "s2": "", "s3": _FIREFOX})
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
+    assert _browsers_cells(html) == ["Firefox", "1", "Other", "1"]
+
+
+def test_browsers_absent_without_their_column(tmp_path):
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", _SESSION_TIMED_ROWS)])
+    assert ">Browsers</h3>" not in html
+
+
+def test_browsers_follow_dwell_time(tmp_path):
+    rows = [{**row, "metrics_user_agent": _FIREFOX} for row in _SESSION_TIMED_ROWS]
+    html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
+    assert html.index(">Dwell Time</h3>") < html.index(">Browsers</h3>")
 
 
 def test_plotlyjs_embedded_once_across_sections(tmp_path):
@@ -880,6 +922,20 @@ def test_require_full_order_rejects_incomplete_pair_order(tmp_path):
 
 # -- metrics_filter ---------------------------------------------------------
 
+
+def test_every_metric_has_its_own_table_and_filter():
+    """Each metric is reported and filtered by code of its own (see
+    MetricsConfig), so a new one must be registered in each place."""
+    from listen_and_rate.analysis.report import _METRIC_MATCHERS, _METRIC_TABLES
+    from listen_and_rate.config.base import MetricsConfig
+    from listen_and_rate.config.report import MetricsFilter
+
+    metrics = list(MetricsConfig.model_fields)
+    assert list(_METRIC_TABLES) == metrics
+    assert list(_METRIC_MATCHERS) == metrics
+    assert list(MetricsFilter.model_fields) == metrics
+
+
 _TIMED_ROWS = [
     {
         "session_id": "s1",
@@ -911,38 +967,50 @@ _TIMED_ROWS = [
 ]
 
 
-def _timed_df(tmp_path):
-    return pd.read_csv(_write_csv(tmp_path / "timed.csv", _TIMED_ROWS))
-
-
-def _kept_items(tmp_path, bounds):
+def _kept_items(tmp_path, metrics_filter: dict, rows=_TIMED_ROWS):
+    """Filter rows by one group, given as the report config hands it over."""
     from listen_and_rate.analysis.report import _filter_group_rows
+    from listen_and_rate.config.report import ReportGroupConfig
 
-    kept = _filter_group_rows(
-        _timed_df(tmp_path), {"label": "L", "metrics_filter": {"dwell_time": bounds}}
-    )
-    return list(kept["item"])
+    group = ReportGroupConfig(label="L", metrics_filter=metrics_filter).model_dump()
+    df = pd.read_csv(_write_csv(tmp_path / "rows.csv", rows))
+    return list(_filter_group_rows(df, group)["item"])
 
 
 def test_metrics_filter_keeps_only_rows_within_the_range(tmp_path):
     """Row-level: a rushed trial drops without dropping the listener."""
-    assert _kept_items(tmp_path, {"min": 1.0}) == ["u2"]
+    assert _kept_items(tmp_path, {"dwell_time": {"min": 1.0}}) == ["u2"]
 
 
 def test_metrics_filter_bounds_are_inclusive(tmp_path):
-    assert _kept_items(tmp_path, {"min": 0.4, "max": 0.4}) == ["u1"]
+    assert _kept_items(tmp_path, {"dwell_time": {"min": 0.4, "max": 0.4}}) == ["u1"]
 
 
 def test_metrics_filter_drops_rows_with_no_measurement(tmp_path):
     """A blank reading cannot satisfy a range, matching the glob filters."""
-    assert _kept_items(tmp_path, {}) == ["u1", "u2"]
+    assert _kept_items(tmp_path, {"dwell_time": {}}) == ["u1", "u2"]
+
+
+_BROWSED_ROWS = [
+    {**row, "item": f"u{i}", "metrics_user_agent": agent}
+    for i, (row, agent) in enumerate(
+        zip(_TIMED_ROWS, [_FIREFOX, _CHROME, ""], strict=True), start=1
+    )
+]
+
+
+def test_metrics_filter_matches_the_user_agent_by_glob(tmp_path):
+    assert _kept_items(tmp_path, {"user_agent": "*Firefox/*"}, _BROWSED_ROWS) == ["u1"]
+
+
+def test_metrics_filter_takes_any_of_several_user_agent_patterns(tmp_path):
+    patterns = ["*Firefox/*", "*Chrome/*"]
+    assert _kept_items(tmp_path, {"user_agent": patterns}, _BROWSED_ROWS) == [
+        "u1",
+        "u2",
+    ]
 
 
 def test_metrics_filter_names_the_group_for_an_unrecorded_metric(tmp_path):
-    from listen_and_rate.analysis.report import _filter_group_rows
-
-    with pytest.raises(ValueError, match="'Fast'.*replay_count"):
-        _filter_group_rows(
-            _timed_df(tmp_path),
-            {"label": "Fast", "metrics_filter": {"replay_count": {"min": 1}}},
-        )
+    with pytest.raises(ValueError, match="'L'.*user_agent"):
+        _kept_items(tmp_path, {"user_agent": "*"})

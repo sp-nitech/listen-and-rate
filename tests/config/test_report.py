@@ -187,30 +187,50 @@ def test_load_report_config_or_exit_exits_on_unknown_field(tmp_path):
 # -- metrics_filter ---------------------------------------------------------
 
 
-def test_metrics_filter_accepts_a_min_max_range():
-    """Numeric, so a range rather than the glob the other filters take."""
-    rc = ReportConfig(
-        groups=[
-            {
-                "label": "Deliberated",
-                "metrics_filter": {"dwell_time": {"min": 1.0, "max": 60.0}},
-            }
-        ]
+def _metrics_filter(value: dict):
+    return (
+        ReportConfig(groups=[{"label": "L", "metrics_filter": value}])
+        .groups[0]
+        .metrics_filter
     )
-    bounds = rc.groups[0].metrics_filter["dwell_time"]
+
+
+def test_metrics_filter_takes_a_range_for_dwell_time():
+    """A duration, so a range rather than the glob the other filters take."""
+    bounds = _metrics_filter({"dwell_time": {"min": 1.0, "max": 60.0}}).dwell_time
     assert (bounds.min, bounds.max) == (1.0, 60.0)
 
 
 def test_metrics_filter_accepts_one_sided_bounds():
-    rc = ReportConfig(
-        groups=[{"label": "L", "metrics_filter": {"dwell_time": {"min": 1}}}]
-    )
-    bounds = rc.groups[0].metrics_filter["dwell_time"]
+    bounds = _metrics_filter({"dwell_time": {"min": 1}}).dwell_time
     assert (bounds.min, bounds.max) == (1.0, None)
 
 
 def test_metrics_filter_rejects_an_unknown_bound():
     with pytest.raises(ValidationError, match="Unknown field"):
-        ReportConfig(
-            groups=[{"label": "L", "metrics_filter": {"dwell_time": {"over": 1}}}]
-        )
+        _metrics_filter({"dwell_time": {"over": 1}})
+
+
+def test_metrics_filter_takes_glob_patterns_for_user_agent():
+    assert _metrics_filter({"user_agent": "*Firefox*"}).user_agent == "*Firefox*"
+    assert _metrics_filter({"user_agent": ["*Edg/*", "*Chrome*"]}).user_agent == [
+        "*Edg/*",
+        "*Chrome*",
+    ]
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"dwell_time": "*1*"},
+        {"user_agent": {"min": 1}},
+    ],
+)
+def test_metrics_filter_rejects_the_other_metrics_kind_of_value(value):
+    with pytest.raises(ValidationError):
+        _metrics_filter(value)
+
+
+def test_metrics_filter_rejects_an_unknown_metric():
+    with pytest.raises(ValidationError, match="Unknown field"):
+        _metrics_filter({"replay_count": {"min": 1}})

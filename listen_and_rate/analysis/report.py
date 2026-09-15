@@ -61,9 +61,9 @@ _FILTER_KINDS = (
     ("stimuli_filter", "", "stimulus column"),
 )
 
-# metrics_filter is kept out of _FILTER_KINDS: its values are numeric ranges,
-# not glob patterns, so it needs its own comparison rather than another entry
-# in the loop that applies them.
+# metrics_filter is kept out of _FILTER_KINDS: each metric is matched in its
+# own terms (see _METRIC_MATCHERS), so it needs its own dispatch rather than
+# another entry in the glob loop.
 _METRICS_FILTER = ("metrics_filter", METRICS_COLUMN_PREFIX, "recorded metric")
 
 
@@ -94,10 +94,9 @@ def _participants_section_html(
     One table per form (Metadata / Survey) listing, for every prefixed
     column present in the results, how many SESSIONS gave each response -
     rows are deduplicated by session_id first, since form answers repeat on
-    every rating row of a session. A third table (Metrics) follows when the
-    results carry recorded metrics; see _metrics_subsection_html. Returns ''
-    when the results carry none of these, so reports without them stay
-    unchanged.
+    every rating row of a session. A table per recorded metric follows (Dwell
+    Time, Browsers); see _metrics_subsection_html. Returns '' when the results
+    carry none of these, so reports without them stay unchanged.
 
     form_labels maps a prefixed column name (e.g. 'survey_trial_count') to
     the field's human label from the config; when present it is shown in the
@@ -135,39 +134,45 @@ def _participants_section_html(
 
 
 def _metrics_subsection_html(df, page_columns: list[str] | None = None) -> str:
-    """Build the Participants "Metrics" table: each metric's session totals.
+    """Build the Participants tables of the recorded metrics, one per metric.
 
-    For every metrics_ column, each session's readings are added up and the
-    table shows the mean, median, min and max of those totals - for
-    dwell_time, how long the test took. The median sits beside the mean
-    because one listener who left the tab open moves the mean and the max a
-    long way. The only metric today is dwell_time, so every value is read
-    as seconds and shown as m:ss.
+    Each metric differs in granularity and type (see MetricsConfig), so each
+    has a table of its own, built by its entry in _METRIC_TABLES. A metric
+    the results do not carry is left out.
+    """
+    return "".join(
+        build(df, page_columns)
+        for metric, build in _METRIC_TABLES.items()
+        if METRICS_COLUMN_PREFIX + metric in df.columns
+    )
+
+
+def _dwell_time_table_html(df, page_columns: list[str] | None) -> str:
+    """Build the "Dwell Time" table: how long each session's test took.
+
+    Each session's readings are added up and the table shows the mean,
+    median, min and max of those totals, as m:ss. The median sits beside the
+    mean because one listener who left the tab open moves the mean and the
+    max a long way.
 
     The readings are added up per page, not per row. page_columns names the
     columns that identify one page when a page writes several rows each
     carrying its one reading (MUSHRA); None means every row is its own page.
 
-    Blank readings are dropped before adding up. A metric is recorded on
+    Blank readings are dropped before adding up. dwell_time is recorded on
     every answered page or on none of a session's pages, so what this leaves
-    out is a whole session from a file written before the metric was turned
-    on - not part of a session, which would understate its total. Returns ''
-    when no metric has a reading at all.
+    out is a whole session from a file written before it was turned on - not
+    part of a session, which would understate its total. Returns '' when
+    there is no reading at all.
     """
     per_page = df.drop_duplicates(page_columns) if page_columns else df
-    rows = []
-    for column in [c for c in df.columns if c.startswith(METRICS_COLUMN_PREFIX)]:
-        values = per_page[column].apply(_metric_value)
-        totals = values[values.notna()].groupby(per_page["session_id"]).sum()
-        if totals.empty:
-            continue
-        metric = column[len(METRICS_COLUMN_PREFIX) :]
-        stats = (totals.mean(), totals.median(), totals.min(), totals.max())
-        rows.append([metric] + [_format_duration(s) for s in stats])
-    if not rows:
+    values = per_page[METRICS_COLUMN_PREFIX + "dwell_time"].apply(_metric_value)
+    totals = values[values.notna()].groupby(per_page["session_id"]).sum()
+    if totals.empty:
         return ""
-    return _table_heading_html("Metrics") + _render_table_html(
-        ["Metric", "Mean", "Median", "Min", "Max"], rows
+    stats = (totals.mean(), totals.median(), totals.min(), totals.max())
+    return _table_heading_html("Dwell Time") + _render_table_html(
+        ["Mean", "Median", "Min", "Max"], [[_format_duration(s) for s in stats]]
     )
 
 
@@ -182,39 +187,78 @@ def _format_duration(seconds: float) -> str:
     return f"{minutes}:{secs:02d}"
 
 
-def _apply_metrics_filter(sub, group: dict, label: str):
-    """Drop rows whose recorded metrics fall outside the group's ranges.
+def _browsers_table_html(df, page_columns: list[str] | None) -> str:
+    """Build the "Browsers" table: how many sessions each browser took.
 
-    Separate from the glob filters because the values are numbers: a duration
-    has no useful pattern match, only bounds. A row with no reading for a
-    metric never matches, matching how a missing column value is treated
-    there.
+    user_agent is stored raw and named here, by ua-parser (the User Agent
+    String Parser project's rules), so its name is shown as it gives it -
+    "Mobile Safari" apart from "Safari" is worth seeing in a listening test.
+    An agent it cannot name counts as "Other". Counted per session, like the
+    form answers, since every row of a session carries the same value. A
+    blank is left out: it is a request that carried none, or a file from
+    before user_agent was turned on. Returns '' when there is no value at all.
+    """
+    from ua_parser import parse_user_agent
+
+    per_session = df.drop_duplicates("session_id")
+    agents = per_session[METRICS_COLUMN_PREFIX + "user_agent"].dropna().astype(str)
+    if agents.empty:
+        return ""
+    names = agents.map(lambda ua: getattr(parse_user_agent(ua), "family", "Other"))
+    counts = names.value_counts().sort_index()
+    return _table_heading_html("Browsers") + _render_table_html(
+        ["Browser", "Sessions"], [[name, str(int(n))] for name, n in counts.items()]
+    )
+
+
+# Each metric's Participants table, in MetricsConfig's column order.
+_METRIC_TABLES = {
+    "dwell_time": _dwell_time_table_html,
+    "user_agent": _browsers_table_html,
+}
+
+
+def _apply_metrics_filter(sub, group: dict, label: str):
+    """Drop rows whose recorded metrics do not match the group's filter.
+
+    Each metric is matched in its own terms, by its entry in
+    _METRIC_MATCHERS (see MetricsFilter). A metric left unset (None, as the
+    report config hands it over) is not filtered on. A row with no reading
+    for a metric never matches, matching how a missing column value is
+    treated by the glob filters.
     """
     kind, prefix, kind_label = _METRICS_FILTER
-    for key, bounds in (group.get(kind) or {}).items():
+    for key, value in (group.get(kind) or {}).items():
+        if value is None:
+            continue
         column_name = prefix + key
         if column_name not in sub.columns:
             raise ValueError(
                 f"group {label!r}: {key!r} is not a {kind_label} in the results"
             )
-        values = sub[column_name].apply(_metric_value)
-        matches = values.notna()
-        # Inclusive, so a whole-number threshold reads as written: min 1 keeps
-        # a trial that took exactly one second.
-        if bounds.get("min") is not None:
-            matches &= values >= bounds["min"]
-        if bounds.get("max") is not None:
-            matches &= values <= bounds["max"]
-        sub = sub[matches]
+        sub = sub[_METRIC_MATCHERS[key](sub[column_name], value)]
     return sub
+
+
+def _within_range(column, bounds: dict):
+    """Which of column's readings fall within the inclusive {min, max} bounds."""
+    values = column.apply(_metric_value)
+    matches = values.notna()
+    # Inclusive, so a whole-number threshold reads as written: min 1 keeps
+    # a trial that took exactly one second.
+    if bounds.get("min") is not None:
+        matches &= values >= bounds["min"]
+    if bounds.get("max") is not None:
+        matches &= values <= bounds["max"]
+    return matches
 
 
 def _metric_value(value) -> float:
     """Parse one stored metric reading; NaN when it is blank or not a number.
 
     NaN rather than None so the column stays a float Series and the bound
-    comparisons below stay vectorized - and so an unmeasured row is excluded
-    by notna(), the way a missing value is in the glob filters.
+    comparisons stay vectorized - and so an unmeasured row is excluded by
+    notna(), the way a missing value is in the glob filters.
     """
     try:
         return float(value)
@@ -222,33 +266,49 @@ def _metric_value(value) -> float:
         return float("nan")
 
 
-def _filter_group_rows(df, group: dict):
-    """Return df's rows matching one group's metadata/survey/stimuli filters.
+def _matches_glob(column, value: str | list[str]):
+    """Which of column's values match the glob pattern, or any of a list.
 
-    Values are fnmatch glob patterns (a value without metacharacters is an
-    exact match); a list of patterns is OR, keys and the filter blocks are
-    AND. Rows whose column value is missing never match. Raises ValueError -
-    always naming the group - for a key whose (prefixed) column the results
-    don't carry, or a filter that matches no rows at all.
+    fnmatch patterns (a value without metacharacters is an exact match). A
+    missing value never matches, and is never handed to fnmatch: it stays a
+    float NaN even through astype(str) in pandas 3, which fnmatch rejects.
     """
     from fnmatch import fnmatchcase
 
+    from pandas import notna
+
+    patterns = [value] if isinstance(value, str) else list(value)
+    return column.map(
+        lambda v: bool(notna(v)) and any(fnmatchcase(str(v), p) for p in patterns)
+    )
+
+
+# How each metric's metrics_filter value is matched (see MetricsFilter).
+_METRIC_MATCHERS = {
+    "dwell_time": _within_range,
+    "user_agent": _matches_glob,
+}
+
+
+def _filter_group_rows(df, group: dict):
+    """Return df's rows matching one group's filters.
+
+    metadata/survey/stimuli filter values are glob patterns (see
+    _matches_glob), and metrics_filter values are matched per metric (see
+    _apply_metrics_filter). Keys and the filter blocks are AND. Raises
+    ValueError - always naming the group - for a key whose (prefixed) column
+    the results don't carry, or a filter that matches no rows at all.
+    """
     label = group["label"]
-    sub = df
-    sub = _apply_metrics_filter(sub, group, label)
+    sub = _apply_metrics_filter(df, group, label)
     for kind, prefix, kind_label in _FILTER_KINDS:
         for key, value in (group.get(kind) or {}).items():
-            patterns = [value] if isinstance(value, str) else list(value)
             column_name = prefix + key
             if column_name not in sub.columns:
                 raise ValueError(
                     f"group {label!r}: {key!r} is not a {kind_label} in the results"
                 )
-            column = sub[column_name]
-            matches = column.notna() & column.astype(str).map(
-                lambda v, pats=patterns: any(fnmatchcase(v, p) for p in pats)
-            )
-            sub = sub[matches]
+            sub = sub[_matches_glob(sub[column_name], value)]
     if sub.empty:
         raise ValueError(f"group {label!r} matched no rows in the results")
     return sub

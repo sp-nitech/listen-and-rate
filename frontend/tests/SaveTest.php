@@ -154,6 +154,15 @@ final class SaveTest extends TestCase
         }
     }
 
+    public function testSessionMetricsLeaveOutAUserAgentThatIsNotPrintableAscii(): void
+    {
+        // No browser's is anything else. Cut or not, a byte outside ASCII
+        // would make the result file invalid UTF-8.
+        foreach (["Mozilla/5.0 caf\u{e9}", "Mozilla/5.0 caf\xe9", "Mozilla/5.0 \x01"] as $agent) {
+            $this->assertSame([], session_metrics($agent, ['user_agent']), bin2hex($agent));
+        }
+    }
+
     public function testSessionMetricsCutALongUserAgentToItsFirst512Characters(): void
     {
         $agent = 'Mozilla/5.0 ' . str_repeat('x', 600);
@@ -225,6 +234,21 @@ final class SaveTest extends TestCase
         $path = $this->tmpDir . '/r.json';
         write_json_file($path, ['records' => [['metrics' => ['dwell_time' => 9.0]]]]);
         $this->assertStringContainsString('9.0', file_get_contents($path));
+    }
+
+    public function testWriteJsonFileRefusesWhatItCannotEncodeAndLeavesNoFile(): void
+    {
+        // json_encode returns false on a string that is not valid UTF-8.
+        // Written anyway, that is an empty file reported as saved - one the
+        // report then fails to read, and one that blocks a retry with a 409.
+        $path = $this->tmpDir . '/r.json';
+        try {
+            write_json_file($path, ['metrics' => ['user_agent' => "caf\xe9"]]);
+            $this->fail('Expected a SaveRequestError');
+        } catch (SaveRequestError $e) {
+            $this->assertSame(500, $e->status);
+        }
+        $this->assertFileDoesNotExist($path);
     }
 
     public function testWriteJsonFileLeavesSlashesUnescaped(): void

@@ -699,6 +699,24 @@ def test_submit_leaves_out_a_user_agent_a_spreadsheet_would_read_as_a_formula(
     assert row["metrics_user_agent"] == ""
 
 
+@pytest.mark.parametrize(
+    "agent",
+    [b"Mozilla/5.0 caf\xc3\xa9", b"Mozilla/5.0 caf\xe9"],
+    ids=["utf-8", "latin-1"],
+)
+def test_submit_leaves_out_a_user_agent_that_is_not_printable_ascii(
+    tmp_path, test_audio_file, monkeypatch, agent
+):
+    """No browser's is anything else, and save.php could not store it as
+    valid UTF-8 - so both deployments leave it out alike."""
+    config = _metrics_config(tmp_path, test_audio_file, user_agent=True)
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        assert _submit_with_dwell_time(tc, agent=agent).status_code == 200
+    path = next((tmp_path / "results").rglob("*.csv"))
+    row = next(csv.DictReader(path.open(encoding="utf-8")))
+    assert row["metrics_user_agent"] == ""
+
+
 def test_submit_cuts_a_long_user_agent_to_its_first_512_characters(
     tmp_path, test_audio_file, monkeypatch
 ):

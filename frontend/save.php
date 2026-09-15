@@ -63,11 +63,13 @@ const OUTCOME_TIE = '=';
 const METRIC_DECIMALS = 2;
 
 /**
- * First characters a spreadsheet reads as the start of a formula. A browser's
- * User-Agent never starts with one, so one that does is crafted and is not
- * recorded. Mirrors listen_and_rate/routers/api/_shared.py's _FORMULA_PREFIXES.
+ * First characters a spreadsheet reads as the start of a formula, less the
+ * tab and carriage return that a User-Agent outside printable ASCII is
+ * already refused for. A browser's User-Agent never starts with one, so one
+ * that does is crafted and is not recorded. Mirrors
+ * listen_and_rate/routers/api/_shared.py's _FORMULA_PREFIXES.
  */
-const FORMULA_PREFIXES = ['=', '+', '-', '@', "\t", "\r"];
+const FORMULA_PREFIXES = ['=', '+', '-', '@'];
 
 /**
  * The most of a User-Agent kept. A browser's own runs to a few hundred
@@ -362,15 +364,18 @@ function answer_metrics(array $answer, array $keys): array
  * The metrics read once per submission, keeping only the opted-in keys.
  *
  * That is user_agent, the request's User-Agent header. Left out when the
- * request carried none, or one a spreadsheet would read as a formula (see
- * FORMULA_PREFIXES), and cut to USER_AGENT_MAX_LENGTH. Stored like the
- * form answers: once in JSON, on every row in CSV. Mirrors _session_metrics in listen_and_rate/routers/api/_shared.py.
+ * request carried none, or one that is not printable ASCII - a byte beyond
+ * it would leave the result file invalid UTF-8, which json_encode refuses -
+ * or one a spreadsheet would read as a formula (see FORMULA_PREFIXES), and
+ * cut to USER_AGENT_MAX_LENGTH, bytes being characters within ASCII. Stored
+ * like the form answers: once in JSON, on every row in CSV. Mirrors
+ * _session_metrics in listen_and_rate/routers/api/_shared.py.
  */
 function session_metrics(string $userAgent, array $keys): array
 {
     if (
         !in_array('user_agent', $keys, true)
-        || $userAgent === ''
+        || preg_match('/\A[\x20-\x7E]+\z/', $userAgent) !== 1
         || in_array($userAgent[0], FORMULA_PREFIXES, true)
     ) {
         return [];
@@ -521,7 +526,7 @@ function open_result_file_exclusive(string $path, string $cannotWriteMessage)
     throw new SaveRequestError(500, $cannotWriteMessage);
 }
 
-/** @throws SaveRequestError (409) if the file exists, (500) if it cannot be written. */
+/** @throws SaveRequestError (409) if the file exists, (500) if it cannot be encoded or written. */
 function write_json_file(string $path, array $jsonData): void
 {
     // PHP cannot tell an empty list from an empty map, so json_encode would
@@ -532,15 +537,26 @@ function write_json_file(string $path, array $jsonData): void
             $jsonData[$key] = (object) $jsonData[$key];
         }
     }
+    // Encoded before the file is opened, so a value json_encode refuses (a
+    // string that is not valid UTF-8) fails the request instead of leaving
+    // an empty file behind - one reported as saved, that the report cannot
+    // read, and that would turn the listener's retry into a 409.
+    try {
+        $json = json_encode(
+            $jsonData,
+            // PRESERVE_ZERO_FRACTION so a whole-number metric stays 9.0 rather
+            // than collapsing to 9, and UNESCAPED_SLASHES so "/" stays "/"
+            // rather than "\/" - both matching what json.dump writes. The "\/"
+            // guards "</script>" in HTML, and this file is never embedded in a
+            // page.
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION
+                | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+        );
+    } catch (JsonException $e) {
+        throw new SaveRequestError(500, 'Cannot encode the results: ' . $e->getMessage());
+    }
     $fp = open_result_file_exclusive($path, "Cannot write {$path}");
-    $written = @fwrite($fp, json_encode(
-        $jsonData,
-        // PRESERVE_ZERO_FRACTION so a whole-number metric stays 9.0 rather
-        // than collapsing to 9, and UNESCAPED_SLASHES so "/" stays "/" rather
-        // than "\/" - both matching what json.dump writes. The "\/" guards
-        // "</script>" in HTML, and this file is never embedded in a page.
-        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION | JSON_UNESCAPED_SLASHES
-    ));
+    $written = @fwrite($fp, $json);
     fclose($fp);
     if ($written === false) {
         throw new SaveRequestError(500, "Cannot write {$path}");

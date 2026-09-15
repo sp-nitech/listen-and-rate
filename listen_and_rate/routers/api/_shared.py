@@ -40,11 +40,12 @@ T = TypeVar("T")
 _METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9.-]+\Z")
 
 # First characters a spreadsheet reads as the start of a formula (OWASP's CSV
-# injection list). The User-Agent is the one free text in the results - the
-# metadata text fields above allow no such value - and no browser's starts
-# with one, so one that does is crafted and is not recorded. Kept in sync with
-# frontend/save.php.
-_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+# injection list, less the tab and carriage return that a User-Agent outside
+# printable ASCII is already refused for). The User-Agent is the one free text
+# in the results - the metadata text fields above allow no such value - and no
+# browser's starts with one, so one that does is crafted and is not recorded.
+# Kept in sync with frontend/save.php.
+_FORMULA_PREFIXES = ("=", "+", "-", "@")
 
 # The most of a User-Agent kept. A browser's own runs to a few hundred
 # characters at most, so only a padded one is cut - a server lets a header grow
@@ -262,14 +263,21 @@ def _session_metrics(body: SubmitRequest, config: Config) -> dict[str, str]:
 
     That is user_agent, taken from the request rather than the body (see
     SubmitRequest). Left out when the request carried none, which the CSV
-    saver writes as a blank cell, or one a spreadsheet would read as a
-    formula (see _FORMULA_PREFIXES), and cut to _USER_AGENT_MAX_LENGTH. Only
-    what the config opts into is kept.
+    saver writes as a blank cell, or one that is not printable ASCII, or one
+    a spreadsheet would read as a formula (see _FORMULA_PREFIXES), and cut to
+    _USER_AGENT_MAX_LENGTH. Only what the config opts into is kept.
+
+    Printable ASCII is all a browser sends, as HTTP asks of a header value.
+    Anything else is crafted, and would not be stored alike by both
+    deployments: read here as Latin-1 it turns into different text, and in
+    save.php it is not valid UTF-8 at all. Within ASCII, too, a character is
+    a byte, so the cut falls in the same place in both.
     """
     agent = body._user_agent
     if (
         not config.metrics.user_agent
         or not agent
+        or not (agent.isascii() and agent.isprintable())
         or agent.startswith(_FORMULA_PREFIXES)
     ):
         return {}

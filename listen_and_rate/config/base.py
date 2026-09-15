@@ -172,11 +172,13 @@ class MetricsConfig(_StrictModel):
     quality-control aid - spotting rushed or fatigued listeners - and not a
     measure of the systems.
 
-    `user_agent`, per session, is the browser's User-Agent string, as it
-    arrived with the submission - read by the server, never sent by the page,
-    so a listener cannot fill it in. It is stored raw: naming the browser is
-    left to the report, so a better parser later reads the same results
-    better.
+    `user_agent`, per session, is the User-Agent header as it arrived with
+    the submission - read from the request, never from the body, since the
+    page does not send one. It is what the client says it is, so an
+    extension, a proxy or a custom client can change it: it shows which
+    browsers listeners used, but does not prove it. It is stored raw: naming
+    the browser is left to the report, so a better parser later reads the
+    same results better.
     """
 
     dwell_time: bool = False

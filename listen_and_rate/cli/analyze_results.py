@@ -200,14 +200,28 @@ def _write_report(
     # Participants section reads "Playback device" instead of "device". Only
     # available when --config was given; without it the section falls back to
     # the bare keys.
+    # The free_text fields' columns too, listed in a table of their own
+    # rather than counted; without --config they cannot be told apart.
     form_labels = None
+    free_text_columns = None
     if config is not None:
-        form_labels = {
-            METADATA_COLUMN_PREFIX + f.key: f.label for f in config.metadata.fields
-        } | {SURVEY_COLUMN_PREFIX + f.key: f.label for f in config.survey.fields}
+        form_fields = [
+            (METADATA_COLUMN_PREFIX + f.key, f) for f in config.metadata.fields
+        ] + [(SURVEY_COLUMN_PREFIX + f.key, f) for f in config.survey.fields]
+        form_labels = {column: f.label for column, f in form_fields}
+        free_text_columns = [
+            column for column, f in form_fields if f.type == "free_text"
+        ]
 
     try:
-        html = _render(paths, report, system_order, require_full_order, form_labels)
+        html = _render(
+            paths,
+            report,
+            system_order,
+            require_full_order,
+            form_labels,
+            free_text_columns,
+        )
     except ResultVersionMismatch:
         # Already says the versions differ, in more detail than the note would.
         raise
@@ -224,7 +238,9 @@ def _write_report(
     logger.info("Report saved: %s", out_path)
 
 
-def _render(paths, report, system_order, require_full_order, form_labels) -> str:
+def _render(
+    paths, report, system_order, require_full_order, form_labels, free_text_columns
+) -> str:
     """Build the report HTML from the resolved CLI arguments."""
     return generate_report_html(
         paths,
@@ -240,6 +256,7 @@ def _render(paths, report, system_order, require_full_order, form_labels) -> str
         png_scale=report.scale.png,
         require_full_order=require_full_order,
         form_labels=form_labels,
+        free_text_columns=free_text_columns,
         tie_label=report.tie_label,
         mean_bar_color=report.color.mean_bar,
         count_bar_color=report.color.count_bar,

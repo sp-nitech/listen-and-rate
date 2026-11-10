@@ -714,6 +714,57 @@ def test_participants_section_falls_back_to_key_without_label(tmp_path):
     assert ">trial_count</td>" in html
 
 
+_COMMENTED_ROWS = [
+    {**row, "survey_comment": comment}
+    for row, comment in zip(
+        _GROUPED_ROWS,
+        ["'- too quiet", "'- too quiet", "", ""],
+        strict=True,
+    )
+]
+
+
+def _free_text_table(html: str) -> str:
+    """The Free-text responses table: from its heading to the end of that table."""
+    start = html.index(">Free-text responses<")
+    return html[start : html.index("</table>", start)]
+
+
+def test_free_text_answers_are_listed_in_their_own_table(tmp_path):
+    # Counting them would give every comment a count of one.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _COMMENTED_ROWS)],
+        form_labels={"survey_comment": "Any other comments about the test?"},
+        free_text_columns=["survey_comment"],
+    )
+    listed = _free_text_table(html)
+    assert ">Any other comments about the test?<" in listed
+    # One row per session, the CSV's formula guard taken off, and none for
+    # the session that left it blank.
+    assert listed.count(">- too quiet<") == 1
+    assert "&#x27;- too quiet" not in html
+    assert listed.count("<tr>") == 2  # the header and the one answer
+    survey = html[html.index(">Survey<") : html.index(">Free-text responses<")]
+    assert "comment" not in survey.lower()
+
+
+def test_free_text_answers_wrap(tmp_path):
+    # A long comment wraps rather than widening the table past the page.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _COMMENTED_ROWS)],
+        free_text_columns=["survey_comment"],
+    )
+    assert "white-space:pre-wrap" in _free_text_table(html)
+
+
+def test_free_text_table_absent_without_free_text_answers(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        free_text_columns=["survey_comment"],
+    )
+    assert ">Free-text responses<" not in html
+
+
 def test_participants_section_absent_without_form_columns(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
     assert "Participants" not in html
@@ -772,8 +823,8 @@ _SESSION_TIMED_ROWS = _timed_mos_rows(
 
 
 def _dwell_time_table(html: str) -> str:
-    """Return the HTML of the table under the Participants "Dwell Time" heading."""
-    start = html.index(">Dwell Time</h3>")
+    """Return the HTML of the table under the Participants "Dwell time" heading."""
+    start = html.index(">Dwell time</h3>")
     return html[start : html.index("</table>", start)]
 
 
@@ -814,13 +865,13 @@ def test_dwell_time_leaves_out_sessions_without_readings(tmp_path):
 def test_dwell_time_absent_with_no_readings(tmp_path):
     rows = _timed_mos_rows([("s1", "A", ""), ("s1", "B", "")])
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
-    assert ">Dwell Time</h3>" not in html
+    assert ">Dwell time</h3>" not in html
 
 
 def test_dwell_time_absent_without_its_column(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)])
     assert "Participants" in html
-    assert ">Dwell Time</h3>" not in html
+    assert ">Dwell time</h3>" not in html
 
 
 def test_dwell_time_covers_the_full_data_once_under_groups(tmp_path):
@@ -828,7 +879,7 @@ def test_dwell_time_covers_the_full_data_once_under_groups(tmp_path):
         [_write_csv(tmp_path / "s.csv", _SESSION_TIMED_ROWS)],
         groups=[{"label": "OnlyS1", "stimuli_filter": {"session_id": "s1"}}],
     )
-    assert html.count(">Dwell Time</h3>") == 1
+    assert html.count(">Dwell time</h3>") == 1
     cells = re.findall(r"<td[^>]*>([^<]*)</td>", _dwell_time_table(html))
     assert cells == ["16:19", "14:03", "9:41", "25:12"]
 
@@ -877,7 +928,7 @@ def test_browsers_absent_without_their_column(tmp_path):
 def test_browsers_follow_dwell_time(tmp_path):
     rows = [{**row, "metrics_user_agent": _FIREFOX} for row in _SESSION_TIMED_ROWS]
     html = generate_report_html([_write_csv(tmp_path / "s.csv", rows)])
-    assert html.index(">Dwell Time</h3>") < html.index(">Browsers</h3>")
+    assert html.index(">Dwell time</h3>") < html.index(">Browsers</h3>")
 
 
 def test_plotlyjs_embedded_once_across_sections(tmp_path):

@@ -8,14 +8,16 @@
  * resolves with {key: value, ...} when the listener clicks the submit button.
  *
  * Supported field types:
- *   text   - free-text input; only [a-zA-Z0-9.\-] allowed
- *   select - radio button group from options[]
+ *   text      - single-line input; only [a-zA-Z0-9.\-] allowed, starting
+ *               with a letter or digit
+ *   free_text - multi-line textarea; any characters, up to a length limit
+ *   select    - radio button group from options[]
  */
 
 import { escapeHtml, proseHtml } from './dom.js';
 import { t } from './strings.js';
 
-const _TEXT_PATTERN = /^[a-zA-Z0-9.-]+$/;
+const _TEXT_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9.-]*$/;
 
 /** Whether a {title, description, fields} form block has anything to display. */
 export function hasFormPage(form) {
@@ -24,7 +26,7 @@ export function hasFormPage(form) {
 
 export class MetadataPage {
   /**
-   * @param {Array<{key:string, label:string, type:string, options?:string[], required:boolean}>} fields
+   * @param {Array<{key:string, label:string, type:string, options?:string[], required:boolean, max_length?:number}>} fields
    * @param {{title?: string, submitLabel?: string}} [options] - Page heading
    *   and submit-button label; the defaults are the pre-test metadata form's.
    */
@@ -84,8 +86,20 @@ export class MetadataPage {
         <div class="metadata-field">
           <label class="metadata-label" for="meta-${escapeHtml(f.key)}">${labelHtml}</label>
           <input class="metadata-input" type="text" id="meta-${escapeHtml(f.key)}"
-                 data-key="${escapeHtml(f.key)}" autocomplete="off" spellcheck="false"
+                 data-key="${escapeHtml(f.key)}" value="${escapeHtml(f.default ?? '')}"
+                 autocomplete="off" spellcheck="false"
+                 maxlength="${escapeHtml(String(f.max_length ?? ''))}"
                  placeholder="${escapeHtml(t('metadata_textPlaceholder'))}">
+        </div>`;
+    }
+
+    if (f.type === 'free_text') {
+      return `
+        <div class="metadata-field">
+          <label class="metadata-label" for="meta-${escapeHtml(f.key)}">${labelHtml}</label>
+          <textarea class="metadata-input" id="meta-${escapeHtml(f.key)}"
+                    data-key="${escapeHtml(f.key)}" rows="4"
+                    maxlength="${escapeHtml(String(f.max_length ?? ''))}">${escapeHtml(f.default ?? '')}</textarea>
         </div>`;
     }
 
@@ -115,9 +129,16 @@ export class MetadataPage {
   _bindEvents(page, resolve) {
     for (const input of page.querySelectorAll('input[type="text"]')) {
       input.addEventListener('input', () => {
-        const clean = input.value.replace(/[^a-zA-Z0-9.-]/g, '');
+        const clean = input.value.replace(/[^a-zA-Z0-9.-]/g, '').replace(/^[.-]+/, '');
         if (clean !== input.value) input.value = clean;
         this._values[input.dataset.key] = clean;
+        this._updateStart(page);
+      });
+    }
+
+    for (const textarea of page.querySelectorAll('textarea')) {
+      textarea.addEventListener('input', () => {
+        this._values[textarea.dataset.key] = textarea.value;
         this._updateStart(page);
       });
     }
@@ -140,7 +161,7 @@ export class MetadataPage {
       // this is what makes that visible instead of looking frozen.
       start.disabled = true;
       if (this.busyLabel) start.textContent = this.busyLabel;
-      for (const field of page.querySelectorAll('input')) field.disabled = true;
+      for (const field of page.querySelectorAll('input, textarea')) field.disabled = true;
       resolve({ ...this._values });
     });
 
@@ -155,7 +176,11 @@ export class MetadataPage {
       .filter((f) => f.required)
       .every((f) => {
         const val = this._values[f.key] ?? '';
-        return f.type === 'text' ? _TEXT_PATTERN.test(val) : val.length > 0;
+        if (f.type === 'text') return _TEXT_PATTERN.test(val);
+        // The server trims what trim() does: see FREE_TEXT_TRIMMED in
+        // listen_and_rate/config/base.py.
+        if (f.type === 'free_text') return val.trim().length > 0;
+        return val.length > 0;
       });
     const btn = page.querySelector('#metadata-start');
     if (btn) btn.disabled = !allValid;

@@ -63,11 +63,23 @@ const OUTCOME_TIE = '=';
 const METRIC_DECIMALS = 2;
 
 /**
+ * A regex character class of what String.trim() removes from either end of
+ * a free_text value in the browser, less the control characters
+ * normalize_free_text has already removed and the CR it has made LF. Mirrors
+ * listen_and_rate/config/base.py's FREE_TEXT_TRIMMED.
+ */
+const FREE_TEXT_TRIMMED = '[ \n\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}\x{FEFF}]';
+
+/**
  * First characters a spreadsheet reads as the start of a formula, less the
- * tab and carriage return that a User-Agent outside printable ASCII is
- * already refused for. A browser's User-Agent never starts with one, so one
- * that does is crafted and is not recorded. Mirrors
- * listen_and_rate/routers/api/_shared.py's _FORMULA_PREFIXES.
+ * tab and carriage return that neither a User-Agent nor a free_text value can
+ * start with: the one is refused outside printable ASCII, the other has its
+ * control characters removed and is trimmed. A browser's User-Agent never
+ * starts with one, so one that does is crafted and is not recorded; a
+ * free_text value that does is a listener's comment such as "- too quiet",
+ * so the CSV keeps it, prefixed with "'" to be read as text (see
+ * formula_guarded_form). JSON is not opened as a spreadsheet and stores it as
+ * written. Mirrors listen_and_rate/storage.py's FORMULA_PREFIXES.
  */
 const FORMULA_PREFIXES = ['=', '+', '-', '@'];
 
@@ -138,6 +150,24 @@ function prefix_keys(string $prefix, array $values): array
         $prefixed[$prefix . $key] = $value;
     }
     return $prefixed;
+}
+
+/**
+ * Prefix each free_text answer a spreadsheet would read as a formula with
+ * "'", for CSV storage (see FORMULA_PREFIXES). Answers of the other field
+ * types, and fields with no answer, are left as they are. Mirrors
+ * listen_and_rate/storage.py's _formula_guarded_form.
+ */
+function formula_guarded_form(array $fields, array $values): array
+{
+    foreach ($fields as $field) {
+        $key = $field['key'];
+        if (($field['type'] ?? 'text') === 'free_text' && isset($values[$key])
+            && in_array($values[$key][0], FORMULA_PREFIXES, true)) {
+            $values[$key] = "'" . $values[$key];
+        }
+    }
+    return $values;
 }
 
 /**
@@ -274,12 +304,33 @@ function validate_submission_shape(string $testType, array $data): void
 }
 
 /**
+ * Return a free_text form value as it is stored.
+ *
+ * Line breaks become LF, every other control character is removed, and
+ * leading and trailing spaces and line breaks (FREE_TEXT_TRIMMED) are
+ * trimmed, so a value that was only those counts as unanswered. A value that is not valid UTF-8 is
+ * refused, since it cannot be stored as text. Mirrors
+ * listen_and_rate/config/base.py's normalize_free_text.
+ */
+function normalize_free_text(string $key, string $value): string
+{
+    if (!preg_match('//u', $value)) {
+        throw new SaveRequestError(400, "Metadata field {$key} is not valid UTF-8");
+    }
+    $value = str_replace(["\r\n", "\r"], "\n", $value);
+    $value = preg_replace('/[^\P{Cc}\n]/u', '', $value);
+    return preg_replace('/^' . FREE_TEXT_TRIMMED . '+|' . FREE_TEXT_TRIMMED . '+\z/u', '', $value);
+}
+
+/**
  * Validate submitted metadata against config.metadata field definitions, then
  * keep only declared keys so undeclared/malformed values never reach storage.
  * Mirrors listen_and_rate/routers/api/_shared.py's _validate_metadata().
  *
  * @throws SaveRequestError (400) on a missing required field, an invalid text
- *         value, or a select value outside its configured options.
+ *         value, a free_text value that is not valid UTF-8, a text or
+ *         free_text value longer than its max_length, or a select value
+ *         outside its configured options.
  */
 function validate_metadata(array $fields, array $submitted): array
 {
@@ -287,6 +338,10 @@ function validate_metadata(array $fields, array $submitted): array
     foreach ($fields as $field) {
         $key   = $field['key'];
         $value = $submitted[$key] ?? '';
+        $type  = $field['type'] ?? 'text';
+        if (is_string($value) && $value !== '' && $type === 'free_text') {
+            $value = normalize_free_text($key, $value);
+        }
         if ($value === '') {
             if (!empty($field['required'])) {
                 throw new SaveRequestError(400, "Missing required metadata field: {$key}");
@@ -300,12 +355,18 @@ function validate_metadata(array $fields, array $submitted): array
         if (!is_string($value)) {
             throw new SaveRequestError(400, "Metadata field {$key} must be a string");
         }
-        $type = $field['type'] ?? 'text';
         // \z, not $: PCRE's $ also matches before a trailing newline, which
-        // the browser's JS regex does not - see _METADATA_TEXT_RE in
-        // listen_and_rate/routers/api/_shared.py.
-        if ($type === 'text' && !preg_match('/^[a-zA-Z0-9.-]+\z/', $value)) {
+        // the browser's JS regex does not - see METADATA_TEXT_RE in
+        // listen_and_rate/config/base.py.
+        if ($type === 'text' && !preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.-]*\z/', $value)) {
             throw new SaveRequestError(400, "Metadata field {$key} contains invalid characters");
+        }
+        // Counted in code points, as Python's len() does. The exported config
+        // carries each text and free_text field's max_length, its default
+        // filled in by listen_and_rate/config/base.py.
+        $maxLength = $field['max_length'] ?? null;
+        if (is_int($maxLength) && preg_match_all('/./su', $value) > $maxLength) {
+            throw new SaveRequestError(400, "Metadata field {$key} is longer than {$maxLength} characters");
         }
         if ($type === 'select' && !empty($field['options']) && !in_array($value, $field['options'], true)) {
             throw new SaveRequestError(400, "Metadata field {$key}: value is not one of the configured options");
@@ -571,9 +632,12 @@ function write_csv_file(string $path, array $fields, array $rows, string $experi
         "Cannot open {$path} for writing. "
         . "Run on the server: chmod 755 {$experimentDir}"
     );
-    fputcsv($fp, $fields, ',', '"', '\\');
+    // No escape character ('' rather than fputcsv's '\\'): RFC 4180 doubles
+    // every quote inside a field, as Python's csv module does, so a '\\"' in
+    // a free_text comment or a User-Agent is written the same by both.
+    fputcsv($fp, $fields, ',', '"', '');
     foreach ($rows as $row) {
-        fputcsv($fp, $row, ',', '"', '\\');
+        fputcsv($fp, $row, ',', '"', '');
     }
     fclose($fp);
 }
@@ -1316,7 +1380,10 @@ function handle_save_request(): void
         // the builders just lay out whatever keys they are handed, so the
         // merged prefixed map flows through them unchanged. JSON keeps the
         // raw keys inside its nested metadata/survey objects instead.
-        $form      = array_merge(prefix_keys('metadata_', $meta), prefix_keys('survey_', $survey));
+        $form      = array_merge(
+            prefix_keys('metadata_', formula_guarded_form($config_data['metadata']['fields'], $meta)),
+            prefix_keys('survey_', formula_guarded_form($config_data['survey']['fields'], $survey))
+        );
         $form_keys    = array_keys($form);
         $metrics_keys = enabled_metrics($config_data);
         $session_metrics = session_metrics((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''), $metrics_keys);

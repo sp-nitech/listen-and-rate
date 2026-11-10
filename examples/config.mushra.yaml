@@ -190,6 +190,11 @@ stimuli_dirs:
 #         - "Appropriate"
 #         - "Too Many"
 #       required: true
+#     - key: comment
+#       label: "Any other comments about the test?"
+#       type: free_text
+#       required: false
+#       max_length: 1000
 
 # -- Metrics (optional) -------------------------------------------------------
 # Measurements of how the listener took the test, rather than of the systems

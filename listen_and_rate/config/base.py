@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import re
+import unicodedata
 from pathlib import Path
 from typing import ClassVar, Literal, Self
 
@@ -46,6 +48,49 @@ class _StrictModel(BaseModel):
         return data
 
 
+# Text form values. Kept in sync with frontend/js/metadata.js and
+# frontend/save.php. \Z, not $: both Python's and PCRE's $ also match before a
+# trailing newline, so "alice\n" would pass here and in save.php while the
+# browser's JS regex (whose $ does not) rejects it - letting a crafted request
+# store a value the form itself refuses, newline and all. The first character
+# is a letter or digit, so no value starts with a FORMULA_PREFIXES character
+# (listen_and_rate/storage.py) and a spreadsheet reads none as a formula.
+METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9.-]*\Z")
+
+# The most of a text or free_text form value kept, in code points, when the
+# field gives no max_length, and the most one may give. The field config
+# carries the resolved max_length to the form and to frontend/save.php, so
+# neither keeps a copy. The form's maxlength counts UTF-16 code units, one or
+# two per code point, so it never lets a listener type past it.
+TEXT_DEFAULT_MAX_LENGTH = 64
+FREE_TEXT_DEFAULT_MAX_LENGTH = 1000
+MAX_LENGTH_LIMIT = 1000
+
+# What String.trim() removes from either end of a free_text value in the
+# browser (ECMAScript's WhiteSpace and LineTerminator), less the control
+# characters normalize_free_text has already removed and the CR it has made
+# LF. Listed rather than taken from Unicode's categories, which change with
+# the Unicode version each of Python, PHP and the browser uses. Kept in sync
+# with frontend/save.php.
+FREE_TEXT_TRIMMED = (
+    " \n\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007"
+    "\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+)
+
+
+def normalize_free_text(value: str) -> str:
+    """Return a free_text form value as it is stored.
+
+    Line breaks become LF, every other control character is removed, and
+    leading and trailing spaces and line breaks (FREE_TEXT_TRIMMED) are
+    trimmed, so a value that was only those is empty. Kept in sync with
+    frontend/save.php.
+    """
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    value = "".join(c for c in value if c == "\n" or unicodedata.category(c) != "Cc")
+    return value.strip(FREE_TEXT_TRIMMED)
+
+
 class MetadataFieldConfig(_StrictModel):
     """One field of the pre-test metadata form or the post-test survey.
 
@@ -58,10 +103,11 @@ class MetadataFieldConfig(_StrictModel):
 
     key: str
     label: str
-    type: Literal["text", "select"] = "text"
+    type: Literal["text", "free_text", "select"] = "text"
     options: list[str] | None = None
     required: bool = False
     default: str | None = None
+    max_length: int | None = Field(default=None, ge=1, le=MAX_LENGTH_LIMIT)
 
     @model_validator(mode="after")
     def check_key_and_options(self) -> MetadataFieldConfig:
@@ -73,6 +119,16 @@ class MetadataFieldConfig(_StrictModel):
                 "digits, or underscores. Got: {key}",
                 {"key": repr(self.key)},
             )
+        if self.type == "select" and self.max_length is not None:
+            raise PydanticCustomError(
+                "metadata_select_max_length",
+                "metadata field {key}: select type takes no max_length",
+                {"key": repr(self.key)},
+            )
+        if self.max_length is None and self.type == "text":
+            self.max_length = TEXT_DEFAULT_MAX_LENGTH
+        if self.max_length is None and self.type == "free_text":
+            self.max_length = FREE_TEXT_DEFAULT_MAX_LENGTH
         if self.type == "select" and not self.options:
             raise PydanticCustomError(
                 "metadata_select_missing_options",
@@ -91,6 +147,34 @@ class MetadataFieldConfig(_StrictModel):
                         "options": self.options,
                     },
                 )
+        # An empty default is no default: the field starts unanswered, and
+        # `required` decides whether that is accepted.
+        if (
+            self.default
+            and self.type == "text"
+            and not METADATA_TEXT_RE.match(self.default)
+        ):
+            raise PydanticCustomError(
+                "metadata_default_invalid_characters",
+                "metadata field {key}: default {default} may contain only "
+                "letters, digits, hyphens, and dots, and must start with a "
+                "letter or digit",
+                {"key": repr(self.key), "default": repr(self.default)},
+            )
+        # The form shows the default as the server would store it, so the
+        # limit applies to that, and one of only spaces starts unanswered.
+        if self.default is not None and self.type == "free_text":
+            self.default = normalize_free_text(self.default)
+        if (
+            self.default is not None
+            and self.max_length is not None
+            and len(self.default) > self.max_length
+        ):
+            raise PydanticCustomError(
+                "metadata_default_too_long",
+                "metadata field {key}: default is longer than {limit} characters",
+                {"key": repr(self.key), "limit": self.max_length},
+            )
         return self
 
 

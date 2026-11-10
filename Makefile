@@ -8,6 +8,7 @@ HOST    := 0.0.0.0
 PORT    := 8000
 
 BIOME        := tools/biome/biome
+PHP          := tools/php/php
 PHP_CS_FIXER := tools/php-cs-fixer/php-cs-fixer.phar
 PHPUNIT      := tools/phpunit/phpunit.phar
 PINACT       := tools/pinact/pinact
@@ -66,7 +67,7 @@ lint: tool
 	uv run --no-sync djlint --check frontend/*.html
 	uv run --no-sync mdformat --check *.md
 	(cd frontend && ../$(BIOME) check .)
-	(cd frontend && php ../$(PHP_CS_FIXER) check --config .php-cs-fixer.php --no-ansi)
+	(cd frontend && ../$(PHP) ../$(PHP_CS_FIXER) check --config .php-cs-fixer.php --no-ansi)
 	$(PINACT) run --check .github/*/*.yaml
 	$(TAPLO) format --check pyproject.toml
 	$(YAMLFMT) --lint scripts/examples examples .yamlfmt.yaml .github/*/*.yaml
@@ -78,7 +79,7 @@ format: tool
 	uv run --no-sync djlint --reformat frontend/*.html
 	uv run --no-sync mdformat *.md
 	(cd frontend && ../$(BIOME) format --write .)
-	(cd frontend && php ../$(PHP_CS_FIXER) fix --config .php-cs-fixer.php --no-ansi)
+	(cd frontend && ../$(PHP) ../$(PHP_CS_FIXER) fix --config .php-cs-fixer.php --no-ansi)
 	$(PINACT) run -u --min-age 14 .github/*/*.yaml
 	$(TAPLO) format pyproject.toml
 	$(YAMLFMT) scripts/examples examples .yamlfmt.yaml .github/*/*.yaml
@@ -86,7 +87,7 @@ format: tool
 .PHONY: test
 test: tool
 	uv run --no-sync pytest -s -x
-	php $(PHPUNIT) --configuration frontend/phpunit.xml
+	$(PHP) $(PHPUNIT) --configuration frontend/phpunit.xml
 	(cd frontend && uv run --no-sync python -m nodejs_wheel --test "tests/js/**/*.test.js")
 
 .PHONY: tool

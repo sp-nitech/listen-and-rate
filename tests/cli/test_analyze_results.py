@@ -176,7 +176,7 @@ def test_analyze_results_derives_results_dir_from_config(
     assert "<html>" in report.read_text(encoding="utf-8")
 
 
-def test_analyze_results_lists_free_text_answers_as_comments(
+def test_analyze_results_lists_free_text_answers_in_their_own_table(
     tmp_path, test_audio_file, monkeypatch
 ):
     # Only the config tells a free_text column from one to count.
@@ -201,7 +201,7 @@ def test_analyze_results_lists_free_text_answers_as_comments(
     _run_analyze(monkeypatch, "--config", str(config_yaml))
 
     html = (results_dir / "report.html").read_text(encoding="utf-8")
-    assert ">Comments<" in html
+    assert ">Free-text responses<" in html
 
 
 def _sequence_configs(tmp_path, test_audio_file) -> list[Path]:

@@ -200,8 +200,8 @@ def _write_report(
     # Participants section reads "Playback device" instead of "device". Only
     # available when --config was given; without it the section falls back to
     # the bare keys.
-    # The free_text fields' columns too, listed as comments rather than
-    # counted; without --config they cannot be told apart.
+    # The free_text fields' columns too, listed in a table of their own
+    # rather than counted; without --config they cannot be told apart.
     form_labels = None
     free_text_columns = None
     if config is not None:

@@ -1247,6 +1247,9 @@ textarea.metadata-input {
   display: block;
   line-height: 1.5;
   resize: vertical;
+  /* Never resized below its first height: the rows="4" metadata.js gives it
+     (4 lines at line-height 1.5), plus its padding and border. */
+  min-height: calc(6em + 24px);
 }
 
 .radio-group {

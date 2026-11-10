@@ -110,9 +110,9 @@ def _participants_section_html(
 
     The free_text_columns (prefixed, from the config) hold free-form answers,
     which a count would only give one each. They are left out of those
-    tables and listed instead, one row per answer, in a Comments table after
-    them; see _comments_subsection_html. Without a config they are not known
-    and are counted like the rest.
+    tables and listed instead, one row per answer, in a "Free-text responses"
+    table after them; see _free_text_subsection_html. Without a config they
+    are not known and are counted like the rest.
 
     page_columns is passed through to _metrics_subsection_html.
     """
@@ -137,7 +137,7 @@ def _participants_section_html(
             _table_heading_html(form_label)
             + _render_table_html(["Field", "Response", "Sessions"], rows)
         )
-    subsections.append(_comments_subsection_html(per_session, labels, free_text))
+    subsections.append(_free_text_subsection_html(per_session, labels, free_text))
     subsections.append(_metrics_subsection_html(df, page_columns))
     body = "".join(subsections)
     if not body:
@@ -145,10 +145,10 @@ def _participants_section_html(
     return _section_heading_html("Participants") + body
 
 
-def _comments_subsection_html(
+def _free_text_subsection_html(
     per_session, labels: dict[str, str], free_text: set[str]
 ) -> str:
-    """Build the "Comments" table: each session's free-form answers, as given.
+    """Build the "Free-text responses" table: each free-form answer, as given.
 
     Listed in the results' column order, then session order, without the
     "'" the CSV saver puts before one a spreadsheet would read as a formula
@@ -170,7 +170,7 @@ def _comments_subsection_html(
                 rows.append([field, formula_unguarded(response)])
     if not rows:
         return ""
-    return _table_heading_html("Comments") + _render_table_html(
+    return _table_heading_html("Free-text responses") + _render_table_html(
         ["Field", "Response"], rows, wrap=True
     )
 
@@ -190,7 +190,7 @@ def _metrics_subsection_html(df, page_columns: list[str] | None = None) -> str:
 
 
 def _dwell_time_table_html(df, page_columns: list[str] | None) -> str:
-    """Build the "Dwell Time" table: how long each session's test took.
+    """Build the "Dwell time" table: how long each session's test took.
 
     Each session's readings are added up and the table shows the mean,
     median, min and max of those totals, as m:ss. The median sits beside the
@@ -213,7 +213,7 @@ def _dwell_time_table_html(df, page_columns: list[str] | None) -> str:
     if totals.empty:
         return ""
     stats = (totals.mean(), totals.median(), totals.min(), totals.max())
-    return _table_heading_html("Dwell Time") + _render_table_html(
+    return _table_heading_html("Dwell time") + _render_table_html(
         ["Mean", "Median", "Min", "Max"], [[_format_duration(s) for s in stats]]
     )
 
@@ -420,8 +420,8 @@ def generate_report_html(
             to that field's human label from the config, shown in the
             Participants section's Field column in place of the bare key.
         free_text_columns: The prefixed form columns of free_text fields
-            (from the config), listed in the Participants section's Comments
-            table rather than counted.
+            (from the config), listed in the Participants section's
+            "Free-text responses" table rather than counted.
         tie_label: Name of the AB count chart's centered tie bar (its
             position is always centered). Ignored by the other test types.
         mean_bar_color: Fill color of the mean/rate bars.

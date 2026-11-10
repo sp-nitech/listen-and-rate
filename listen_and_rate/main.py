@@ -45,6 +45,8 @@ def _build_stage(config: Config, cleanup: ExitStack) -> Stage:
         [f.key for f in config.metadata.fields],
         [f.key for f in config.survey.fields],
         config.metrics.enabled_keys(),
+        [f.key for f in config.metadata.fields if f.type == "free_text"],
+        [f.key for f in config.survey.fields if f.type == "free_text"],
     )
     # With loudness_normalization configured, pre-normalize every clip into
     # a temp cache once at startup and serve from there; otherwise serve the

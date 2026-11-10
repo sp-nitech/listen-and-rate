@@ -898,6 +898,14 @@ audio {
   pointer-events: none;
 }
 
+/* The Reference's slider is permanently fixed at 100 (it IS the
+   benchmark) - not interactive, and its thumb is muted gray rather than
+   the accent color used for actual ratings. */
+.mushra-range-fixed .mushra-range-thumb {
+  background: var(--color-text-muted);
+  box-shadow: none;
+}
+
 /* brightness() (not swapping to --color-primary-hover) so hovering always
    reads as "lighter", in both themes - --color-primary-hover is a lighter
    tint in dark mode but a *darker* one in light mode (the usual "hover
@@ -906,14 +914,6 @@ audio {
 .mushra-range:hover .mushra-range-thumb,
 .mushra-range:hover .mushra-range-fill {
   filter: brightness(1.4);
-}
-
-/* The Reference's slider is permanently fixed at 100 (it IS the
-   benchmark) - not interactive, and its thumb is muted gray rather than
-   the accent color used for actual ratings. */
-.mushra-range-fixed .mushra-range-thumb {
-  background: var(--color-text-muted);
-  box-shadow: none;
 }
 
 /* Not-yet-rated sliders hide their thumb/fill and read "–" instead of a
@@ -1241,6 +1241,12 @@ audio {
 .metadata-input::placeholder {
   color: var(--color-text-muted);
   font-size: 0.85rem;
+}
+
+textarea.metadata-input {
+  display: block;
+  line-height: 1.5;
+  resize: vertical;
 }
 
 .radio-group {

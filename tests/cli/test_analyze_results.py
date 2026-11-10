@@ -176,6 +176,34 @@ def test_analyze_results_derives_results_dir_from_config(
     assert "<html>" in report.read_text(encoding="utf-8")
 
 
+def test_analyze_results_lists_free_text_answers_as_comments(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # Only the config tells a free_text column from one to count.
+    config_yaml = write_config(
+        tmp_path,
+        {
+            "test_type": "mos",
+            "title": "T",
+            "instructions": "I",
+            "output": {"format": "csv", "path": str(tmp_path / "results")},
+            "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+            "survey": {
+                "fields": [{"key": "comment", "label": "C", "type": "free_text"}]
+            },
+        },
+    )
+    results_dir = tmp_path / "results" / config_yaml.stem
+    results_dir.mkdir(parents=True)
+    rows = [{**r, "survey_comment": "Too quiet"} for r in CSV_ROWS]
+    _write_csv(results_dir / "s1.csv", rows)
+
+    _run_analyze(monkeypatch, "--config", str(config_yaml))
+
+    html = (results_dir / "report.html").read_text(encoding="utf-8")
+    assert ">Comments<" in html
+
+
 def _sequence_configs(tmp_path, test_audio_file) -> list[Path]:
     """Write stages a (asking the metadata form) then b, sharing one output.path."""
     base = {

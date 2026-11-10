@@ -714,6 +714,57 @@ def test_participants_section_falls_back_to_key_without_label(tmp_path):
     assert ">trial_count</td>" in html
 
 
+_COMMENTED_ROWS = [
+    {**row, "survey_comment": comment}
+    for row, comment in zip(
+        _GROUPED_ROWS,
+        ["'- too quiet", "'- too quiet", "", ""],
+        strict=True,
+    )
+]
+
+
+def _comments_table(html: str) -> str:
+    """The Comments table: from its heading to the end of that table."""
+    start = html.index(">Comments<")
+    return html[start : html.index("</table>", start)]
+
+
+def test_free_text_answers_are_listed_under_comments(tmp_path):
+    # Counting them would give every comment a count of one.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _COMMENTED_ROWS)],
+        form_labels={"survey_comment": "Any other comments about the test?"},
+        free_text_columns=["survey_comment"],
+    )
+    comments = _comments_table(html)
+    assert ">Any other comments about the test?<" in comments
+    # One row per session, the CSV's formula guard taken off, and none for
+    # the session that left it blank.
+    assert comments.count(">- too quiet<") == 1
+    assert "&#x27;- too quiet" not in html
+    assert comments.count("<tr>") == 2  # the header and the one answer
+    survey = html[html.index(">Survey<") : html.index(">Comments<")]
+    assert "comment" not in survey.lower()
+
+
+def test_free_text_answers_wrap(tmp_path):
+    # A long comment wraps rather than widening the table past the page.
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _COMMENTED_ROWS)],
+        free_text_columns=["survey_comment"],
+    )
+    assert "white-space:pre-wrap" in _comments_table(html)
+
+
+def test_comments_absent_without_free_text_answers(tmp_path):
+    html = generate_report_html(
+        [_write_csv(tmp_path / "s.csv", _GROUPED_ROWS)],
+        free_text_columns=["survey_comment"],
+    )
+    assert ">Comments<" not in html
+
+
 def test_participants_section_absent_without_form_columns(tmp_path):
     html = generate_report_html([_write_csv(tmp_path / "s.csv", CSV_ROWS)])
     assert "Participants" not in html

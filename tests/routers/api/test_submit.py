@@ -7,6 +7,11 @@ import json
 
 import pytest
 
+from listen_and_rate.config.base import (
+    FREE_TEXT_DEFAULT_MAX_LENGTH,
+    TEXT_DEFAULT_MAX_LENGTH,
+)
+
 from ._helpers import (
     _ab_client,
     _abx_client,
@@ -232,6 +237,156 @@ def test_submit_text_metadata_allows_dots(tmp_path, test_audio_file, monkeypatch
         assert res.status_code == 200
 
 
+_FREE_TEXT_FIELDS = [
+    {"key": "comment", "label": "Additional comments", "type": "free_text"}
+]
+
+
+def test_submit_free_text_survey_keeps_any_characters(
+    tmp_path, test_audio_file, monkeypatch
+):
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=_FREE_TEXT_FIELDS
+    ) as tc:
+        res = _submit(tc, {}, survey={"comment": "音が小さい。\nNo issues, thanks!"})
+        assert res.status_code == 200
+        path = tmp_path / "results" / "config" / "s.csv"
+        rows = list(csv.DictReader(path.open(newline="", encoding="utf-8")))
+        assert rows[0]["survey_comment"] == "音が小さい。\nNo issues, thanks!"
+
+
+@pytest.mark.parametrize(
+    ("submitted", "stored"),
+    [
+        ("first\r\nsecond\rthird", "first\nsecond\nthird"),
+        ("nul\x00 and bell\x07", "nul and bell"),
+        ("  padded \n", "padded"),
+        # The browser's String.trim() removes these too.
+        ("\u3000\u00a0padded\ufeff\u2028", "padded"),
+        # A spreadsheet would read these as a formula; the prefix keeps them
+        # text without refusing an ordinary comment such as "- too quiet".
+        ("=SUM(A1:A2)", "'=SUM(A1:A2)"),
+        ("- too quiet", "'- too quiet"),
+    ],
+)
+def test_submit_free_text_survey_is_normalized(
+    tmp_path, test_audio_file, monkeypatch, submitted, stored
+):
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=_FREE_TEXT_FIELDS
+    ) as tc:
+        res = _submit(tc, {}, survey={"comment": submitted})
+        assert res.status_code == 200
+        path = tmp_path / "results" / "config" / "s.csv"
+        rows = list(csv.DictReader(path.open(newline="", encoding="utf-8")))
+        assert rows[0]["survey_comment"] == stored
+
+
+def test_submit_free_text_read_as_formula_is_kept_as_is_in_json(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # The "'" prefix is for spreadsheets opening the CSV; JSON is not opened
+    # as one, so it keeps what the listener wrote.
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "json", "path": str(tmp_path / "results")},
+        "stimuli_list": {
+            "entries": [
+                {"id": "s001", "path": str(test_audio_file)},
+                {"id": "s002", "path": str(test_audio_file)},
+            ]
+        },
+        "survey": {"fields": _FREE_TEXT_FIELDS},
+    }
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        res = _submit(tc, {}, survey={"comment": "- too quiet"})
+        assert res.status_code == 200
+        data = json.loads(
+            (tmp_path / "results" / "config" / "s.json").read_text(encoding="utf-8")
+        )
+        assert data["survey"] == {"comment": "- too quiet"}
+
+
+def test_submit_whitespace_only_required_free_text_returns_400(
+    tmp_path, test_audio_file, monkeypatch
+):
+    fields = [{**_FREE_TEXT_FIELDS[0], "required": True}]
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=fields
+    ) as tc:
+        assert _submit(tc, {}, survey={"comment": " \n\t"}).status_code == 400
+
+
+def test_submit_ideographic_space_only_required_free_text_returns_400(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # The browser's String.trim() leaves it empty, so the form refuses it too.
+    fields = [{**_FREE_TEXT_FIELDS[0], "required": True}]
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=fields
+    ) as tc:
+        assert _submit(tc, {}, survey={"comment": "\u3000"}).status_code == 400
+
+
+def test_submit_too_long_free_text_returns_400(tmp_path, test_audio_file, monkeypatch):
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=_FREE_TEXT_FIELDS
+    ) as tc:
+        longest = "あ" * FREE_TEXT_DEFAULT_MAX_LENGTH
+        assert _submit(tc, {}, survey={"comment": longest}).status_code == 200
+        assert _submit(tc, {}, survey={"comment": longest + "あ"}).status_code == 400
+
+
+def test_submit_free_text_longer_than_its_max_length_returns_400(
+    tmp_path, test_audio_file, monkeypatch
+):
+    fields = [{**_FREE_TEXT_FIELDS[0], "max_length": 3}]
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=fields
+    ) as tc:
+        assert _submit(tc, {}, survey={"comment": "あいうえ"}).status_code == 400
+        assert _submit(tc, {}, survey={"comment": "あいう"}).status_code == 200
+
+
+def test_submit_too_long_text_returns_400(tmp_path, test_audio_file, monkeypatch):
+    fields = [{"key": "listener", "label": "Listener", "type": "text"}]
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, fields
+    ) as tc:
+        longest = "a" * TEXT_DEFAULT_MAX_LENGTH
+        assert _submit(tc, {"listener": longest + "a"}).status_code == 400
+        assert _submit(tc, {"listener": longest}).status_code == 200
+
+
+def test_submit_free_text_that_is_not_utf8_returns_400_and_saves_nothing(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """A lone surrogate is valid JSON but cannot be written as UTF-8.
+
+    Refused before the result file is created, the session can still be
+    submitted; otherwise the save would fail part-way, leaving a file that
+    turns every retry into a 409. save.php refuses it too.
+    """
+    body = (
+        '{"session_id": "s", "test_type": "mos",'
+        ' "ratings": [{"stimulus_id": "s001", "rating": 5},'
+        ' {"stimulus_id": "s002", "rating": 4}],'
+        ' "metadata": {}, "survey": {"comment": "\\ud800"}}'
+    )
+    with _client_with_metadata_config(
+        tmp_path, test_audio_file, monkeypatch, [], survey_fields=_FREE_TEXT_FIELDS
+    ) as tc:
+        res = tc.post(
+            "/api/submit",
+            content=body,
+            headers={"Content-Type": "application/json"},
+        )
+        assert res.status_code == 400
+        assert _submit(tc, {}, survey={"comment": "ok"}).status_code == 200
+
+
 def test_submit_select_metadata_not_in_options_returns_400(
     tmp_path, test_audio_file, monkeypatch
 ):
@@ -418,6 +573,31 @@ def test_submit_rejects_a_metadata_value_with_a_trailing_newline(
                 "test_type": "mos",
                 "ratings": [{"stimulus_id": "s001", "rating": 4}],
                 "metadata": {"listener": "alice\n"},
+            },
+        )
+        assert res.status_code == 400
+
+
+def test_submit_rejects_a_metadata_text_value_starting_with_a_hyphen(
+    tmp_path, test_audio_file, monkeypatch
+):
+    """A spreadsheet would read "-A1" as a formula, so it is not stored."""
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "output": {"format": "csv", "path": str(tmp_path / "results")},
+        "metadata": {"fields": [{"key": "listener", "label": "L", "type": "text"}]},
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    with _create_app_client(tmp_path, config, monkeypatch) as tc:
+        res = tc.post(
+            "/api/submit",
+            json={
+                "session_id": "s1",
+                "test_type": "mos",
+                "ratings": [{"stimulus_id": "s001", "rating": 4}],
+                "metadata": {"listener": "-A1"},
             },
         )
         assert res.status_code == 400

@@ -133,7 +133,9 @@ def _table_heading_html(label: str) -> str:
     )
 
 
-def _render_table_html(headers: list[str], rows: list[list[str]]) -> str:
+def _render_table_html(
+    headers: list[str], rows: list[list[str]], wrap: bool = False
+) -> str:
     """Render a headers+rows grid as a standalone, bordered HTML <table>.
 
     The generic table painter shared by every report table (significance,
@@ -142,11 +144,16 @@ def _render_table_html(headers: list[str], rows: list[list[str]]) -> str:
     (and rename labels) straight from the admin's config, so a stray '<'
     shouldn't be able to break the page - matching the browser-tab title's own
     escaping.
+
+    With wrap, each cell's text keeps its line breaks and wraps at a fixed
+    width, so a long free-form answer does not widen the table past the page.
     """
     thead = "".join(f'<th style="{_TH_STYLE}">{_escape_html(h)}</th>' for h in headers)
     tbody = "".join(
         "<tr>"
-        + "".join(f'<td style="{_TD_STYLE}">{_escape_html(cell)}</td>' for cell in row)
+        + "".join(
+            f'<td style="{_TD_STYLE}">{_cell_html(cell, wrap)}</td>' for cell in row
+        )
         + "</tr>"
         for row in rows
     )
@@ -162,6 +169,18 @@ def _render_table_html(headers: list[str], rows: list[list[str]]) -> str:
         f"border-collapse:collapse;"
         f'font-family:{_TEXT_FAMILY};font-size:{_TEXT_SIZE}px">'
         f"<thead><tr>{thead}</tr></thead><tbody>{tbody}</tbody></table>"
+    )
+
+
+def _cell_html(cell: str, wrap: bool) -> str:
+    """Escape a table cell's text, inside a wrapping box when asked to."""
+    if not wrap:
+        return _escape_html(cell)
+    # A max-width on the <td> itself is ignored by an auto-width table, so
+    # the box inside the cell carries it.
+    return (
+        '<div style="max-width:40em;white-space:pre-wrap;overflow-wrap:anywhere">'
+        f"{_escape_html(cell)}</div>"
     )
 
 

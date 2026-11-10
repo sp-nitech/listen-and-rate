@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from collections.abc import Callable
 from typing import Protocol, TypeVar
 
@@ -26,26 +25,22 @@ from ...config import (
     build_ab_trials,
 )
 from ...config._utils import _duplicates
+from ...config.base import (
+    METADATA_TEXT_RE,
+    normalize_free_text,
+)
 from ...models import ChoiceEntry, RatingEntry, SubmitRequest
 from ...rng import rng
-from ...storage import METRIC_DECIMALS, OUTCOME_A, OUTCOME_B, ResultSaver
+from ...storage import (
+    FORMULA_PREFIXES,
+    METRIC_DECIMALS,
+    OUTCOME_A,
+    OUTCOME_B,
+    ResultSaver,
+)
 
 T = TypeVar("T")
 
-# Text form values. Kept in sync with frontend/js/metadata.js and
-# frontend/save.php. \Z, not $: both Python's and PCRE's $ also match before a
-# trailing newline, so "alice\n" would pass here and in save.php while the
-# browser's JS regex (whose $ does not) rejects it - letting a crafted request
-# store a value the form itself refuses, newline and all.
-_METADATA_TEXT_RE = re.compile(r"^[a-zA-Z0-9.-]+\Z")
-
-# First characters a spreadsheet reads as the start of a formula (OWASP's CSV
-# injection list, less the tab and carriage return that a User-Agent outside
-# printable ASCII is already refused for). The User-Agent is the one free text
-# in the results - the metadata text fields above allow no such value - and no
-# browser's starts with one, so one that does is crafted and is not recorded.
-# Kept in sync with frontend/save.php.
-_FORMULA_PREFIXES = ("=", "+", "-", "@")
 
 # The most of a User-Agent kept. A browser's own runs to a few hundred
 # characters at most, so only a padded one is cut - a server lets a header grow
@@ -60,13 +55,18 @@ def _validate_metadata(
     """Validate submitted metadata against the configured field definitions.
 
     Raises HTTPException(400) on a missing required field, a text field that
-    doesn't match the client's input pattern, or a select value outside its
-    configured options. Returns a sanitized dict containing only keys that
-    are declared in `fields`, so undeclared keys never reach storage.
+    doesn't match the client's input pattern, a text or free_text field
+    longer than its max_length, or a select value outside its configured
+    options.
+    Returns a sanitized dict containing only keys that are declared in
+    `fields`, so undeclared keys never reach storage; a free_text value is
+    stored normalized (see _normalize_free_text).
     """
     sanitized: dict[str, str] = {}
     for field in fields:
         value = metadata.get(field.key)
+        if value and field.type == "free_text":
+            value = _normalize_free_text(field.key, value)
         if not value:
             if field.required:
                 raise HTTPException(
@@ -74,10 +74,16 @@ def _validate_metadata(
                     detail=f"Missing required metadata field: {field.key!r}",
                 )
             continue
-        if field.type == "text" and not _METADATA_TEXT_RE.match(value):
+        if field.type == "text" and not METADATA_TEXT_RE.match(value):
             raise HTTPException(
                 status_code=400,
                 detail=f"Metadata field {field.key!r} contains invalid characters",
+            )
+        if field.max_length is not None and len(value) > field.max_length:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Metadata field {field.key!r} is longer than "
+                f"{field.max_length} characters",
             )
         if field.type == "select" and field.options and value not in field.options:
             raise HTTPException(
@@ -87,6 +93,25 @@ def _validate_metadata(
             )
         sanitized[field.key] = value
     return sanitized
+
+
+def _normalize_free_text(key: str, value: str) -> str:
+    """Return a free_text form value as it is stored.
+
+    See normalize_free_text: a value that was only spaces, line breaks and
+    control characters counts as unanswered. A value that cannot be written
+    as UTF-8 (a lone surrogate, which JSON can carry) raises
+    HTTPException(400): left to the saver it would fail after the result file
+    is created, and every retry of the session would then be a 409.
+    """
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Metadata field {key!r} is not valid UTF-8",
+        ) from None
+    return normalize_free_text(value)
 
 
 def _all_stimuli(config: Config) -> list[StimulusConfig]:
@@ -264,8 +289,8 @@ def _session_metrics(body: SubmitRequest, config: Config) -> dict[str, str]:
     That is user_agent, taken from the request rather than the body (see
     SubmitRequest). Left out when the request carried none, which the CSV
     saver writes as a blank cell, or one that is not printable ASCII, or one
-    a spreadsheet would read as a formula (see _FORMULA_PREFIXES), and cut to
-    _USER_AGENT_MAX_LENGTH. Only what the config opts into is kept.
+    a spreadsheet would read as a formula (see storage.FORMULA_PREFIXES), and
+    cut to _USER_AGENT_MAX_LENGTH. Only what the config opts into is kept.
 
     Printable ASCII is all a browser sends, as HTTP asks of a header value.
     Anything else is crafted, and would not be stored alike by both
@@ -278,7 +303,7 @@ def _session_metrics(body: SubmitRequest, config: Config) -> dict[str, str]:
         not config.metrics.user_agent
         or not agent
         or not (agent.isascii() and agent.isprintable())
-        or agent.startswith(_FORMULA_PREFIXES)
+        or agent.startswith(FORMULA_PREFIXES)
     ):
         return {}
     return {"user_agent": agent[:_USER_AGENT_MAX_LENGTH]}

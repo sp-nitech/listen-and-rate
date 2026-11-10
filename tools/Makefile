@@ -1,17 +1,25 @@
-BIOME_VERSION        := 2.5.11
-PHP_CS_FIXER_VERSION := 3.95.24
-PHPUNIT_VERSION      := 12.5.33
-PINACT_VERSION       := 4.1.1
+BIOME_VERSION        := 2.6.6
+PHP_VERSION          := 8.5.8
+PHP_CS_FIXER_VERSION := 3.95.30
+PHPUNIT_VERSION      := 12.5.43
+PINACT_VERSION       := 5.0.2
 TAPLO_VERSION        := 0.10.0
 YAMLFMT_VERSION      := 0.21.0
 
-all: biome php-cs-fixer phpunit pinact taplo yamlfmt
+all: biome php php-cs-fixer phpunit pinact taplo yamlfmt
 
 biome:
 	mkdir -p biome
 	wget https://github.com/biomejs/biome/releases/download/%40biomejs%2Fbiome%40$(BIOME_VERSION)/biome-linux-x64 \
 	    -O biome/biome
 	chmod +x biome/biome
+
+php:
+	mkdir -p php
+	wget https://dl.static-php.dev/static-php-cli/common/php-$(PHP_VERSION)-cli-linux-x86_64.tar.gz \
+	    -O php.tar.gz
+	tar xzf php.tar.gz -C php
+	rm -f php.tar.gz
 
 php-cs-fixer:
 	mkdir -p php-cs-fixer
@@ -48,6 +56,6 @@ yamlfmt:
 	rm -f yamlfmt.tar.gz
 
 clean:
-	rm -rf biome php-cs-fixer phpunit pinact taplo yamlfmt
+	rm -rf biome php php-cs-fixer phpunit pinact taplo yamlfmt
 
 .PHONY: all clean

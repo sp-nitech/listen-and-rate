@@ -9,6 +9,11 @@ import pytest
 from pydantic import ValidationError
 
 from listen_and_rate.config import load_config
+from listen_and_rate.config.base import (
+    FREE_TEXT_DEFAULT_MAX_LENGTH,
+    MAX_LENGTH_LIMIT,
+    TEXT_DEFAULT_MAX_LENGTH,
+)
 
 from ._helpers import (
     minimal_config,
@@ -373,6 +378,175 @@ def test_survey_parses_fields(tmp_path, test_audio_file):
     assert result.survey.title == "Questionnaire"
     assert result.survey.fields[0].key == "trial_count"
     assert result.survey.fields[0].options == ["TooFew", "Appropriate", "TooMany"]
+
+
+@pytest.mark.parametrize("form", ["metadata", "survey"])
+def test_form_parses_free_text_field(tmp_path, test_audio_file, form):
+    data = minimal_config(str(test_audio_file))
+    data[form] = {
+        "fields": [{"key": "comment", "label": "Any comments?", "type": "free_text"}]
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert getattr(result, form).fields[0].type == "free_text"
+
+
+@pytest.mark.parametrize(
+    ("field_type", "expected"),
+    [
+        ("text", TEXT_DEFAULT_MAX_LENGTH),
+        ("free_text", FREE_TEXT_DEFAULT_MAX_LENGTH),
+    ],
+)
+def test_max_length_defaults_by_type(tmp_path, test_audio_file, field_type, expected):
+    # Filled in here, so the form and save.php read it rather than keep a copy.
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {"fields": [{"key": "f", "label": "F", "type": field_type}]}
+    result = load_config(write_config(tmp_path, data))
+    assert result.survey.fields[0].max_length == expected
+
+
+@pytest.mark.parametrize("field_type", ["text", "free_text"])
+def test_max_length_given_is_kept(tmp_path, test_audio_file, field_type):
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {
+        "fields": [{"key": "f", "label": "F", "type": field_type, "max_length": 10}]
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.survey.fields[0].max_length == 10
+
+
+@pytest.mark.parametrize("max_length", [0, MAX_LENGTH_LIMIT + 1])
+def test_max_length_outside_its_range_rejected(tmp_path, test_audio_file, max_length):
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {
+        "fields": [
+            {"key": "f", "label": "F", "type": "free_text", "max_length": max_length}
+        ]
+    }
+    with pytest.raises(ValidationError, match="max_length"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_select_with_max_length_rejected(tmp_path, test_audio_file):
+    # Its answers are its options, so a limit would mean nothing.
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {
+        "fields": [
+            {
+                "key": "f",
+                "label": "F",
+                "type": "select",
+                "options": ["a", "b"],
+                "max_length": 10,
+            }
+        ]
+    }
+    with pytest.raises(ValidationError, match="max_length"):
+        load_config(write_config(tmp_path, data))
+
+
+@pytest.mark.parametrize("field_type", ["text", "free_text"])
+def test_default_longer_than_max_length_rejected(tmp_path, test_audio_file, field_type):
+    # The form would show it and the server refuse it on every submission.
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {
+        "fields": [
+            {
+                "key": "f",
+                "label": "F",
+                "type": field_type,
+                "max_length": 3,
+                "default": "abcd",
+            }
+        ]
+    }
+    with pytest.raises(ValidationError, match="'f'"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_text_default_outside_the_text_pattern_rejected(tmp_path, test_audio_file):
+    # The form would submit it and the server refuse it on every submission.
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {
+        "fields": [
+            {"key": "listener", "label": "Name", "type": "text", "default": "J Doe"}
+        ]
+    }
+    with pytest.raises(ValidationError, match="listener"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_text_default_empty_accepted(tmp_path, test_audio_file):
+    # An empty value is an unanswered one, which `required` decides on.
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {
+        "fields": [{"key": "listener", "label": "Name", "type": "text", "default": ""}]
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.fields[0].default == ""
+
+
+def test_text_default_starting_with_a_hyphen_rejected(tmp_path, test_audio_file):
+    # A spreadsheet would read "-A1" as a formula.
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {
+        "fields": [
+            {"key": "listener", "label": "Name", "type": "text", "default": "-A1"}
+        ]
+    }
+    with pytest.raises(ValidationError, match="listener"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_free_text_default_longer_than_the_limit_rejected(tmp_path, test_audio_file):
+    # The form would show it and the server refuse it on every submission.
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {
+        "fields": [
+            {
+                "key": "comment",
+                "label": "Additional comments",
+                "type": "free_text",
+                "default": "x" * (FREE_TEXT_DEFAULT_MAX_LENGTH + 1),
+            }
+        ]
+    }
+    with pytest.raises(ValidationError, match="comment"):
+        load_config(write_config(tmp_path, data))
+
+
+def test_free_text_default_normalized_as_stored(tmp_path, test_audio_file):
+    # The form shows what the server would store, so the limit applies to it.
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {
+        "fields": [
+            {
+                "key": "comment",
+                "label": "Additional comments",
+                "type": "free_text",
+                "default": " " + "x" * FREE_TEXT_DEFAULT_MAX_LENGTH + "\r\n",
+            }
+        ]
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.survey.fields[0].default == "x" * FREE_TEXT_DEFAULT_MAX_LENGTH
+
+
+def test_free_text_default_of_only_spaces_is_empty(tmp_path, test_audio_file):
+    # The server would store it as unanswered, so the form starts unanswered.
+    data = minimal_config(str(test_audio_file))
+    data["survey"] = {
+        "fields": [
+            {
+                "key": "comment",
+                "label": "Additional comments",
+                "type": "free_text",
+                "default": " \n ",
+            }
+        ]
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.survey.fields[0].default == ""
 
 
 @pytest.mark.parametrize("form", ["metadata", "survey"])

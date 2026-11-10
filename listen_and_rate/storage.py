@@ -31,6 +31,18 @@ METRICS_COLUMN_PREFIX = "metrics_"
 # frontend/save.php.
 METRIC_DECIMALS = 2
 
+# First characters a spreadsheet reads as the start of a formula (OWASP's CSV
+# injection list, less the tab and carriage return that neither a User-Agent
+# nor a free_text form value can start with: the one is refused outside
+# printable ASCII, the other has its control characters removed and is
+# trimmed). The metadata text fields allow no such value. No browser's
+# User-Agent starts with one, so one that does is crafted and is not
+# recorded; a free_text value that does is a listener's comment such as
+# "- too quiet", so the CSV saver keeps it, prefixed with "'" to be read as
+# text. JSON is not opened as a spreadsheet and stores it as written.
+# Mirrored by frontend/save.php.
+FORMULA_PREFIXES = ("=", "+", "-", "@")
+
 # AB/XAB outcome tokens: the winner/closer column records which SIDE of the
 # stored pair was chosen (system_a / system_b), or a tie, as a fixed
 # positional token rather than a system name. The lowercase a/b mirror the
@@ -55,6 +67,32 @@ def _metric_cell(value: float | str | None) -> str:
     if isinstance(value, str):
         return value
     return f"{value:.{METRIC_DECIMALS}f}"
+
+
+def _formula_guarded_form(
+    free_text_keys: set[str], values: dict[str, str]
+) -> dict[str, str]:
+    """Prefix each free_text answer a spreadsheet would read as a formula with "'".
+
+    See FORMULA_PREFIXES. Answers of the other field types are returned as
+    they are. Mirrored by frontend/save.php's formula_guarded_form.
+    """
+    return {
+        k: "'" + v if k in free_text_keys and v.startswith(FORMULA_PREFIXES) else v
+        for k, v in values.items()
+    }
+
+
+def formula_unguarded(value: str) -> str:
+    """Take off the "'" _formula_guarded_form puts before a free_text answer.
+
+    For reading the answer back as the listener wrote it. One that the
+    listener began with "'" and a FORMULA_PREFIXES character loses its "'"
+    too, which the CSV cannot tell apart from a guarded one.
+    """
+    if value.startswith("'") and value[1:].startswith(FORMULA_PREFIXES):
+        return value[1:]
+    return value
 
 
 def _csv_cell(value: object) -> object:
@@ -128,6 +166,10 @@ class CSVResultSaver(ResultSaver):
     they describe how the answers were given, so they read after the outcome
     itself. The JSON saver keeps them nested instead, matching
     metadata/survey's own split between the two formats.
+
+    The metadata_free_text_keys/survey_free_text_keys name the free_text
+    answers, and a value of theirs a spreadsheet would read as a formula is
+    written with a "'" in front (see FORMULA_PREFIXES).
     """
 
     # tool_version comes first because it belongs to the software rather than
@@ -147,11 +189,15 @@ class CSVResultSaver(ResultSaver):
         metadata_keys: list[str] | None = None,
         survey_keys: list[str] | None = None,
         metrics_keys: list[str] | None = None,
+        metadata_free_text_keys: list[str] | None = None,
+        survey_free_text_keys: list[str] | None = None,
     ) -> None:
         self._dir = output_dir / experiment_id
         self._metadata_keys = list(metadata_keys or [])
         self._survey_keys = list(survey_keys or [])
         self._metrics_keys = list(metrics_keys or [])
+        self._metadata_free_text_keys = set(metadata_free_text_keys or [])
+        self._survey_free_text_keys = set(survey_free_text_keys or [])
 
     def save(
         self,
@@ -165,8 +211,8 @@ class CSVResultSaver(ResultSaver):
         """Write one row per record to {experiment_id}/{session_id}.csv."""
         path = self._dir / f"{session_id}.csv"
         ts = datetime.now().astimezone().isoformat(timespec="seconds")
-        meta = metadata or {}
-        answers = survey or {}
+        meta = _formula_guarded_form(self._metadata_free_text_keys, metadata or {})
+        answers = _formula_guarded_form(self._survey_free_text_keys, survey or {})
         session_metrics = metrics or {}
         meta_fields = [METADATA_COLUMN_PREFIX + k for k in self._metadata_keys]
         survey_fields = [SURVEY_COLUMN_PREFIX + k for k in self._survey_keys]
@@ -257,12 +303,20 @@ def make_result_saver(
     metadata_keys: list[str] | None = None,
     survey_keys: list[str] | None = None,
     metrics_keys: list[str] | None = None,
+    metadata_free_text_keys: list[str] | None = None,
+    survey_free_text_keys: list[str] | None = None,
 ) -> ResultSaver:
     """Instantiate the appropriate ResultSaver for the given format string."""
     p = Path(output_dir)
     if fmt == "csv":
         return CSVResultSaver(
-            p, experiment_id, metadata_keys, survey_keys, metrics_keys
+            p,
+            experiment_id,
+            metadata_keys,
+            survey_keys,
+            metrics_keys,
+            metadata_free_text_keys,
+            survey_free_text_keys,
         )
     if fmt == "json":
         return JSONResultSaver(p, experiment_id)

@@ -17,6 +17,7 @@ from ..storage import (
     METADATA_COLUMN_PREFIX,
     METRICS_COLUMN_PREFIX,
     SURVEY_COLUMN_PREFIX,
+    formula_unguarded,
 )
 from ._render import (
     _TEXT_SIZE,
@@ -90,6 +91,7 @@ def _participants_section_html(
     df,
     form_labels: dict[str, str] | None = None,
     page_columns: list[str] | None = None,
+    free_text_columns: list[str] | None = None,
 ) -> str:
     """Build the trailing "Participants" section: what the listeners gave.
 
@@ -106,16 +108,23 @@ def _participants_section_html(
     no config was given) fall back to the key, so config-less reports are
     unchanged.
 
+    The free_text_columns (prefixed, from the config) hold free-form answers,
+    which a count would only give one each. They are left out of those
+    tables and listed instead, one row per answer, in a Comments table after
+    them; see _comments_subsection_html. Without a config they are not known
+    and are counted like the rest.
+
     page_columns is passed through to _metrics_subsection_html.
     """
     labels = form_labels or {}
+    free_text = set(free_text_columns or [])
     per_session = df.drop_duplicates("session_id") if "session_id" in df.columns else df
     subsections = []
     for form_label, prefix in (
         ("Metadata", METADATA_COLUMN_PREFIX),
         ("Survey", SURVEY_COLUMN_PREFIX),
     ):
-        columns = [c for c in df.columns if c.startswith(prefix)]
+        columns = [c for c in df.columns if c.startswith(prefix) and c not in free_text]
         if not columns:
             continue
         rows = []
@@ -128,11 +137,42 @@ def _participants_section_html(
             _table_heading_html(form_label)
             + _render_table_html(["Field", "Response", "Sessions"], rows)
         )
+    subsections.append(_comments_subsection_html(per_session, labels, free_text))
     subsections.append(_metrics_subsection_html(df, page_columns))
     body = "".join(subsections)
     if not body:
         return ""
     return _section_heading_html("Participants") + body
+
+
+def _comments_subsection_html(
+    per_session, labels: dict[str, str], free_text: set[str]
+) -> str:
+    """Build the "Comments" table: each session's free-form answers, as given.
+
+    Listed in the results' column order, then session order, without the
+    "'" the CSV saver puts before one a spreadsheet would read as a formula
+    (see storage.formula_unguarded), so a CSV and a JSON result read the
+    same. A blank answer is left out. Returns '' when there is none.
+    """
+    rows = []
+    for column in per_session.columns:
+        if column not in free_text:
+            continue
+        prefix = (
+            METADATA_COLUMN_PREFIX
+            if column.startswith(METADATA_COLUMN_PREFIX)
+            else SURVEY_COLUMN_PREFIX
+        )
+        field = labels.get(column, column[len(prefix) :])
+        for response in per_session[column].dropna().astype(str):
+            if response:
+                rows.append([field, formula_unguarded(response)])
+    if not rows:
+        return ""
+    return _table_heading_html("Comments") + _render_table_html(
+        ["Field", "Response"], rows, wrap=True
+    )
 
 
 def _metrics_subsection_html(df, page_columns: list[str] | None = None) -> str:
@@ -332,6 +372,7 @@ def generate_report_html(
     require_full_order: bool = False,
     groups: list[dict] | None = None,
     form_labels: dict[str, str] | None = None,
+    free_text_columns: list[str] | None = None,
     tie_label: str = "No preference",
     mean_bar_color: str = "#72b7b2",
     count_bar_color: str = "#cd5c5c",
@@ -378,6 +419,9 @@ def generate_report_html(
         form_labels: Maps a prefixed form column (e.g. 'survey_trial_count')
             to that field's human label from the config, shown in the
             Participants section's Field column in place of the bare key.
+        free_text_columns: The prefixed form columns of free_text fields
+            (from the config), listed in the Participants section's Comments
+            table rather than counted.
         tie_label: Name of the AB count chart's centered tie bar (its
             position is always centered). Ignored by the other test types.
         mean_bar_color: Fill color of the mean/rate bars.
@@ -525,6 +569,8 @@ def generate_report_html(
     # Trailing form-answer distributions and metric totals, always computed on
     # the FULL data (never per group) and rendered at most once; '' without
     # form or metrics columns.
-    body += _participants_section_html(typed_df, form_labels, page_columns)
+    body += _participants_section_html(
+        typed_df, form_labels, page_columns, free_text_columns
+    )
     html = _wrap_report_html(title, body, width)
     return _set_html_title(html, title)

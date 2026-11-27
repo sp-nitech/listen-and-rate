@@ -498,6 +498,50 @@ def test_text_default_starting_with_a_hyphen_rejected(tmp_path, test_audio_file)
         load_config(write_config(tmp_path, data))
 
 
+def test_default_from_defaults_to_none(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {
+        "fields": [{"key": "listener", "label": "Name", "type": "text"}]
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.fields[0].default_from == "none"
+
+
+def test_default_from_remote_user_accepted_on_text(tmp_path, test_audio_file):
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {
+        "fields": [
+            {
+                "key": "listener",
+                "label": "Name",
+                "type": "text",
+                "default_from": "remote_user",
+            }
+        ]
+    }
+    result = load_config(write_config(tmp_path, data))
+    assert result.metadata.fields[0].default_from == "remote_user"
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        {"type": "free_text"},
+        {"type": "select", "options": ["a", "b"]},
+    ],
+)
+def test_default_from_remote_user_on_other_types_rejected(
+    tmp_path, test_audio_file, field
+):
+    # A login name is a single token: only a text field takes it as is.
+    data = minimal_config(str(test_audio_file))
+    data["metadata"] = {
+        "fields": [{"key": "f", "label": "F", "default_from": "remote_user", **field}]
+    }
+    with pytest.raises(ValidationError, match="default_from"):
+        load_config(write_config(tmp_path, data))
+
+
 def test_free_text_default_longer_than_the_limit_rejected(tmp_path, test_audio_file):
     # The form would show it and the server refuse it on every submission.
     data = minimal_config(str(test_audio_file))

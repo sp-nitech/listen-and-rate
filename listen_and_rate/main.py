@@ -6,6 +6,7 @@ import os
 import secrets
 import shutil
 import tempfile
+import warnings
 from contextlib import ExitStack, asynccontextmanager
 from pathlib import Path
 
@@ -27,6 +28,30 @@ from .storage import make_result_saver
 # frontend/ files that only the PHP export runs: included by the PHP entry
 # points, never requested by the browser.
 _PHP_ONLY_HELPERS = ("x_token.php", "stage.php")
+
+
+def _warn_remote_user_defaults(configs: list[Config]) -> None:
+    """Warn about each form field that takes default_from: remote_user.
+
+    Only the PHP deployment sees the web server's REMOTE_USER, so this server
+    starts such a field from its `default` like any other. It is a warning,
+    not an error, so a config written for the PHP deployment can be tried
+    here as is. A sequence asks only the first config's metadata form (the
+    others carry a copy of it), so that form is checked once.
+    """
+    first = configs[0]
+    forms = [(first, "metadata", first.metadata)]
+    forms += [(config, "survey", config.survey) for config in configs]
+    for config, name, form in forms:
+        for field in form.fields:
+            if field.default_from == "remote_user":
+                warnings.warn(
+                    f"Config {config.experiment_id!r}: default_from "
+                    f"'remote_user' of {name} field {field.key!r} has no effect "
+                    "on this server. Only the PHP deployment fills it in.",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
 
 def _build_stage(config: Config, cleanup: ExitStack) -> Stage:
@@ -76,6 +101,7 @@ async def lifespan(app: FastAPI):
     config_paths = os.environ.get("LISTEN_AND_RATE_CONFIG", "./config.yaml")
     with exit_on_user_error():
         configs = load_sequence(config_paths.split(os.pathsep))
+    _warn_remote_user_defaults(configs)
     with ExitStack() as cleanup:
         app.state.stages = {c.experiment_id: _build_stage(c, cleanup) for c in configs}
         # Used to blind ABX's hidden "X" reference (see x_token.py). Set

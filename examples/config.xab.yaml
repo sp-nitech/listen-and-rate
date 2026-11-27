@@ -149,6 +149,7 @@ stimuli_dirs:
 #       label: "User name"
 #       type: text
 #       required: true
+#       default_from: none # or "remote_user" (web login name, PHP only)
 #     - key: device
 #       label: "Playback device"
 #       type: select

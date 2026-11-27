@@ -226,6 +226,118 @@ final class ConfigTest extends TestCase
         $this->assertSame(1.5, $response['durations']['A__u1']);
     }
 
+    // -- REMOTE_USER as a form's starting value -----------------------------
+
+    /** A {title, fields} block of one text field, as config_data.php carries it. */
+    private function formWithTextField(string $defaultFrom, ?string $default = null): array
+    {
+        return [
+            'title' => 'Listener Information',
+            'description' => null,
+            'fields' => [[
+                'key' => 'listener',
+                'label' => 'User name',
+                'type' => 'text',
+                'options' => null,
+                'required' => true,
+                'default' => $default,
+                'default_from' => $defaultFrom,
+                'max_length' => 64,
+            ]],
+        ];
+    }
+
+    private function fakeConfigDataWithForms(array $metadata, ?array $survey = null): array
+    {
+        return $this->baseFakeConfigData('mos', [
+            'shortcuts' => ['play' => 'Space'],
+            'rating_labels' => null,
+            'metadata' => $metadata,
+            'survey' => $survey ?? ['title' => 'Questionnaire', 'fields' => []],
+        ]);
+    }
+
+    public function testRemoteUserStartsTheFieldThatTakesIt(): void
+    {
+        $data = $this->fakeConfigDataWithForms($this->formWithTextField('remote_user'));
+        $response = build_config_response($data, 'alice.b-1');
+        $this->assertSame('alice.b-1', $response['metadata']['fields'][0]['default']);
+    }
+
+    public function testRemoteUserStartsSurveyFieldsToo(): void
+    {
+        // Both forms share one field schema, so both honor default_from.
+        $data = $this->fakeConfigDataWithForms(
+            $this->formWithTextField('none'),
+            $this->formWithTextField('remote_user')
+        );
+        $response = build_config_response($data, 'alice');
+        $this->assertSame('alice', $response['survey']['fields'][0]['default']);
+    }
+
+    public function testRemoteUserLeavesFieldsThatDoNotTakeItAlone(): void
+    {
+        $data = $this->fakeConfigDataWithForms($this->formWithTextField('none', 'bob'));
+        $response = build_config_response($data, 'alice');
+        $this->assertSame('bob', $response['metadata']['fields'][0]['default']);
+    }
+
+    public function testRemoteUserTheFieldWouldRefuseIsNotUsed(): void
+    {
+        // The form would start with a value save.php refuses on every
+        // submission, so the configured default stays instead.
+        $data = $this->fakeConfigDataWithForms($this->formWithTextField('remote_user', 'guest'));
+        foreach (['alice@example.ac.jp', 'alice_b', '-alice', str_repeat('a', 65)] as $name) {
+            $response = build_config_response($data, $name);
+            $this->assertSame('guest', $response['metadata']['fields'][0]['default'], $name);
+        }
+    }
+
+    public function testFieldWithoutDefaultFromIsLeftAlone(): void
+    {
+        // A bundle exported before default_from existed carries no such key.
+        $metadata = $this->formWithTextField('none', 'bob');
+        unset($metadata['fields'][0]['default_from']);
+        $data = $this->fakeConfigDataWithForms($metadata);
+        $this->assertSame($metadata, build_config_response($data, 'alice')['metadata']);
+    }
+
+    public function testRequestRemoteUserPrefersRemoteUser(): void
+    {
+        $server = ['REMOTE_USER' => 'a', 'REDIRECT_REMOTE_USER' => 'b', 'PHP_AUTH_USER' => 'c'];
+        $this->assertSame('a', request_remote_user($server));
+    }
+
+    public function testRequestRemoteUserFallsBackInOrder(): void
+    {
+        // Apache after an internal redirect, then nginx's stock fastcgi_params.
+        $this->assertSame('b', request_remote_user(['REDIRECT_REMOTE_USER' => 'b', 'PHP_AUTH_USER' => 'c']));
+        $this->assertSame('c', request_remote_user(['PHP_AUTH_USER' => 'c']));
+        $this->assertSame('c', request_remote_user(['REMOTE_USER' => '', 'PHP_AUTH_USER' => 'c']));
+    }
+
+    public function testRequestRemoteUserKeepsAFalsyLookingName(): void
+    {
+        // '0' is falsy in PHP, but it is still a name.
+        $this->assertSame('0', request_remote_user(['REMOTE_USER' => '0']));
+    }
+
+    public function testRequestRemoteUserIsNullWithoutALogin(): void
+    {
+        $this->assertNull(request_remote_user([]));
+        $this->assertNull(request_remote_user(['REMOTE_USER' => '', 'PHP_AUTH_USER' => '']));
+    }
+
+    public function testNoRemoteUserLeavesTheFormsUnchanged(): void
+    {
+        // Not behind an authenticating web server: nothing to start with.
+        $metadata = $this->formWithTextField('remote_user');
+        $data = $this->fakeConfigDataWithForms($metadata);
+        foreach ([null, ''] as $name) {
+            $this->assertSame($metadata, build_config_response($data, $name)['metadata']);
+        }
+    }
+
     // -- config_version (resume fingerprint) -------------------------------
 
     public function testBuildConfigResponseIncludesConfigVersion(): void
@@ -250,6 +362,15 @@ final class ConfigTest extends TestCase
         $data['instructions'] = 'DIFFERENT';
         $v2 = build_config_response($data)['config_version'];
         $this->assertNotSame($v1, $v2);
+    }
+
+    public function testConfigVersionSameForEveryRemoteUser(): void
+    {
+        // Each listener's starting value differs, the deployment does not.
+        $data = $this->fakeConfigDataWithForms($this->formWithTextField('remote_user'));
+        $v1 = build_config_response($data, 'alice')['config_version'];
+        $v2 = build_config_response($data, 'bob')['config_version'];
+        $this->assertSame($v1, $v2);
     }
 
     // -- practice stage ---------------------------------------------------

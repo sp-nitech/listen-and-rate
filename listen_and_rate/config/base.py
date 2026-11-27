@@ -107,6 +107,14 @@ class MetadataFieldConfig(_StrictModel):
     options: list[str] | None = None
     required: bool = False
     default: str | None = None
+    # Where the form's starting value comes from besides `default`.
+    # "remote_user" is the name the web server authenticated the listener as
+    # (Basic or Digest auth, say). Only the PHP deployment can see it -
+    # frontend/config.php fills it in when save.php would accept it for the
+    # field, and keeps `default` otherwise, as for an SSO login like
+    # 'taro@example.ac.jp'. The listener can still edit it.
+    # The FastAPI server keeps `default` and warns at startup (see main.py).
+    default_from: Literal["none", "remote_user"] = "none"
     max_length: int | None = Field(default=None, ge=1, le=MAX_LENGTH_LIMIT)
 
     @model_validator(mode="after")
@@ -174,6 +182,13 @@ class MetadataFieldConfig(_StrictModel):
                 "metadata_default_too_long",
                 "metadata field {key}: default is longer than {limit} characters",
                 {"key": repr(self.key), "limit": self.max_length},
+            )
+        # A login name is a single token, which only a text field takes as is.
+        if self.default_from == "remote_user" and self.type != "text":
+            raise PydanticCustomError(
+                "metadata_default_from_not_text",
+                "metadata field {key}: default_from 'remote_user' needs type text",
+                {"key": repr(self.key)},
             )
         return self
 

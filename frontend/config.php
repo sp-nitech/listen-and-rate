@@ -22,6 +22,9 @@
 
 require_once __DIR__ . '/stage.php';
 require_once __DIR__ . '/x_token.php';
+// For validate_metadata(): a login name becomes a form's starting value only
+// if submitting it would pass.
+require_once __DIR__ . '/save.php';
 
 // -- Shared helpers ------------------------------------------------------
 
@@ -169,12 +172,65 @@ function base_config_response(array $data, array $extras): array
         // {stimulus_id: seconds}, baked in at export time so the time bar can
         // show clip length immediately (see _shared.py's _test_config_response).
         'durations' => $data['durations'],
-        // Each form is one {title, fields} block, passed through unchanged -
-        // the export tool always writes both, so no fallback is needed.
+        // Each form is one {title, fields} block as exported - the export
+        // tool always writes both, so no fallback is needed.
+        // build_config_response() may then start fields with REMOTE_USER.
         'metadata' => $data['metadata'],
         'survey' => $data['survey'],
         'shortcuts' => $data['shortcuts'],
     ], $extras);
+}
+
+/**
+ * The name the web server authenticated the request as, from $_SERVER, or
+ * null when there is none. Web servers hand it to PHP under different names:
+ *   REMOTE_USER          - set by Apache (mod_php or FastCGI) after it
+ *                          checks Basic/Digest auth
+ *   REDIRECT_REMOTE_USER - Apache's name for it after an internal redirect
+ *                          (mod_rewrite, ErrorDocument)
+ *   PHP_AUTH_USER        - read by PHP from a Basic Authorization header,
+ *                          the only one under nginx's stock fastcgi_params
+ * PHP fills in the last even where no server checks it, which costs nothing
+ * here: the name is only a starting value the listener can edit anyway.
+ */
+function request_remote_user(array $server): ?string
+{
+    foreach (['REMOTE_USER', 'REDIRECT_REMOTE_USER', 'PHP_AUTH_USER'] as $key) {
+        $name = $server[$key] ?? null;
+        if (is_string($name) && $name !== '') {
+            return $name;
+        }
+    }
+    return null;
+}
+
+/**
+ * Start each field of a {title, fields} form block that says
+ * default_from: remote_user with $remoteUser (see request_remote_user). A
+ * name validate_metadata() would refuse for the field - outside the text
+ * pattern, as an SSO login like 'taro@example.ac.jp' is, or longer than its
+ * max_length - is not used, and the field keeps its configured default.
+ * With no name (null or ''), the block is returned as
+ * is. Only this backend sees REMOTE_USER, so the FastAPI one has no mirror
+ * and warns at startup instead (see listen_and_rate/main.py).
+ */
+function with_remote_user_defaults(array $form, ?string $remoteUser): array
+{
+    if ($remoteUser === null || $remoteUser === '') {
+        return $form;
+    }
+    foreach ($form['fields'] as $i => $field) {
+        if (($field['default_from'] ?? 'none') !== 'remote_user') {
+            continue;
+        }
+        try {
+            validate_metadata([$field], [$field['key'] => $remoteUser]);
+        } catch (SaveRequestError) {
+            continue;
+        }
+        $form['fields'][$i]['default'] = $remoteUser;
+    }
+    return $form;
 }
 
 /**
@@ -637,11 +693,14 @@ function build_mushra_config_response(array $data): array
 /**
  * Build the /config.php response array from the static config_data.php data,
  * dispatching to the test type's builder ('mos' is also the fallback for an
- * unrecognized test_type, matching save.php's normalization).
+ * unrecognized test_type, matching save.php's normalization). $remoteUser,
+ * the request's login name (see request_remote_user), starts the form fields
+ * that ask for it (see with_remote_user_defaults). It is applied after config_version is taken
+ * from $data, so the fingerprint stays the same for every listener.
  */
-function build_config_response(array $data): array
+function build_config_response(array $data, ?string $remoteUser = null): array
 {
-    return match ($data['test_type'] ?? 'mos') {
+    $response = match ($data['test_type'] ?? 'mos') {
         'mos' => build_mos_config_response($data),
         'dmos' => build_dmos_config_response($data),
         'cmos' => build_cmos_config_response($data),
@@ -651,12 +710,18 @@ function build_config_response(array $data): array
         'mushra' => build_mushra_config_response($data),
         default => build_mos_config_response($data),
     };
+    $response['metadata'] = with_remote_user_defaults($response['metadata'], $remoteUser);
+    $response['survey'] = with_remote_user_defaults($response['survey'], $remoteUser);
+    return $response;
 }
 
 // Only run when this file is executed directly as an HTTP entry point (see
 // save.php for the same guard and rationale).
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     header('Content-Type: application/json; charset=utf-8');
+    // Each response is this listener's own: a fresh sample of the stimuli,
+    // and maybe their login name. No cache may hand it to anyone else.
+    header('Cache-Control: private, no-store');
     // A sequence asked for no stage: answer with its manifest, the stage ids
     // in the order the browser runs them (see stage.php).
     $stages = sequence_stages(__DIR__);
@@ -671,5 +736,5 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
         exit;
     }
     $data = include $stageDir . '/config_data.php';
-    echo json_encode(build_config_response($data));
+    echo json_encode(build_config_response($data, request_remote_user($_SERVER)));
 }

@@ -259,6 +259,33 @@ def test_export_php_deploy_config_data_includes_survey_fields(
     assert "_title'" not in text
 
 
+def test_export_php_deploy_config_data_carries_default_from(
+    tmp_path, test_audio_file, monkeypatch
+):
+    # config.php reads it to start the field with the request's REMOTE_USER.
+    config = {
+        "test_type": "mos",
+        "title": "T",
+        "instructions": "I",
+        "metadata": {
+            "fields": [
+                {
+                    "key": "listener",
+                    "label": "User name",
+                    "type": "text",
+                    "default_from": "remote_user",
+                }
+            ]
+        },
+        "stimuli_list": {"entries": [{"id": "s001", "path": str(test_audio_file)}]},
+    }
+    config_yaml = write_config(tmp_path, config)
+    outdir = tmp_path / "deploy"
+    _run_export(config_yaml, outdir, monkeypatch)
+    text = (_stage_dir(outdir) / "config_data.php").read_text(encoding="utf-8")
+    assert "'default_from' => 'remote_user'" in text
+
+
 def test_export_php_deploy_config_data_includes_practice_params(
     tmp_path, test_audio_file, monkeypatch
 ):
